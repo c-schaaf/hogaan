@@ -37,6 +37,31 @@ function redactPhones(s: string): string {
   return s.replace(PHONE_RE, '<phone-redacted>');
 }
 
+function formatErrForDev(
+  err: unknown,
+): { name?: string; message?: string; value?: string } | undefined {
+  if (err === undefined) {
+    return undefined;
+  }
+  if (err instanceof Error) {
+    return { name: err.name, message: redactPhones(err.message) };
+  }
+  if (typeof err === 'string') {
+    return { value: redactPhones(err) };
+  }
+  if (typeof err === 'number' || typeof err === 'boolean') {
+    return { value: String(err) };
+  }
+  if (err === null) {
+    return { value: 'null' };
+  }
+  try {
+    return { value: redactPhones(JSON.stringify(err)) };
+  } catch {
+    return { value: '<unserializable>' };
+  }
+}
+
 const SENTRY_LEVELS: Record<IncidentSeverity, Sentry.SeverityLevel> = {
   P0: 'fatal',
   P1: 'error',
@@ -72,8 +97,15 @@ export function reportIncident(
   err?: unknown,
 ): void {
   if (!initialized) {
+    const errInfo = formatErrForDev(err);
     console.warn(
-      JSON.stringify({ kind: 'incident', severity, message: redactPhones(message), ctx }),
+      JSON.stringify({
+        kind: 'incident',
+        severity,
+        message: redactPhones(message),
+        ctx,
+        ...(errInfo !== undefined ? { err: errInfo } : {}),
+      }),
     );
     return;
   }

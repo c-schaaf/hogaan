@@ -10,3 +10,4 @@ export * from './audit-log.js';
 export * from './whatsapp-messages.js';
 export * from './suppression-list.js';
 export * from './library-versions.js';
+export * from './prompt-logs.js';
