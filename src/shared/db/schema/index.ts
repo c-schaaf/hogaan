@@ -1,5 +1,12 @@
-// Schema lands in Phase 1.10 — users, sessions, turns, memories (vector(1024)),
-// sponsors, cohorts, access_codes, audit_log (append-only),
-// whatsapp_messages, suppression_list, library_versions.
-// Empty barrel for now so drizzle-kit has a target to scan.
-export {};
+export * from './enums.js';
+export * from './sponsors.js';
+export * from './cohorts.js';
+export * from './users.js';
+export * from './access-codes.js';
+export * from './sessions.js';
+export * from './turns.js';
+export * from './memories.js';
+export * from './audit-log.js';
+export * from './whatsapp-messages.js';
+export * from './suppression-list.js';
+export * from './library-versions.js';

@@ -1,14 +1,20 @@
 import { buildApp } from './app.js';
 import { loadConfig } from './shared/secrets/config.js';
+import { initSentry, shutdownSentry, startHeartbeat } from './shared/observability/index.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
+  initSentry(config);
+
   const app = await buildApp(config);
+  const heartbeat = startHeartbeat(config);
 
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info({ signal }, 'shutdown signal received');
+    heartbeat.stop();
     try {
       await app.close();
+      await shutdownSentry();
       process.exit(0);
     } catch (err) {
       app.log.error({ err }, 'error during shutdown');
