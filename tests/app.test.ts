@@ -6,6 +6,7 @@ const testConfig: AppConfig = {
   nodeEnv: 'test',
   port: 0,
   logLevel: 'error',
+  publicBaseUrl: undefined,
   databaseUrl: undefined,
   redisUrl: undefined,
   upstashRedisRestUrl: undefined,

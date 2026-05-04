@@ -1,12 +1,18 @@
 import { buildApp } from './app.js';
 import { loadConfig } from './shared/secrets/config.js';
 import { initSentry, shutdownSentry, startHeartbeat } from './shared/observability/index.js';
+import { wireWhatsAppDeliveryRoutes } from './whatsapp-delivery/setup.js';
 
 async function main(): Promise<void> {
   const config = loadConfig();
   initSentry(config);
 
   const app = await buildApp(config);
+  const wired = await wireWhatsAppDeliveryRoutes(app, config);
+  app.log.info(
+    { whatsappRoutes: wired.registered, reason: wired.reason ?? 'ok' },
+    'whatsapp delivery routes',
+  );
   const heartbeat = startHeartbeat(config);
 
   const shutdown = async (signal: string): Promise<void> => {

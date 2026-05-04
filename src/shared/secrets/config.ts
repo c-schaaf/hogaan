@@ -1,6 +1,7 @@
 type RequiredKey = 'NODE_ENV' | 'PORT' | 'LOG_LEVEL';
 
 type OptionalKey =
+  | 'PUBLIC_BASE_URL'
   | 'DATABASE_URL'
   | 'REDIS_URL'
   | 'UPSTASH_REDIS_REST_URL'
@@ -25,6 +26,7 @@ export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'staging' | 'production';
   port: number;
   logLevel: 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
+  publicBaseUrl: string | undefined;
   databaseUrl: string | undefined;
   redisUrl: string | undefined;
   upstashRedisRestUrl: string | undefined;
@@ -95,6 +97,7 @@ export function loadConfig(): AppConfig {
     nodeEnv: nodeEnvRaw,
     port,
     logLevel: logLevelRaw as AppConfig['logLevel'],
+    publicBaseUrl: readOptional('PUBLIC_BASE_URL'),
     databaseUrl: readOptional('DATABASE_URL'),
     redisUrl: readOptional('REDIS_URL'),
     upstashRedisRestUrl: readOptional('UPSTASH_REDIS_REST_URL'),

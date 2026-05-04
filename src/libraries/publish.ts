@@ -126,3 +126,54 @@ async function activateExisting(db: Database, id: string, libraryName: LibraryNa
     await tx.update(libraryVersions).set({ active: true }).where(eq(libraryVersions.id, id));
   });
 }
+
+export interface SignoffOptions {
+  libraryName: LibraryName;
+  version: string;
+  /** Sign-off attribution. Format: "<name>:signed-off-<YYYY-MM-DD>". */
+  signedBy: string;
+  /** Free-form attestation note appended to the existing notes. */
+  attestation: string;
+}
+
+/**
+ * Record a sign-off on an EXISTING (libraryName, version) row by updating
+ * `published_by` and appending to `notes`. Does NOT touch `payload` or `hash`
+ * — content immutability is preserved. Idempotent: re-running with the same
+ * signedBy is a no-op.
+ *
+ * Use this when content was published earlier with a placeholder author
+ * (e.g. `system:seed-script`) and an authority later attests to it.
+ */
+export async function recordSignoff(
+  db: Database,
+  opts: SignoffOptions,
+): Promise<{ libraryName: LibraryName; version: string; alreadySignedOff: boolean }> {
+  const rows = await db
+    .select()
+    .from(libraryVersions)
+    .where(eq(libraryVersions.libraryName, opts.libraryName))
+    .then((all) => all.filter((r) => r.version === opts.version));
+
+  if (rows.length === 0) {
+    throw new Error(`cannot record sign-off: ${opts.libraryName}@${opts.version} does not exist`);
+  }
+  const row = rows[0]!;
+
+  if (row.publishedBy === opts.signedBy) {
+    return { libraryName: opts.libraryName, version: opts.version, alreadySignedOff: true };
+  }
+
+  const existingNotes = row.notes ?? '';
+  const newNotes =
+    existingNotes.length === 0
+      ? opts.attestation
+      : `${existingNotes}\n--- ${opts.signedBy} ---\n${opts.attestation}`;
+
+  await db
+    .update(libraryVersions)
+    .set({ publishedBy: opts.signedBy, notes: newNotes })
+    .where(eq(libraryVersions.id, row.id));
+
+  return { libraryName: opts.libraryName, version: opts.version, alreadySignedOff: false };
+}

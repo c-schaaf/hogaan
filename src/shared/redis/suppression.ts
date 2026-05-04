@@ -3,7 +3,8 @@ import type { RedisBundle } from './client.js';
 const SUPPRESSION_KEY = 'suppression:set';
 const BLOCK_KEY = 'block:set';
 
-const DEFAULT_TIMEOUT_MS = 250;
+/** See idempotency/index.ts for the rationale on the 1500ms hot-path budget. */
+const DEFAULT_TIMEOUT_MS = 1500;
 
 export type SuppressionStatus = 'clean' | 'suppressed' | 'blocked';
 

@@ -10,6 +10,16 @@ import {
 } from '../src/libraries/index.js';
 import { loadConfig } from '../src/shared/secrets/config.js';
 
+// Sign-off record (2026-05-04):
+//   - voice_rules v1, cultural_framing v1, prompt_templates v1, scenarios v1:
+//     APPROVED by Hamse. See scripts/attest-library-signoffs.ts for the
+//     attestation that updates library_versions.published_by + notes.
+//   - crisis_resources v1 placeholder superseded by v2 — see
+//     scripts/publish-crisis-resources-v2.ts.
+//
+// This script is the v1 baseline seed. Re-running it is idempotent and will
+// NOT overwrite sign-off attestations recorded by the attestation script.
+
 async function main(): Promise<void> {
   const config = loadConfig();
   const { db, close } = getDb(config);

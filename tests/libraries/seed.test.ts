@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   crisisResourcesV1,
+  crisisResourcesV2,
   culturalFramingV1,
   promptTemplatesV1,
   scenariosV1,
@@ -57,14 +58,31 @@ describe('library seed content invariants', () => {
     }
   });
 
-  it('crisis_resources includes Tabaha + Befrienders Worldwide (per user decision)', () => {
+  it('crisis_resources v1 ships Tabaha + Befrienders Worldwide (historical baseline)', () => {
     const names = crisisResourcesV1.resources.map((r) => r.name);
     expect(names).toContain('Tabaha');
     expect(names).toContain('Befrienders Worldwide');
   });
 
-  it('crisis_resources holding message is present', () => {
-    expect(crisisResourcesV1.holdingMessage.length).toBeGreaterThan(50);
+  it('crisis_resources v1 has the placeholder phone the v2 publish replaces', () => {
+    const tabaha = crisisResourcesV1.resources.find((r) => r.name === 'Tabaha');
+    expect(tabaha?.channels[0]?.value).toBe('+252-tbd');
+  });
+
+  it('crisis_resources v2 carries the confirmed Tabaha phone number', () => {
+    const tabaha = crisisResourcesV2.resources.find((r) => r.name === 'Tabaha');
+    expect(tabaha).toBeDefined();
+    expect(tabaha?.channels[0]?.value).toBe('+254722178177');
+    expect(tabaha?.channels[0]?.note).toMatch(/Confirmed by ops 2026-05-04/);
+  });
+
+  it('crisis_resources v2 still ships Befrienders as global fallback', () => {
+    const names = crisisResourcesV2.resources.map((r) => r.name);
+    expect(names).toContain('Befrienders Worldwide');
+  });
+
+  it('crisis_resources v2 holding message is present', () => {
+    expect(crisisResourcesV2.holdingMessage.length).toBeGreaterThan(50);
   });
 
   it('scenarios has 12, one per practice, with multi-turn steps', () => {

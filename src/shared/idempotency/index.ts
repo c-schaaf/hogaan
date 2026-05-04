@@ -19,6 +19,13 @@ import type { RedisBundle } from '../redis/client.js';
 
 const TTL_SECONDS_DEFAULT = 24 * 60 * 60;
 const KEY_PREFIX = 'idem:';
+/**
+ * Per-op timeout. Bumped from 250–500ms after seeing 300–700ms steady-state
+ * latency from regions farther from the Upstash node. 1500ms still leaves
+ * ~3.5s of the 6s turn budget for the LLM + delivery, and the alternative
+ * (false-positive E15 incidents) is worse than slightly slower turns.
+ */
+const HOT_PATH_TIMEOUT_MS = 1500;
 
 export type IdempotencyState = 'absent' | 'dispatching' | 'sent' | 'failed';
 
@@ -65,7 +72,7 @@ export async function lookup(
   correlationId: string,
 ): Promise<{ state: IdempotencyState; record?: IdempotencyRecord }> {
   try {
-    const raw = await redis.withTimeout('idem:lookup', 250, () =>
+    const raw = await redis.withTimeout('idem:lookup', HOT_PATH_TIMEOUT_MS, () =>
       redis.client.get<string>(k(correlationId)),
     );
     if (raw === null || raw === undefined) {
@@ -99,7 +106,7 @@ export async function acquire(
 
   let setRes: string | null;
   try {
-    setRes = await redis.withTimeout('idem:acquire', 500, () =>
+    setRes = await redis.withTimeout('idem:acquire', HOT_PATH_TIMEOUT_MS, () =>
       redis.client.set(k(correlationId), serialize(record), { ex: ttlSeconds, nx: true }),
     );
   } catch (err) {
@@ -134,7 +141,7 @@ export async function markSent(
     finalizedAt: new Date().toISOString(),
   };
   try {
-    await redis.withTimeout('idem:mark-sent', 500, () =>
+    await redis.withTimeout('idem:mark-sent', HOT_PATH_TIMEOUT_MS, () =>
       redis.client.set(k(correlationId), serialize(updated), { ex: TTL_SECONDS_DEFAULT }),
     );
   } catch (err) {
@@ -156,7 +163,7 @@ export async function markFailed(
     finalizedAt: new Date().toISOString(),
   };
   try {
-    await redis.withTimeout('idem:mark-failed', 500, () =>
+    await redis.withTimeout('idem:mark-failed', HOT_PATH_TIMEOUT_MS, () =>
       redis.client.set(k(correlationId), serialize(updated), { ex: TTL_SECONDS_DEFAULT }),
     );
   } catch (err) {

@@ -27,6 +27,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.92.0",
     "@axiomhq/js": "^1.6.0",
+    "@fastify/formbody": "^8.0.2",
     "@fastify/sensible": "^6.0.1",
     "@sentry/node": "^10.51.0",
     "@upstash/ratelimit": "^2.0.8",
@@ -40,7 +41,8 @@
     "opossum": "^9.0.0",
     "p-retry": "^8.0.0",
     "pino": "^9.5.0",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "twilio": "^6.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
