@@ -1,0 +1,1247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_HogaanRQC" targetNamespace="http://hogaan.app/processes" exporter="Hogaan Process Specification" exporterVersion="1.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.9.0">
+  <bpmn:collaboration id="Collaboration_Hogaan_RQC">
+    <bpmn:documentation>Collaboration scope for the Response Quality Check process. Single pool ('Hogaan Coaching Platform') containing all four lanes that participate in this process: Orchestration Engine, LLM Service, Data Layer, External Services. The WhatsApp Gateway lane is not used in this process and is intentionally omitted.</bpmn:documentation>
+    <bpmn:participant id="Participant_Hogaan" name="Hogaan Coaching Platform" processRef="Process_ResponseQualityCheck" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_ResponseQualityCheck" name="Hogaan Response Quality Check Process" isExecutable="false">
+    <bpmn:documentation>Hogaan Response Quality Check Process. Validates every candidate LLM coaching response against 10 brand and safety checks before delivery to the user. Implements Hamse Warfa's leadership framework (12 Practices, 4 Levels) as a runtime quality gate. Triggered by the Coaching Conversation Process (#2) at its Step 10. Returns either an approved response or routes to a fallback path.
+
+OWNERSHIP: Orchestration Engine owns the process spine, gateways, and termination. LLM Service performs structure/asset/tone/safety classification and regeneration. Data Layer owns rule catalogs (practices, levels, voice rules, hero phrases). External Services handles crisis escalation and fallback subprocess invocation.
+
+ENGINE TARGET: This artifact is a SPECIFICATION not a deployment. isExecutable=false. Do not deploy directly to a BPMN engine; use this as the source-of-truth functional spec for service implementation.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_RQC">
+      <bpmn:lane id="Lane_OrchestrationEngine" name="Orchestration Engine">
+        <bpmn:documentation>Orchestration Engine. Hosts process control flow: gateways, retry counter logic, fail-merge points, end-event termination, and any pure script tasks (input validation, length count, state initialization). Implementation: state machine in the application backend (Node.js + workflow library, or equivalent). All decision logic lives here.</bpmn:documentation>
+        <bpmn:flowNodeRef>StartEvent_CandidateGenerated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ValidateInput</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_ValidInput</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_MalformedInput</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_InitVariables</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_LoopMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Check1_PracticePass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Check2_LevelPass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Check3_StructurePass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Check4_AssetPass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Check5_HeroPass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Check6_UsefulPass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Check7_TonePass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Check8_SafetyPass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Check9_Length</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_Check9_LengthPass</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_WasRegenerated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_ApprovedFirstAttempt</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_ApprovedRegenerated</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_FailMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ConstructCorrectivePrompt</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_IncrementRetry</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_RetryLimit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_MaxRetriesExceeded</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_ErrorMerge</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_SetDegradedFlag</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_LLMService" name="LLM Service">
+        <bpmn:documentation>LLM Service. Hosts every task that calls a large language model: classifiers (structure detection, asset framing, tone, safety) and the regeneration call. Implementation: Anthropic API client (or equivalent) with prompt templates and response parsing. All model latency lives here — budget tightly.</bpmn:documentation>
+        <bpmn:flowNodeRef>Task_Check3_SignatureStructure</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Check4_AssetBased</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Check7_Tone</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Check8_Safety</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_LLM_Regenerate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Error_C3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Error_C4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Error_C7</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Error_C8</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Error_Regen</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_DataLayer" name="Data Layer">
+        <bpmn:documentation>Data Layer. Hosts every task that reads from or writes to persistent storage: rule catalog lookups (practice catalog, level catalog, hero-phrase catalog, useful-to-society anchor rules). Implementation: Postgres or document store with versioned rule catalogs maintained by Process #17 (Prompt &amp; Content Management).</bpmn:documentation>
+        <bpmn:flowNodeRef>Task_Check1_PracticeTag</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Check2_LevelTag</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Check5_HeroToGuide</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Check6_UsefulSociety</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_ExternalServices" name="External Services">
+        <bpmn:documentation>External Services. Hosts call activities to subprocesses outside the main RQC orchestration: Crisis Handoff (routes to human resources for self-harm/abuse signals) and Fallback Response (delivers a brand-aligned safe holding message when regeneration loops fail or services error out). Implementation: each subprocess is invoked via call activity; failures escalate to Process #18 (Incident Handling).</bpmn:documentation>
+        <bpmn:flowNodeRef>SubProcess_CrisisHandoff</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_CrisisEscalation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_SafetyHardFailure</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>SubProcess_Fallback_MaxRetries</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>SubProcess_Fallback_Degraded</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_ServiceUnavailable</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="StartEvent_CandidateGenerated" name="Candidate Response Generated">
+      <bpmn:documentation>Process trigger. Fired by the Coaching Conversation Process when an LLM has produced a candidate response that needs validation.
+
+PAYLOAD:
+- candidateResponseText (string, required) — the LLM-generated response to validate
+- userMessage (string, required) — the user's original message that prompted this response
+- userId (string, required) — for context retrieval and logging
+- sessionId (string, required) — current coaching session identifier
+- predictedPracticeTag (string) — one of 12 Practices, set by Coaching Process Step 6
+- predictedLevelTag (string) — one of 4 Levels (Self/Team/Org/Community), set by Coaching Process Step 6
+- responseMode (string) — FullCoachingResponse | ClarifyingQuestion | ProfileUpdateAcknowledgment | MetaResponse
+- attemptNumber (int) — set to 0 on first invocation, incremented on regeneration
+
+EVENT TYPE: Message start event. Triggered programmatically by the orchestrating Coaching Process — this is not a direct user-facing event.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Start_To_Validate</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MsgDef_CandidateGenerated" />
+    </bpmn:startEvent>
+    <bpmn:scriptTask id="Task_ValidateInput" name="Validate Input Payload">
+      <bpmn:documentation>Validates the incoming payload schema before any quality check runs. Pure script logic — no external calls.
+
+CHECKS PERFORMED:
+- candidateResponseText is non-empty string
+- userMessage is non-empty string
+- userId and sessionId are valid format
+- predictedPracticeTag is one of 12 valid practice names (Integrity, Purpose, Accountability, Dignity, Empathy, Inclusion, Assets, Innovation, Prosperity, Humility, Democracy, Peace)
+- predictedLevelTag is one of 4 valid levels (Self, Team, Organization, Community)
+- responseMode is one of 4 valid modes
+- attemptNumber is non-negative integer
+
+OUTPUT VARIABLE: isValid (boolean)
+
+IMPLEMENTATION HINT: JSON schema validator (Ajv, Zod, etc.) with the schema versioned in source. Fail fast on first violation; do not attempt partial validation.</bpmn:documentation>
+      <bpmn:incoming>Flow_Start_To_Validate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Validate_To_GW_Valid</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:exclusiveGateway id="GW_ValidInput" name="Input Valid?">
+      <bpmn:documentation>Routes based on input validation result. If valid, proceed to checks. If invalid, terminate with MalformedInput end event — caller receives error and logs incident upstream.
+
+DECISION LOGIC (plain English):
+- TRUE branch (Valid): isValid == true → proceed to Task_InitVariables
+- FALSE branch (Invalid): isValid == false → terminate at EndEvent_MalformedInput
+
+NOTE: Malformed input here indicates an upstream bug in the Coaching Process. Always log to incident handling.</bpmn:documentation>
+      <bpmn:incoming>Flow_Validate_To_GW_Valid</bpmn:incoming>
+      <bpmn:outgoing>Flow_ValidInput_Pass</bpmn:outgoing>
+      <bpmn:outgoing>Flow_ValidInput_Fail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_MalformedInput" name="E7: Malformed Input">
+      <bpmn:documentation>E7: MalformedInput end event. Reached when input payload validation fails at GW_ValidInput. Indicates upstream bug in the Coaching Process. Caller receives an error response; incident logged via Process #18.</bpmn:documentation>
+      <bpmn:incoming>Flow_ValidInput_Fail</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:scriptTask id="Task_InitVariables" name="Initialize Loop Variables">
+      <bpmn:documentation>Initializes process-local state for the regeneration loop and check accumulator.
+
+VARIABLES INITIALIZED:
+- retryCount: int = 0 (incremented on each regeneration)
+- maxRetries: int = 3 (constant, used by GW_RetryLimit)
+- checkResults: object = {} (accumulates pass/fail/error state for each check, used by Response Quality Check audit log)
+- degradedFlag: boolean = false (set true if any check raises a service error)
+- correctivePromptHistory: array = [] (accumulates corrective prompts across retries for analytics)
+
+IMPLEMENTATION HINT: Pure script task. State is process-local; not persisted unless an end event triggers it.</bpmn:documentation>
+      <bpmn:incoming>Flow_ValidInput_Pass</bpmn:incoming>
+      <bpmn:outgoing>Flow_Init_To_LoopMerge</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:exclusiveGateway id="GW_LoopMerge" name="Loop Merge">
+      <bpmn:documentation>Convergence point for two flows: (a) initial entry from Task_InitVariables on the first attempt, (b) re-entry from Task_LLM_Regenerate on retry attempts. After this point, the 9 sequential checks begin.
+
+DECISION LOGIC: Pass-through merge — no branching. All incoming flows route to Task_Check1_PracticeTag.
+
+IMPLEMENTATION HINT: Standard exclusive gateway used as a merge node. Required to satisfy single-incoming-flow rule for downstream tasks in strict BPMN.</bpmn:documentation>
+      <bpmn:incoming>Flow_Init_To_LoopMerge</bpmn:incoming>
+      <bpmn:incoming>Flow_Regen_To_LoopMerge</bpmn:incoming>
+      <bpmn:outgoing>Flow_LoopMerge_To_C1</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:businessRuleTask id="Task_Check1_PracticeTag" name="Check 1: Practice Tag Validation">
+      <bpmn:documentation>CHECK 1 — Practice Tag Validation.
+
+VERIFIES: The candidate response has been internally tagged against one of Hamse's 12 Practices and the tag is valid.
+
+LOGIC: Look up predictedPracticeTag against the canonical practice catalog (12 entries). Reject if missing, misspelled, or null.
+
+IMPLEMENTATION HINT: Business rule task. The catalog is a static read from the Data Layer, cacheable in memory at service startup. Sub-100ms latency. The rule catalog is owned by Process #17 (Prompt &amp; Content Management) and versioned.
+
+OUTPUT VARIABLE: checkResults.check1 = { status: 'pass' | 'fail', reason: string }</bpmn:documentation>
+      <bpmn:incoming>Flow_LoopMerge_To_C1</bpmn:incoming>
+      <bpmn:outgoing>Flow_C1_To_GW</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="GW_Check1_PracticePass" name="Practice Tag Valid?">
+      <bpmn:documentation>Routes based on Check 1 result.
+
+DECISION LOGIC (plain English):
+- PASS branch: checkResults.check1.status == 'pass' → proceed to Task_Check2_LevelTag
+- FAIL branch: checkResults.check1.status == 'fail' → route to GW_FailMerge for regeneration</bpmn:documentation>
+      <bpmn:incoming>Flow_C1_To_GW</bpmn:incoming>
+      <bpmn:outgoing>Flow_C1_Pass</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C1_Fail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:businessRuleTask id="Task_Check2_LevelTag" name="Check 2: Level Tag and Congruence">
+      <bpmn:documentation>CHECK 2 — Level Tag Validation and Congruence.
+
+VERIFIES: (a) the level tag is one of the 4 valid Levels (Self/Team/Organization/Community), AND (b) the level is congruent with the user's situation as inferred from the user message and intent.
+
+CONGRUENCE EXAMPLES:
+- User asks about firing a team member → Team or Organization is congruent; Community is incongruent
+- User asks about personal motivation → Self is congruent; Organization is incongruent
+
+LOGIC: Validate against canonical level catalog AND apply a congruence rule using the user message intent classification (passed in from Coaching Process Step 3).
+
+IMPLEMENTATION HINT: Business rule task with two-part rule. The level catalog and congruence rules are both owned by Process #17. Congruence is rule-based, not LLM-based — keep it deterministic for caching and reproducibility.
+
+OUTPUT VARIABLE: checkResults.check2 = { status: 'pass' | 'fail', reason: string }</bpmn:documentation>
+      <bpmn:incoming>Flow_C1_Pass</bpmn:incoming>
+      <bpmn:outgoing>Flow_C2_To_GW</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="GW_Check2_LevelPass" name="Level Tag Valid?">
+      <bpmn:documentation>Routes based on Check 2 result. PASS proceeds to structure check; FAIL routes to fail merge.</bpmn:documentation>
+      <bpmn:incoming>Flow_C2_To_GW</bpmn:incoming>
+      <bpmn:outgoing>Flow_C2_Pass</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C2_Fail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Check3_SignatureStructure" name="Check 3: Signature Structure (LLM)">
+      <bpmn:documentation>CHECK 3 — Signature Structure Detection.
+
+VERIFIES: The response contains all four elements of Hamse's signature teaching arc:
+1. Story or example anchor (a brief story, illustration, or scenario — not pure abstract advice)
+2. Insight (the universal lesson, named clearly)
+3. Values/cultural framing (connection to one of the 12 Practices, with Somali grounding where natural)
+4. Action steps (concrete next moves with a 24–72 hour horizon)
+
+LOGIC: LLM-based classifier with a structured prompt that asks the model to return a JSON object with four boolean fields (storyPresent, insightPresent, framingPresent, actionsPresent) plus a confidence score.
+
+IMPLEMENTATION HINT: Service task calling Anthropic API (Claude Haiku for low-latency classification). Engineers should A/B test against a heuristic-based detector (regex + sentence boundary detection) — heuristic may be sufficient and is much faster.
+
+ERROR BOUNDARY: Service unavailability or timeout routes via Error_C3 to GW_ErrorMerge → Set Degraded → Fallback path.
+
+OUTPUT VARIABLE: checkResults.check3 = { status: 'pass' | 'fail' | 'error', reason: string, components: { story: bool, insight: bool, framing: bool, actions: bool } }</bpmn:documentation>
+      <bpmn:incoming>Flow_C2_Pass</bpmn:incoming>
+      <bpmn:outgoing>Flow_C3_To_GW</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GW_Check3_StructurePass" name="Structure Complete?">
+      <bpmn:documentation>Routes based on Check 3 result. PASS proceeds to asset-based check; FAIL routes to fail merge for regeneration.</bpmn:documentation>
+      <bpmn:incoming>Flow_C3_To_GW</bpmn:incoming>
+      <bpmn:outgoing>Flow_C3_Pass</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C3_Fail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Check4_AssetBased" name="Check 4: Asset-Based Framing (LLM)">
+      <bpmn:documentation>CHECK 4 — Asset-Based Framing Detection.
+
+VERIFIES: The response opens from strengths, capabilities, or resources the user has — not from deficits, problems, or what's missing. Hamse's brand is asset-based: every response should name a strength before naming a gap.
+
+PASS EXAMPLES:
+- "You've already built trust with your team — that's the foundation we'll use here."
+- "Your instinct to ask first instead of acting is exactly right."
+
+FAIL EXAMPLES:
+- "You're avoiding the hard conversation."  (deficit-first)
+- "The problem here is your communication style." (problem-first)
+
+LOGIC: LLM-based classifier examining the first 1-2 sentences of the response.
+
+IMPLEMENTATION HINT: Service task calling Anthropic API. Could be combined with Check 3 in a single multi-attribute classifier call to save latency.
+
+ERROR BOUNDARY: Routes via Error_C4 to GW_ErrorMerge.
+
+OUTPUT VARIABLE: checkResults.check4 = { status: 'pass' | 'fail' | 'error', reason: string }</bpmn:documentation>
+      <bpmn:incoming>Flow_C3_Pass</bpmn:incoming>
+      <bpmn:outgoing>Flow_C4_To_GW</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GW_Check4_AssetPass" name="Asset-Based?">
+      <bpmn:documentation>Routes based on Check 4 result. PASS proceeds to hero-to-guide check; FAIL routes to fail merge.</bpmn:documentation>
+      <bpmn:incoming>Flow_C4_To_GW</bpmn:incoming>
+      <bpmn:outgoing>Flow_C4_Pass</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C4_Fail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:businessRuleTask id="Task_Check5_HeroToGuide" name="Check 5: Hero-to-Guide Voice">
+      <bpmn:documentation>CHECK 5 — Hero-to-Guide Voice Detection.
+
+VERIFIES: The response positions the user as a guide creating conditions for others to succeed — not as a hero who must save the day, nor as a victim who needs rescue. This is core to Hamse's voice: leaders are facilitators, not saviors.
+
+FAIL FLAG PHRASES (rejected): "you must take charge", "you are the answer", "they need you to", "only you can fix", "rise up and lead them"
+
+PASS PATTERNS: "create the conditions for", "make space for", "ask what they need", "let them step into", "guide them toward"
+
+LOGIC: Rule-based classifier using a flag-phrase catalog plus a pattern-match scorer. Catalog is maintained by Process #17.
+
+IMPLEMENTATION HINT: Business rule task with phrase catalog lookup. Fast and deterministic. If rule-based misses too many cases in pilot, upgrade to LLM classifier.
+
+OUTPUT VARIABLE: checkResults.check5 = { status: 'pass' | 'fail', reason: string, flaggedPhrases: array }</bpmn:documentation>
+      <bpmn:incoming>Flow_C4_Pass</bpmn:incoming>
+      <bpmn:outgoing>Flow_C5_To_GW</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="GW_Check5_HeroPass" name="Guide Energy?">
+      <bpmn:documentation>Routes based on Check 5 result. PASS proceeds to useful-to-society check; FAIL routes to fail merge.</bpmn:documentation>
+      <bpmn:incoming>Flow_C5_To_GW</bpmn:incoming>
+      <bpmn:outgoing>Flow_C5_Pass</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C5_Fail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:businessRuleTask id="Task_Check6_UsefulSociety" name="Check 6: Useful-to-Society Anchor">
+      <bpmn:documentation>CHECK 6 — Useful-to-Society Anchor.
+
+VERIFIES: For Self-level and Community-level responses, the response connects (explicitly or implicitly) to a purpose beyond the user's immediate self-interest. This anchor comes from Hamse's father's prayer ('be useful to society') and is the meta-anchor of his framework.
+
+WEIGHTING:
+- Self-level responses: REQUIRED — fail if anchor missing
+- Community-level responses: REQUIRED — fail if anchor missing
+- Team-level responses: OPTIONAL — pure tactical advice acceptable
+- Organization-level responses: OPTIONAL — pure tactical advice acceptable
+
+LOGIC: Rule-based classifier. The level tag from Check 2 determines whether this check is required. If required, scan response for anchor patterns: 'beyond yourself', 'for the people you serve', 'larger purpose', 'useful to', 'in service of', etc.
+
+IMPLEMENTATION HINT: Business rule task. Anchor pattern catalog maintained by Process #17.
+
+OUTPUT VARIABLE: checkResults.check6 = { status: 'pass' | 'fail' | 'not_required', reason: string }</bpmn:documentation>
+      <bpmn:incoming>Flow_C5_Pass</bpmn:incoming>
+      <bpmn:outgoing>Flow_C6_To_GW</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="GW_Check6_UsefulPass" name="Anchor Present?">
+      <bpmn:documentation>Routes based on Check 6 result. PASS or NOT_REQUIRED proceeds to tone check; FAIL routes to fail merge.</bpmn:documentation>
+      <bpmn:incoming>Flow_C6_To_GW</bpmn:incoming>
+      <bpmn:outgoing>Flow_C6_Pass</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C6_Fail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Check7_Tone" name="Check 7: Tone (LLM)">
+      <bpmn:documentation>CHECK 7 — Tone Detection.
+
+VERIFIES: The response tone is warm, direct, and story-grounded. Rejects responses that are robotic, academic, or preachy. Preachy detection is the highest-risk failure mode given the values content of Hogaan — guard against it specifically.
+
+FAIL EXAMPLES:
+- Robotic: "Per the leadership framework, you should consider implementing..."
+- Academic: "Research demonstrates a positive correlation between..."
+- Preachy: "You really must understand that integrity is the foundation of..."
+
+PASS PATTERNS: warm openers, second-person voice, concrete examples, conversational rhythm.
+
+LOGIC: LLM-based tone classifier returning JSON with three booleans (isRobotic, isAcademic, isPreachy) and overall pass/fail.
+
+IMPLEMENTATION HINT: Service task calling Anthropic API. Combine with Check 8 if possible to save a call.
+
+ERROR BOUNDARY: Routes via Error_C7 to GW_ErrorMerge.
+
+OUTPUT VARIABLE: checkResults.check7 = { status: 'pass' | 'fail' | 'error', reason: string, flags: { robotic: bool, academic: bool, preachy: bool } }</bpmn:documentation>
+      <bpmn:incoming>Flow_C6_Pass</bpmn:incoming>
+      <bpmn:outgoing>Flow_C7_To_GW</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GW_Check7_TonePass" name="Tone Warm?">
+      <bpmn:documentation>Routes based on Check 7 result. PASS proceeds to safety check; FAIL routes to fail merge.</bpmn:documentation>
+      <bpmn:incoming>Flow_C7_To_GW</bpmn:incoming>
+      <bpmn:outgoing>Flow_C7_Pass</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C7_Fail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Check8_Safety" name="Check 8: Safety and Crisis Detection (LLM)">
+      <bpmn:documentation>CHECK 8 — Safety Detection (CRITICAL).
+
+VERIFIES TWO THINGS:
+(A) Response content safety — no clinical claims, no legal advice, no harmful guidance, no inappropriate disclosures
+(B) User message crisis detection — self-harm, abuse, imminent danger signals in the ORIGINAL user message
+
+OUTCOMES:
+- pass: response is safe, user message contains no crisis signal → continue to Check 9
+- soft_fail: response contains unsafe content (clinical claim, legal advice) → regenerate
+- crisis: user message contains crisis signal → IMMEDIATE escalation; do NOT deliver any response; routes to Crisis Handoff Subprocess
+- hard_fail: unrecoverable safety violation (e.g., LLM repeatedly produced harmful content despite regeneration) → flag incident, terminate
+
+LOGIC: Two parallel safety classifiers — content classifier (response) and crisis classifier (user message). Crisis classifier has its own dedicated threshold and is non-bypassable.
+
+IMPLEMENTATION HINT: Service task with two model calls (could be one combined call for latency). Crisis detection should err on the side of caution — false positives route to Crisis Handoff which gracefully degrades to general resources, but false negatives could harm users.
+
+ERROR BOUNDARY: Routes via Error_C8 to GW_ErrorMerge.
+
+OUTPUT VARIABLE: checkResults.check8 = { status: 'pass' | 'soft_fail' | 'crisis' | 'hard_fail', reason: string, crisisSignal: bool }
+
+CRITICAL: Crisis signal MUST bypass all subsequent checks and route directly to Crisis Handoff Subprocess. No coaching response is delivered when crisis is detected.</bpmn:documentation>
+      <bpmn:incoming>Flow_C7_Pass</bpmn:incoming>
+      <bpmn:outgoing>Flow_C8_To_GW</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GW_Check8_SafetyPass" name="Safety Status?">
+      <bpmn:documentation>Routes based on Check 8 result. Four-way exclusive gateway.
+
+DECISION LOGIC (plain English):
+- PASS branch: status == 'pass' → proceed to Task_Check9_Length
+- SOFT FAIL branch: status == 'soft_fail' → route to GW_FailMerge for regeneration
+- CRISIS branch: status == 'crisis' → route to SubProcess_CrisisHandoff (highest priority; bypasses all other paths)
+- HARD FAIL branch: status == 'hard_fail' → route to EndEvent_SafetyHardFailure (incident logged)</bpmn:documentation>
+      <bpmn:incoming>Flow_C8_To_GW</bpmn:incoming>
+      <bpmn:outgoing>Flow_C8_Pass</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C8_SoftFail</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C8_Crisis</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C8_HardFail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:callActivity id="SubProcess_CrisisHandoff" name="Crisis Handoff Subprocess">
+      <bpmn:documentation>Call activity invoking the Crisis Handoff Subprocess (separate process definition, owned by safety/compliance team).
+
+PURPOSE: When a crisis signal is detected in the user's message (self-harm, abuse, imminent danger), do NOT deliver coaching. Instead route to a dedicated subprocess that:
+- Sends crisis-appropriate resources (helplines, regional emergency contacts)
+- Does NOT attempt to therapeutic-style respond
+- Logs the event with maximum sensitivity (no message content stored beyond what is required for safety reconciliation)
+- Optionally notifies a human reviewer for follow-up
+
+IMPLEMENTATION HINT: Defined as a separate process; invoked via call activity. The crisis resource catalog is region-specific and maintained outside the main coaching content pipeline.</bpmn:documentation>
+      <bpmn:incoming>Flow_C8_Crisis</bpmn:incoming>
+      <bpmn:outgoing>Flow_Crisis_To_End</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:endEvent id="EndEvent_CrisisEscalation" name="E4: Crisis Escalation">
+      <bpmn:documentation>E4: CrisisEscalation end event. Reached when Check 8 detects a crisis signal in the user message. The Crisis Handoff Subprocess has already executed; this end event simply terminates the RQC process. NO coaching response was delivered.</bpmn:documentation>
+      <bpmn:incoming>Flow_Crisis_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndEvent_SafetyHardFailure" name="E5: Safety Hard Failure">
+      <bpmn:documentation>E5: SafetyHardFailure end event. Reached when Check 8 returns hard_fail (unrecoverable safety violation, e.g., LLM repeatedly produced harmful content). Incident logged with high severity. No response delivered. Caller receives a hard error.</bpmn:documentation>
+      <bpmn:incoming>Flow_C8_HardFail</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:scriptTask id="Task_Check9_Length" name="Check 9: Length Validation">
+      <bpmn:documentation>CHECK 9 — Length Validation.
+
+VERIFIES: The response fits the WhatsApp medium. Default targets:
+- FullCoachingResponse: 120-250 words (60-400 acceptable; outside that range fail)
+- ClarifyingQuestion: 30-80 words
+- ProfileUpdateAcknowledgment: 60-120 words
+- MetaResponse: 40-150 words
+
+LOGIC: Pure script — count words, compare to mode-specific range. If user explicitly requested depth (depth_request flag from upstream), allow longer.
+
+IMPLEMENTATION HINT: Script task. Word count via simple regex split. Mode-specific limits stored as constants in source.
+
+OUTPUT VARIABLE: checkResults.check9 = { status: 'pass' | 'fail', wordCount: int, expectedRange: string, reason: string }</bpmn:documentation>
+      <bpmn:incoming>Flow_C8_Pass</bpmn:incoming>
+      <bpmn:outgoing>Flow_C9_To_GW</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:exclusiveGateway id="GW_Check9_LengthPass" name="Length OK?">
+      <bpmn:documentation>Routes based on Check 9 result. PASS proceeds to final approval gateway; FAIL routes to fail merge.</bpmn:documentation>
+      <bpmn:incoming>Flow_C9_To_GW</bpmn:incoming>
+      <bpmn:outgoing>Flow_C9_Pass</bpmn:outgoing>
+      <bpmn:outgoing>Flow_C9_Fail</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:exclusiveGateway id="GW_WasRegenerated" name="Was Regenerated?">
+      <bpmn:documentation>Final gateway distinguishing first-attempt approval from regeneration-recovered approval. Used purely for analytics and metrics — both branches deliver the response.
+
+DECISION LOGIC (plain English):
+- FIRST ATTEMPT branch: retryCount == 0 → terminate at EndEvent_ApprovedFirstAttempt (target ~70% of runs)
+- REGENERATED branch: retryCount &gt; 0 → terminate at EndEvent_ApprovedRegenerated (flagged for monitoring; if this exceeds 30% of runs, prompt or rules need tuning)</bpmn:documentation>
+      <bpmn:incoming>Flow_C9_Pass</bpmn:incoming>
+      <bpmn:outgoing>Flow_End_FirstAttempt</bpmn:outgoing>
+      <bpmn:outgoing>Flow_End_Regenerated</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_ApprovedFirstAttempt" name="E1: Approved (First Attempt)">
+      <bpmn:documentation>E1: ApprovedFirstAttempt end event. Happy path. All 10 checks passed on the first attempt; response is delivered as-is. TARGET STATE: ~70% of all RQC runs in steady state.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_FirstAttempt</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndEvent_ApprovedRegenerated" name="E2: Approved (After Regeneration)">
+      <bpmn:documentation>E2: ApprovedRegenerated end event. Response was regenerated 1-3 times before passing all checks; delivered. Flagged in metadata for monitoring — if this rate exceeds 30%, prompt assembly or rule catalogs need tuning.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_Regenerated</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="GW_FailMerge" name="Fail Merge">
+      <bpmn:documentation>Convergence point for all 9 check failures. Receives flows from C1 fail through C9 fail (excluding C8 crisis and C8 hard fail which terminate). Routes to Construct Corrective Prompt for regeneration attempt.
+
+DECISION LOGIC: Pass-through merge — no branching.</bpmn:documentation>
+      <bpmn:incoming>Flow_C1_Fail</bpmn:incoming>
+      <bpmn:incoming>Flow_C2_Fail</bpmn:incoming>
+      <bpmn:incoming>Flow_C3_Fail</bpmn:incoming>
+      <bpmn:incoming>Flow_C4_Fail</bpmn:incoming>
+      <bpmn:incoming>Flow_C5_Fail</bpmn:incoming>
+      <bpmn:incoming>Flow_C6_Fail</bpmn:incoming>
+      <bpmn:incoming>Flow_C7_Fail</bpmn:incoming>
+      <bpmn:incoming>Flow_C8_SoftFail</bpmn:incoming>
+      <bpmn:incoming>Flow_C9_Fail</bpmn:incoming>
+      <bpmn:outgoing>Flow_FailMerge_To_Prompt</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_ConstructCorrectivePrompt" name="Construct Corrective Prompt">
+      <bpmn:documentation>Builds a corrective prompt that instructs the LLM what to fix on the next attempt. Uses checkResults state to identify which specific check(s) failed and constructs a targeted instruction.
+
+EXAMPLE OUTPUTS:
+- "Your previous response was missing concrete action steps. Add 2-3 actions the user can take in the next 24-72 hours."
+- "Your previous response opened with what's broken. Open with a strength the user already has."
+- "Your previous response was too long (340 words). Target 150-200 words for this WhatsApp response."
+
+LOGIC: Template-based prompt construction with check-specific corrections. The corrective prompt template library is maintained by Process #17.
+
+IMPLEMENTATION HINT: Service task. Could use a small LLM call to make the correction more contextual, but template-based is faster and equally effective for the MVP.</bpmn:documentation>
+      <bpmn:incoming>Flow_FailMerge_To_Prompt</bpmn:incoming>
+      <bpmn:outgoing>Flow_Prompt_To_Increment</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:scriptTask id="Task_IncrementRetry" name="Increment Retry Counter">
+      <bpmn:documentation>Increments retryCount by 1 and appends the corrective prompt to correctivePromptHistory.
+
+OUTPUT: retryCount = retryCount + 1; correctivePromptHistory.push(currentPrompt)
+
+IMPLEMENTATION HINT: Pure script. State is process-local.</bpmn:documentation>
+      <bpmn:incoming>Flow_Prompt_To_Increment</bpmn:incoming>
+      <bpmn:outgoing>Flow_Increment_To_GW</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:exclusiveGateway id="GW_RetryLimit" name="Under Retry Limit?">
+      <bpmn:documentation>Determines whether to retry or fall back. Maximum 3 retries.
+
+DECISION LOGIC (plain English):
+- RETRY branch: retryCount &lt; 3 → route to Task_LLM_Regenerate
+- EXHAUSTED branch: retryCount &gt;= 3 → route to SubProcess_Fallback_MaxRetries</bpmn:documentation>
+      <bpmn:incoming>Flow_Increment_To_GW</bpmn:incoming>
+      <bpmn:outgoing>Flow_Retry_NotReached</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Retry_Reached</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_LLM_Regenerate" name="LLM: Regenerate Response">
+      <bpmn:documentation>Calls the LLM with the original prompt + the corrective prompt to regenerate the response. The new candidateResponseText replaces the prior one.
+
+IMPLEMENTATION HINT: Service task calling Anthropic API. Use the same model as the original generation (set in Coaching Process). On timeout (&gt;5s), retry once; on second timeout, raise Error_Regen.
+
+ERROR BOUNDARY: Routes via Error_Regen to GW_ErrorMerge.
+
+OUTPUT: candidateResponseText = new response from LLM</bpmn:documentation>
+      <bpmn:incoming>Flow_Retry_NotReached</bpmn:incoming>
+      <bpmn:outgoing>Flow_Regen_To_LoopMerge</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:callActivity id="SubProcess_Fallback_MaxRetries" name="Fallback Response Subprocess (Max Retries Variant)">
+      <bpmn:documentation>Call activity invoking the Fallback Response Subprocess. Delivers a safe, brand-aligned canned response that acknowledges the difficulty of the moment without giving specific advice.
+
+EXAMPLE FALLBACK: "I want to make sure I'm thinking about this carefully with you. Let me come back to you in a moment with a clearer response — or if you'd rather not wait, can you tell me a little more about the specific situation?"
+
+The fallback content library is maintained by Process #17 with multiple variants per response mode.
+
+IMPLEMENTATION HINT: Defined as a separate process; invoked via call activity. Returns a deliverable response string.</bpmn:documentation>
+      <bpmn:incoming>Flow_Retry_Reached</bpmn:incoming>
+      <bpmn:outgoing>Flow_MaxRetries_To_End</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:endEvent id="EndEvent_MaxRetriesExceeded" name="E3: Max Retries Exceeded">
+      <bpmn:documentation>E3: MaxRetriesExceeded end event. The regeneration loop hit retry limit (3 attempts) without producing an approved response. Fallback subprocess delivered a safe canned response in Hamse's voice; session flagged for human review.</bpmn:documentation>
+      <bpmn:incoming>Flow_MaxRetries_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="Error_C3" name="Service Error" attachedToRef="Task_Check3_SignatureStructure">
+      <bpmn:documentation>Error boundary event on Task_Check3_SignatureStructure. Catches LLM service unavailability, timeout (&gt;5s), rate limit, or content filter trigger. Routes to GW_ErrorMerge for degraded-mode handling.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Err_C3</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Error_C3" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Error_C4" name="Service Error" attachedToRef="Task_Check4_AssetBased">
+      <bpmn:documentation>Error boundary event on Task_Check4_AssetBased. Catches LLM service unavailability, timeout, rate limit, or content filter trigger. Routes to GW_ErrorMerge.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Err_C4</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Error_C4" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Error_C7" name="Service Error" attachedToRef="Task_Check7_Tone">
+      <bpmn:documentation>Error boundary event on Task_Check7_Tone. Catches LLM service unavailability, timeout, rate limit, or content filter trigger. Routes to GW_ErrorMerge.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Err_C7</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Error_C7" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Error_C8" name="Service Error" attachedToRef="Task_Check8_Safety">
+      <bpmn:documentation>Error boundary event on Task_Check8_Safety. Catches LLM service unavailability, timeout, rate limit, or content filter trigger. Routes to GW_ErrorMerge. Note: Safety classifier failure is a HIGH-severity incident — if safety can't be checked, no coaching response can be delivered.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Err_C8</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Error_C8" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Error_Regen" name="Service Error" attachedToRef="Task_LLM_Regenerate">
+      <bpmn:documentation>Error boundary event on Task_LLM_Regenerate. Catches LLM service unavailability, timeout, rate limit, or content filter trigger during regeneration. Routes to GW_ErrorMerge.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Err_Regen</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Error_Regen" />
+    </bpmn:boundaryEvent>
+    <bpmn:exclusiveGateway id="GW_ErrorMerge" name="Error Merge">
+      <bpmn:documentation>Convergence point for all 5 error boundary events (C3, C4, C7, C8, Regen). Routes to Set Degraded Flag, then to fallback path.
+
+DECISION LOGIC: Pass-through merge.</bpmn:documentation>
+      <bpmn:incoming>Flow_Err_C3</bpmn:incoming>
+      <bpmn:incoming>Flow_Err_C4</bpmn:incoming>
+      <bpmn:incoming>Flow_Err_C7</bpmn:incoming>
+      <bpmn:incoming>Flow_Err_C8</bpmn:incoming>
+      <bpmn:incoming>Flow_Err_Regen</bpmn:incoming>
+      <bpmn:outgoing>Flow_ErrMerge_To_Flag</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:scriptTask id="Task_SetDegradedFlag" name="Set Degraded Flag">
+      <bpmn:documentation>Sets degradedFlag = true in process state. This flag is included in the response metadata so downstream metrics and the Coaching Process can flag the turn for review.
+
+IMPLEMENTATION HINT: Pure script.</bpmn:documentation>
+      <bpmn:incoming>Flow_ErrMerge_To_Flag</bpmn:incoming>
+      <bpmn:outgoing>Flow_Flag_To_Fallback</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:callActivity id="SubProcess_Fallback_Degraded" name="Fallback Response Subprocess (Degraded Variant)">
+      <bpmn:documentation>Call activity invoking the Fallback Response Subprocess in degraded mode. Same subprocess as MaxRetries fallback but with a different response variant indicating service degradation rather than quality regeneration failure.
+
+IMPLEMENTATION HINT: Same call activity, different variant key passed in.</bpmn:documentation>
+      <bpmn:incoming>Flow_Flag_To_Fallback</bpmn:incoming>
+      <bpmn:outgoing>Flow_Degraded_To_End</bpmn:outgoing>
+    </bpmn:callActivity>
+    <bpmn:endEvent id="EndEvent_ServiceUnavailable" name="E6: Service Unavailable">
+      <bpmn:documentation>E6: ServiceUnavailable end event. One or more service tasks (LLM classifier or regeneration) experienced unrecoverable errors. Degraded-mode fallback response delivered. Incident logged.</bpmn:documentation>
+      <bpmn:incoming>Flow_Degraded_To_End</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_Start_To_Validate" sourceRef="StartEvent_CandidateGenerated" targetRef="Task_ValidateInput">
+      <bpmn:documentation>Process trigger fires. Carries the full payload (candidateResponseText, userMessage, userId, sessionId, predictedPracticeTag, predictedLevelTag, responseMode, attemptNumber).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Validate_To_GW_Valid" sourceRef="Task_ValidateInput" targetRef="GW_ValidInput">
+      <bpmn:documentation>Validation result (isValid boolean) flows to gateway.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ValidInput_Pass" sourceRef="GW_ValidInput" targetRef="Task_InitVariables">
+      <bpmn:documentation>Pass branch — payload schema is correct; proceed to initialize loop variables.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Input is valid (isValid == true)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ValidInput_Fail" sourceRef="GW_ValidInput" targetRef="EndEvent_MalformedInput">
+      <bpmn:documentation>Fail branch — payload missing or malformed; terminate with error.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Input is invalid (isValid == false)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Init_To_LoopMerge" sourceRef="Task_InitVariables" targetRef="GW_LoopMerge">
+      <bpmn:documentation>State initialized (retryCount=0, checkResults={}, etc.); enter the check pipeline.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LoopMerge_To_C1" sourceRef="GW_LoopMerge" targetRef="Task_Check1_PracticeTag">
+      <bpmn:documentation>Begin Check 1 (Practice Tag). On regeneration, this is the loop entry point.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C1_To_GW" sourceRef="Task_Check1_PracticeTag" targetRef="GW_Check1_PracticePass">
+      <bpmn:documentation>Practice tag check result (pass/fail) returned to orchestration gateway.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C1_Pass" sourceRef="GW_Check1_PracticePass" targetRef="Task_Check2_LevelTag">
+      <bpmn:documentation>Practice tag is one of 12 valid practices; proceed to level tag check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Practice tag is valid (checkResults.check1.status == 'pass')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C1_Fail" sourceRef="GW_Check1_PracticePass" targetRef="GW_FailMerge">
+      <bpmn:documentation>Practice tag missing or not in catalog; route to fail merge for regeneration.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Practice tag invalid (checkResults.check1.status == 'fail')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C2_To_GW" sourceRef="Task_Check2_LevelTag" targetRef="GW_Check2_LevelPass">
+      <bpmn:documentation>Level tag and congruence check result.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C2_Pass" sourceRef="GW_Check2_LevelPass" targetRef="Task_Check3_SignatureStructure">
+      <bpmn:documentation>Level is valid and congruent with user situation; proceed to structure check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Level tag valid AND congruent (checkResults.check2.status == 'pass')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C2_Fail" sourceRef="GW_Check2_LevelPass" targetRef="GW_FailMerge">
+      <bpmn:documentation>Level tag missing, invalid, or contextually wrong; regenerate.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Level tag invalid or incongruent (checkResults.check2.status == 'fail')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C3_To_GW" sourceRef="Task_Check3_SignatureStructure" targetRef="GW_Check3_StructurePass">
+      <bpmn:documentation>Structure check result (story/insight/framing/actions all present?).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C3_Pass" sourceRef="GW_Check3_StructurePass" targetRef="Task_Check4_AssetBased">
+      <bpmn:documentation>All four signature elements present; proceed to asset-based framing check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Signature structure complete (checkResults.check3.status == 'pass')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C3_Fail" sourceRef="GW_Check3_StructurePass" targetRef="GW_FailMerge">
+      <bpmn:documentation>One or more signature elements missing; regenerate.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Signature structure incomplete (checkResults.check3.status == 'fail')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C4_To_GW" sourceRef="Task_Check4_AssetBased" targetRef="GW_Check4_AssetPass">
+      <bpmn:documentation>Asset-based framing check result.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C4_Pass" sourceRef="GW_Check4_AssetPass" targetRef="Task_Check5_HeroToGuide">
+      <bpmn:documentation>Asset-based opening confirmed; proceed to hero-to-guide check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Response opens from strengths (checkResults.check4.status == 'pass')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C4_Fail" sourceRef="GW_Check4_AssetPass" targetRef="GW_FailMerge">
+      <bpmn:documentation>Deficit-first framing detected; regenerate.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Response opens from deficits (checkResults.check4.status == 'fail')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C5_To_GW" sourceRef="Task_Check5_HeroToGuide" targetRef="GW_Check5_HeroPass">
+      <bpmn:documentation>Hero-to-guide voice check result.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C5_Pass" sourceRef="GW_Check5_HeroPass" targetRef="Task_Check6_UsefulSociety">
+      <bpmn:documentation>Guide energy confirmed (no hero/savior/victim phrases); proceed to useful-to-society check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Voice is guide-energy (checkResults.check5.status == 'pass')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C5_Fail" sourceRef="GW_Check5_HeroPass" targetRef="GW_FailMerge">
+      <bpmn:documentation>Hero, savior, or victim energy detected; regenerate.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Voice is hero-energy (checkResults.check5.status == 'fail')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C6_To_GW" sourceRef="Task_Check6_UsefulSociety" targetRef="GW_Check6_UsefulPass">
+      <bpmn:documentation>Useful-to-society anchor check result (only required for Self/Community level).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C6_Pass" sourceRef="GW_Check6_UsefulPass" targetRef="Task_Check7_Tone">
+      <bpmn:documentation>Anchor present OR not required at this level; proceed to tone check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Anchor present OR not required for this level (status in ['pass', 'not_required'])</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C6_Fail" sourceRef="GW_Check6_UsefulPass" targetRef="GW_FailMerge">
+      <bpmn:documentation>Self or Community-level response lacks the 'useful to society' anchor; regenerate.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Anchor missing on Self/Community-level response (checkResults.check6.status == 'fail')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C7_To_GW" sourceRef="Task_Check7_Tone" targetRef="GW_Check7_TonePass">
+      <bpmn:documentation>Tone classifier result (warm/direct/grounded vs robotic/academic/preachy).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C7_Pass" sourceRef="GW_Check7_TonePass" targetRef="Task_Check8_Safety">
+      <bpmn:documentation>Tone passes; proceed to safety check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Tone is warm and grounded (checkResults.check7.status == 'pass')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C7_Fail" sourceRef="GW_Check7_TonePass" targetRef="GW_FailMerge">
+      <bpmn:documentation>Tone failure detected; regenerate.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Tone is robotic, academic, or preachy (checkResults.check7.status == 'fail')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C8_To_GW" sourceRef="Task_Check8_Safety" targetRef="GW_Check8_SafetyPass">
+      <bpmn:documentation>Safety check result. Four possible outcomes: pass / soft_fail / crisis / hard_fail.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C8_Pass" sourceRef="GW_Check8_SafetyPass" targetRef="Task_Check9_Length">
+      <bpmn:documentation>Safety check passes; proceed to length check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Response safe AND no crisis signal (status == 'pass')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C8_SoftFail" sourceRef="GW_Check8_SafetyPass" targetRef="GW_FailMerge">
+      <bpmn:documentation>Soft safety failure (clinical claim, legal advice, etc.); regenerate.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Response contains unsafe content (status == 'soft_fail')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C8_Crisis" sourceRef="GW_Check8_SafetyPass" targetRef="SubProcess_CrisisHandoff">
+      <bpmn:documentation>CRITICAL PATH: Crisis signal detected in user message. Bypasses ALL coaching delivery; routes immediately to Crisis Handoff Subprocess.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">User message contains crisis signal (status == 'crisis')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C8_HardFail" sourceRef="GW_Check8_SafetyPass" targetRef="EndEvent_SafetyHardFailure">
+      <bpmn:documentation>Hard safety failure (e.g., LLM repeatedly producing harmful content); terminate without delivery; high-severity incident.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Unrecoverable safety violation (status == 'hard_fail')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Crisis_To_End" sourceRef="SubProcess_CrisisHandoff" targetRef="EndEvent_CrisisEscalation">
+      <bpmn:documentation>Crisis Handoff Subprocess completed (sent crisis resources, logged event); terminate RQC process. NO coaching response delivered.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C9_To_GW" sourceRef="Task_Check9_Length" targetRef="GW_Check9_LengthPass">
+      <bpmn:documentation>Length check result (word count vs mode-specific range).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C9_Pass" sourceRef="GW_Check9_LengthPass" targetRef="GW_WasRegenerated">
+      <bpmn:documentation>All checks passed. Proceed to final routing based on whether regeneration was used.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Length within target range (checkResults.check9.status == 'pass')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_C9_Fail" sourceRef="GW_Check9_LengthPass" targetRef="GW_FailMerge">
+      <bpmn:documentation>Length outside target (too short or too long); regenerate.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Length out of range (checkResults.check9.status == 'fail')</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_FirstAttempt" sourceRef="GW_WasRegenerated" targetRef="EndEvent_ApprovedFirstAttempt">
+      <bpmn:documentation>Happy path on first try. Approved response delivered. Target ~70% of all RQC runs.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">First attempt (retryCount == 0)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_Regenerated" sourceRef="GW_WasRegenerated" targetRef="EndEvent_ApprovedRegenerated">
+      <bpmn:documentation>Regeneration succeeded. Approved response delivered with retryCount metadata flagged for monitoring.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Regenerated 1-3 times (retryCount &gt; 0)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_FailMerge_To_Prompt" sourceRef="GW_FailMerge" targetRef="Task_ConstructCorrectivePrompt">
+      <bpmn:documentation>Failed check converged to fail-merge; build a corrective prompt.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Prompt_To_Increment" sourceRef="Task_ConstructCorrectivePrompt" targetRef="Task_IncrementRetry">
+      <bpmn:documentation>Corrective prompt built; increment retry counter.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Increment_To_GW" sourceRef="Task_IncrementRetry" targetRef="GW_RetryLimit">
+      <bpmn:documentation>Retry counter incremented; check whether limit reached.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Retry_NotReached" sourceRef="GW_RetryLimit" targetRef="Task_LLM_Regenerate">
+      <bpmn:documentation>Retries remaining; regenerate response with corrective prompt.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Under retry limit (retryCount &lt; 3)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Retry_Reached" sourceRef="GW_RetryLimit" targetRef="SubProcess_Fallback_MaxRetries">
+      <bpmn:documentation>Maximum 3 retries exhausted; invoke fallback subprocess to deliver safe canned response.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Retry limit reached (retryCount &gt;= 3)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Regen_To_LoopMerge" sourceRef="Task_LLM_Regenerate" targetRef="GW_LoopMerge">
+      <bpmn:documentation>Regenerated response ready; loop back to start of check pipeline (Check 1). The new candidateResponseText replaces the prior one.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_MaxRetries_To_End" sourceRef="SubProcess_Fallback_MaxRetries" targetRef="EndEvent_MaxRetriesExceeded">
+      <bpmn:documentation>Fallback response delivered; terminate at MaxRetriesExceeded end event; session flagged for human review.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Err_C3" sourceRef="Error_C3" targetRef="GW_ErrorMerge">
+      <bpmn:documentation>Service error on Structure classifier (timeout, unavailable, content filter); route to degraded-mode handling.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Err_C4" sourceRef="Error_C4" targetRef="GW_ErrorMerge">
+      <bpmn:documentation>Service error on Asset-Based classifier; route to degraded-mode handling.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Err_C7" sourceRef="Error_C7" targetRef="GW_ErrorMerge">
+      <bpmn:documentation>Service error on Tone classifier; route to degraded-mode handling.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Err_C8" sourceRef="Error_C8" targetRef="GW_ErrorMerge">
+      <bpmn:documentation>Service error on Safety classifier; route to degraded-mode handling. HIGH SEVERITY — safety check failure means we cannot guarantee response is safe.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Err_Regen" sourceRef="Error_Regen" targetRef="GW_ErrorMerge">
+      <bpmn:documentation>Service error during regeneration LLM call; route to degraded-mode handling.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ErrMerge_To_Flag" sourceRef="GW_ErrorMerge" targetRef="Task_SetDegradedFlag">
+      <bpmn:documentation>Errors converged; set degraded flag in process state.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Flag_To_Fallback" sourceRef="Task_SetDegradedFlag" targetRef="SubProcess_Fallback_Degraded">
+      <bpmn:documentation>Degraded flag set; invoke fallback subprocess in degraded-mode variant.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Degraded_To_End" sourceRef="SubProcess_Fallback_Degraded" targetRef="EndEvent_ServiceUnavailable">
+      <bpmn:documentation>Degraded fallback delivered; terminate at ServiceUnavailable end event; incident logged.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_RQC">
+    <bpmndi:BPMNPlane id="BPMNPlane_RQC" bpmnElement="Collaboration_Hogaan_RQC">
+      <bpmndi:BPMNShape id="Pool_di" bpmnElement="Participant_Hogaan" isHorizontal="true">
+        <dc:Bounds x="50" y="50" width="3500" height="1100" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_OrchestrationEngine_di" bpmnElement="Lane_OrchestrationEngine" isHorizontal="true">
+        <dc:Bounds x="80" y="50" width="3470" height="450" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_LLMService_di" bpmnElement="Lane_LLMService" isHorizontal="true">
+        <dc:Bounds x="80" y="500" width="3470" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_DataLayer_di" bpmnElement="Lane_DataLayer" isHorizontal="true">
+        <dc:Bounds x="80" y="700" width="3470" height="200" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_ExternalServices_di" bpmnElement="Lane_ExternalServices" isHorizontal="true">
+        <dc:Bounds x="80" y="900" width="3470" height="250" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_CandidateGenerated_di" bpmnElement="StartEvent_CandidateGenerated">
+        <dc:Bounds x="130" y="227" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="105" y="268" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ValidateInput_di" bpmnElement="Task_ValidateInput">
+        <dc:Bounds x="220" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_ValidInput_di" bpmnElement="GW_ValidInput" isMarkerVisible="true">
+        <dc:Bounds x="380" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="360" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_MalformedInput_di" bpmnElement="EndEvent_MalformedInput">
+        <dc:Bounds x="387" y="100" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="362" y="141" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_InitVariables_di" bpmnElement="Task_InitVariables">
+        <dc:Bounds x="480" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_LoopMerge_di" bpmnElement="GW_LoopMerge" isMarkerVisible="true">
+        <dc:Bounds x="640" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="620" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_Check1_PracticePass_di" bpmnElement="GW_Check1_PracticePass" isMarkerVisible="true">
+        <dc:Bounds x="800" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="780" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_Check2_LevelPass_di" bpmnElement="GW_Check2_LevelPass" isMarkerVisible="true">
+        <dc:Bounds x="970" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="950" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_Check3_StructurePass_di" bpmnElement="GW_Check3_StructurePass" isMarkerVisible="true">
+        <dc:Bounds x="1140" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1120" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_Check4_AssetPass_di" bpmnElement="GW_Check4_AssetPass" isMarkerVisible="true">
+        <dc:Bounds x="1310" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1290" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_Check5_HeroPass_di" bpmnElement="GW_Check5_HeroPass" isMarkerVisible="true">
+        <dc:Bounds x="1480" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1460" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_Check6_UsefulPass_di" bpmnElement="GW_Check6_UsefulPass" isMarkerVisible="true">
+        <dc:Bounds x="1650" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1630" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_Check7_TonePass_di" bpmnElement="GW_Check7_TonePass" isMarkerVisible="true">
+        <dc:Bounds x="1820" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1800" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_Check8_SafetyPass_di" bpmnElement="GW_Check8_SafetyPass" isMarkerVisible="true">
+        <dc:Bounds x="1990" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1970" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Check9_Length_di" bpmnElement="Task_Check9_Length">
+        <dc:Bounds x="2080" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_Check9_LengthPass_di" bpmnElement="GW_Check9_LengthPass" isMarkerVisible="true">
+        <dc:Bounds x="2240" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2220" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_WasRegenerated_di" bpmnElement="GW_WasRegenerated" isMarkerVisible="true">
+        <dc:Bounds x="2340" y="220" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2320" y="195" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_ApprovedFirstAttempt_di" bpmnElement="EndEvent_ApprovedFirstAttempt">
+        <dc:Bounds x="2440" y="227" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2415" y="268" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_ApprovedRegenerated_di" bpmnElement="EndEvent_ApprovedRegenerated">
+        <dc:Bounds x="2440" y="320" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2415" y="361" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_FailMerge_di" bpmnElement="GW_FailMerge" isMarkerVisible="true">
+        <dc:Bounds x="2440" y="80" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2420" y="55" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ConstructCorrectivePrompt_di" bpmnElement="Task_ConstructCorrectivePrompt">
+        <dc:Bounds x="2540" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_IncrementRetry_di" bpmnElement="Task_IncrementRetry">
+        <dc:Bounds x="2700" y="70" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_RetryLimit_di" bpmnElement="GW_RetryLimit" isMarkerVisible="true">
+        <dc:Bounds x="2860" y="80" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2840" y="55" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_MaxRetriesExceeded_di" bpmnElement="EndEvent_MaxRetriesExceeded">
+        <dc:Bounds x="2960" y="87" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2935" y="128" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_ErrorMerge_di" bpmnElement="GW_ErrorMerge" isMarkerVisible="true">
+        <dc:Bounds x="1990" y="360" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1970" y="335" width="90" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_SetDegradedFlag_di" bpmnElement="Task_SetDegradedFlag">
+        <dc:Bounds x="2090" y="345" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Check3_SignatureStructure_di" bpmnElement="Task_Check3_SignatureStructure">
+        <dc:Bounds x="1090" y="500" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Check4_AssetBased_di" bpmnElement="Task_Check4_AssetBased">
+        <dc:Bounds x="1260" y="500" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Check7_Tone_di" bpmnElement="Task_Check7_Tone">
+        <dc:Bounds x="1770" y="500" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Check8_Safety_di" bpmnElement="Task_Check8_Safety">
+        <dc:Bounds x="1940" y="500" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_LLM_Regenerate_di" bpmnElement="Task_LLM_Regenerate">
+        <dc:Bounds x="2860" y="500" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Error_C3_di" bpmnElement="Error_C3">
+        <dc:Bounds x="1122" y="482" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1097" y="523" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Error_C4_di" bpmnElement="Error_C4">
+        <dc:Bounds x="1292" y="482" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1267" y="523" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Error_C7_di" bpmnElement="Error_C7">
+        <dc:Bounds x="1802" y="482" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1777" y="523" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Error_C8_di" bpmnElement="Error_C8">
+        <dc:Bounds x="1972" y="482" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1947" y="523" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Error_Regen_di" bpmnElement="Error_Regen">
+        <dc:Bounds x="2892" y="482" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2867" y="523" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Check1_PracticeTag_di" bpmnElement="Task_Check1_PracticeTag">
+        <dc:Bounds x="750" y="700" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Check2_LevelTag_di" bpmnElement="Task_Check2_LevelTag">
+        <dc:Bounds x="920" y="700" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Check5_HeroToGuide_di" bpmnElement="Task_Check5_HeroToGuide">
+        <dc:Bounds x="1430" y="700" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Check6_UsefulSociety_di" bpmnElement="Task_Check6_UsefulSociety">
+        <dc:Bounds x="1600" y="700" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubProcess_CrisisHandoff_di" bpmnElement="SubProcess_CrisisHandoff">
+        <dc:Bounds x="1925" y="880" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_CrisisEscalation_di" bpmnElement="EndEvent_CrisisEscalation">
+        <dc:Bounds x="2090" y="902" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2065" y="943" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_SafetyHardFailure_di" bpmnElement="EndEvent_SafetyHardFailure">
+        <dc:Bounds x="1972" y="1000" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1947" y="1041" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubProcess_Fallback_MaxRetries_di" bpmnElement="SubProcess_Fallback_MaxRetries">
+        <dc:Bounds x="2960" y="880" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubProcess_Fallback_Degraded_di" bpmnElement="SubProcess_Fallback_Degraded">
+        <dc:Bounds x="2200" y="880" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_ServiceUnavailable_di" bpmnElement="EndEvent_ServiceUnavailable">
+        <dc:Bounds x="2360" y="902" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2335" y="943" width="90" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_To_Validate_di" bpmnElement="Flow_Start_To_Validate">
+        <di:waypoint x="166" y="245" />
+        <di:waypoint x="220" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Validate_To_GW_Valid_di" bpmnElement="Flow_Validate_To_GW_Valid">
+        <di:waypoint x="320" y="250" />
+        <di:waypoint x="380" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ValidInput_Pass_di" bpmnElement="Flow_ValidInput_Pass">
+        <di:waypoint x="430" y="245" />
+        <di:waypoint x="480" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ValidInput_Fail_di" bpmnElement="Flow_ValidInput_Fail">
+        <di:waypoint x="405" y="220" />
+        <di:waypoint x="405" y="118" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Init_To_LoopMerge_di" bpmnElement="Flow_Init_To_LoopMerge">
+        <di:waypoint x="580" y="250" />
+        <di:waypoint x="640" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_LoopMerge_To_C1_di" bpmnElement="Flow_LoopMerge_To_C1">
+        <di:waypoint x="665" y="270" />
+        <di:waypoint x="665" y="700" />
+        <di:waypoint x="750" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C1_To_GW_di" bpmnElement="Flow_C1_To_GW">
+        <di:waypoint x="850" y="740" />
+        <di:waypoint x="825" y="740" />
+        <di:waypoint x="825" y="245" />
+        <di:waypoint x="825" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C1_Pass_di" bpmnElement="Flow_C1_Pass">
+        <di:waypoint x="850" y="245" />
+        <di:waypoint x="940" y="245" />
+        <di:waypoint x="940" y="700" />
+        <di:waypoint x="920" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C1_Fail_di" bpmnElement="Flow_C1_Fail">
+        <di:waypoint x="825" y="220" />
+        <di:waypoint x="825" y="105" />
+        <di:waypoint x="2440" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C2_To_GW_di" bpmnElement="Flow_C2_To_GW">
+        <di:waypoint x="1020" y="740" />
+        <di:waypoint x="995" y="740" />
+        <di:waypoint x="995" y="245" />
+        <di:waypoint x="995" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C2_Pass_di" bpmnElement="Flow_C2_Pass">
+        <di:waypoint x="1020" y="245" />
+        <di:waypoint x="1110" y="245" />
+        <di:waypoint x="1110" y="540" />
+        <di:waypoint x="1090" y="540" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C2_Fail_di" bpmnElement="Flow_C2_Fail">
+        <di:waypoint x="995" y="220" />
+        <di:waypoint x="995" y="105" />
+        <di:waypoint x="2440" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C3_To_GW_di" bpmnElement="Flow_C3_To_GW">
+        <di:waypoint x="1190" y="540" />
+        <di:waypoint x="1165" y="540" />
+        <di:waypoint x="1165" y="245" />
+        <di:waypoint x="1165" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C3_Pass_di" bpmnElement="Flow_C3_Pass">
+        <di:waypoint x="1190" y="245" />
+        <di:waypoint x="1280" y="245" />
+        <di:waypoint x="1280" y="540" />
+        <di:waypoint x="1260" y="540" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C3_Fail_di" bpmnElement="Flow_C3_Fail">
+        <di:waypoint x="1165" y="220" />
+        <di:waypoint x="1165" y="105" />
+        <di:waypoint x="2440" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C4_To_GW_di" bpmnElement="Flow_C4_To_GW">
+        <di:waypoint x="1360" y="540" />
+        <di:waypoint x="1335" y="540" />
+        <di:waypoint x="1335" y="245" />
+        <di:waypoint x="1335" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C4_Pass_di" bpmnElement="Flow_C4_Pass">
+        <di:waypoint x="1360" y="245" />
+        <di:waypoint x="1450" y="245" />
+        <di:waypoint x="1450" y="740" />
+        <di:waypoint x="1430" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C4_Fail_di" bpmnElement="Flow_C4_Fail">
+        <di:waypoint x="1335" y="220" />
+        <di:waypoint x="1335" y="105" />
+        <di:waypoint x="2440" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C5_To_GW_di" bpmnElement="Flow_C5_To_GW">
+        <di:waypoint x="1530" y="740" />
+        <di:waypoint x="1505" y="740" />
+        <di:waypoint x="1505" y="245" />
+        <di:waypoint x="1505" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C5_Pass_di" bpmnElement="Flow_C5_Pass">
+        <di:waypoint x="1530" y="245" />
+        <di:waypoint x="1620" y="245" />
+        <di:waypoint x="1620" y="740" />
+        <di:waypoint x="1600" y="740" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C5_Fail_di" bpmnElement="Flow_C5_Fail">
+        <di:waypoint x="1505" y="220" />
+        <di:waypoint x="1505" y="105" />
+        <di:waypoint x="2440" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C6_To_GW_di" bpmnElement="Flow_C6_To_GW">
+        <di:waypoint x="1700" y="740" />
+        <di:waypoint x="1675" y="740" />
+        <di:waypoint x="1675" y="245" />
+        <di:waypoint x="1675" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C6_Pass_di" bpmnElement="Flow_C6_Pass">
+        <di:waypoint x="1700" y="245" />
+        <di:waypoint x="1790" y="245" />
+        <di:waypoint x="1790" y="540" />
+        <di:waypoint x="1770" y="540" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C6_Fail_di" bpmnElement="Flow_C6_Fail">
+        <di:waypoint x="1675" y="220" />
+        <di:waypoint x="1675" y="105" />
+        <di:waypoint x="2440" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C7_To_GW_di" bpmnElement="Flow_C7_To_GW">
+        <di:waypoint x="1870" y="540" />
+        <di:waypoint x="1845" y="540" />
+        <di:waypoint x="1845" y="245" />
+        <di:waypoint x="1845" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C7_Pass_di" bpmnElement="Flow_C7_Pass">
+        <di:waypoint x="1870" y="245" />
+        <di:waypoint x="1960" y="245" />
+        <di:waypoint x="1960" y="540" />
+        <di:waypoint x="1940" y="540" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C7_Fail_di" bpmnElement="Flow_C7_Fail">
+        <di:waypoint x="1845" y="220" />
+        <di:waypoint x="1845" y="105" />
+        <di:waypoint x="2440" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C8_To_GW_di" bpmnElement="Flow_C8_To_GW">
+        <di:waypoint x="2040" y="540" />
+        <di:waypoint x="2015" y="540" />
+        <di:waypoint x="2015" y="245" />
+        <di:waypoint x="2015" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C8_Pass_di" bpmnElement="Flow_C8_Pass">
+        <di:waypoint x="2040" y="245" />
+        <di:waypoint x="2080" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C8_SoftFail_di" bpmnElement="Flow_C8_SoftFail">
+        <di:waypoint x="2015" y="220" />
+        <di:waypoint x="2015" y="105" />
+        <di:waypoint x="2440" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C8_Crisis_di" bpmnElement="Flow_C8_Crisis">
+        <di:waypoint x="2015" y="270" />
+        <di:waypoint x="2015" y="920" />
+        <di:waypoint x="1925" y="920" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C8_HardFail_di" bpmnElement="Flow_C8_HardFail">
+        <di:waypoint x="2015" y="270" />
+        <di:waypoint x="2015" y="1018" />
+        <di:waypoint x="1972" y="1018" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Crisis_To_End_di" bpmnElement="Flow_Crisis_To_End">
+        <di:waypoint x="2045" y="920" />
+        <di:waypoint x="2090" y="920" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C9_To_GW_di" bpmnElement="Flow_C9_To_GW">
+        <di:waypoint x="2180" y="250" />
+        <di:waypoint x="2240" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C9_Pass_di" bpmnElement="Flow_C9_Pass">
+        <di:waypoint x="2290" y="245" />
+        <di:waypoint x="2340" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_C9_Fail_di" bpmnElement="Flow_C9_Fail">
+        <di:waypoint x="2265" y="220" />
+        <di:waypoint x="2265" y="105" />
+        <di:waypoint x="2440" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_FirstAttempt_di" bpmnElement="Flow_End_FirstAttempt">
+        <di:waypoint x="2390" y="245" />
+        <di:waypoint x="2440" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_Regenerated_di" bpmnElement="Flow_End_Regenerated">
+        <di:waypoint x="2365" y="270" />
+        <di:waypoint x="2365" y="320" />
+        <di:waypoint x="2440" y="338" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_FailMerge_To_Prompt_di" bpmnElement="Flow_FailMerge_To_Prompt">
+        <di:waypoint x="2490" y="105" />
+        <di:waypoint x="2540" y="110" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Prompt_To_Increment_di" bpmnElement="Flow_Prompt_To_Increment">
+        <di:waypoint x="2640" y="110" />
+        <di:waypoint x="2700" y="110" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Increment_To_GW_di" bpmnElement="Flow_Increment_To_GW">
+        <di:waypoint x="2800" y="110" />
+        <di:waypoint x="2860" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Retry_NotReached_di" bpmnElement="Flow_Retry_NotReached">
+        <di:waypoint x="2885" y="130" />
+        <di:waypoint x="2885" y="540" />
+        <di:waypoint x="2860" y="540" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Retry_Reached_di" bpmnElement="Flow_Retry_Reached">
+        <di:waypoint x="2910" y="105" />
+        <di:waypoint x="2960" y="105" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Regen_To_LoopMerge_di" bpmnElement="Flow_Regen_To_LoopMerge">
+        <di:waypoint x="2860" y="540" />
+        <di:waypoint x="2840" y="540" />
+        <di:waypoint x="2840" y="195" />
+        <di:waypoint x="665" y="195" />
+        <di:waypoint x="665" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_MaxRetries_To_End_di" bpmnElement="Flow_MaxRetries_To_End">
+        <di:waypoint x="2978" y="123" />
+        <di:waypoint x="2978" y="880" />
+        <di:waypoint x="2960" y="920" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Err_C3_di" bpmnElement="Flow_Err_C3">
+        <di:waypoint x="1140" y="518" />
+        <di:waypoint x="1140" y="380" />
+        <di:waypoint x="1990" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Err_C4_di" bpmnElement="Flow_Err_C4">
+        <di:waypoint x="1310" y="518" />
+        <di:waypoint x="1310" y="380" />
+        <di:waypoint x="1990" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Err_C7_di" bpmnElement="Flow_Err_C7">
+        <di:waypoint x="1820" y="518" />
+        <di:waypoint x="1820" y="380" />
+        <di:waypoint x="1990" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Err_C8_di" bpmnElement="Flow_Err_C8">
+        <di:waypoint x="1990" y="518" />
+        <di:waypoint x="1990" y="380" />
+        <di:waypoint x="1990" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Err_Regen_di" bpmnElement="Flow_Err_Regen">
+        <di:waypoint x="2910" y="518" />
+        <di:waypoint x="2910" y="380" />
+        <di:waypoint x="2065" y="380" />
+        <di:waypoint x="1990" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ErrMerge_To_Flag_di" bpmnElement="Flow_ErrMerge_To_Flag">
+        <di:waypoint x="2040" y="385" />
+        <di:waypoint x="2090" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Flag_To_Fallback_di" bpmnElement="Flow_Flag_To_Fallback">
+        <di:waypoint x="2140" y="425" />
+        <di:waypoint x="2140" y="880" />
+        <di:waypoint x="2200" y="920" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Degraded_To_End_di" bpmnElement="Flow_Degraded_To_End">
+        <di:waypoint x="2320" y="920" />
+        <di:waypoint x="2360" y="920" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

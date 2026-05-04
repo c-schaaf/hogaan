@@ -1,0 +1,8 @@
+dist
+node_modules
+drizzle
+coverage
+pnpm-lock.yaml
+*.bpmn
+docs/
+CLAUDE.md

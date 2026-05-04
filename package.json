@@ -1,0 +1,58 @@
+{
+  "name": "hogaan",
+  "version": "0.0.0",
+  "private": true,
+  "description": "WhatsApp-native leadership coaching app delivering Hamse Warfa's twelve-practice framework to Somali professionals",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0 <23.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:bpmn": "vitest run --dir tests/bpmn",
+    "lint": "eslint . --ext .ts,.tsx && prettier --check .",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix && prettier --write .",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "@fastify/sensible": "^6.0.1",
+    "drizzle-orm": "^0.36.0",
+    "fastify": "^5.1.0",
+    "pino": "^9.5.0",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@typescript-eslint/eslint-plugin": "^8.13.0",
+    "@typescript-eslint/parser": "^8.13.0",
+    "drizzle-kit": "^0.28.0",
+    "eslint": "^9.14.0",
+    "eslint-config-prettier": "^9.1.0",
+    "husky": "^9.1.6",
+    "lint-staged": "^15.2.10",
+    "pino-pretty": "^11.3.0",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.4"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

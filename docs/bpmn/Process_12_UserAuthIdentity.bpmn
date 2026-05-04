@@ -1,0 +1,1277 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_HogaanUserAuthIdentity" targetNamespace="http://hogaan.app/processes" exporter="Hogaan Process Specification" exporterVersion="1.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.9.0">
+  <bpmn:message id="Message_WhatsApp" name="WhatsAppIdentityResolutionRequested" />
+  <bpmn:message id="Message_WebSession" name="WebSessionAuthenticationRequested" />
+  <bpmn:message id="Message_WebSignup" name="WebSignupIdentityRequested" />
+  <bpmn:error id="Error_LockContention" name="LockContention" errorCode="ERR_LOCK_TIMEOUT" />
+  <bpmn:error id="Error_UniqueConstraint" name="UniqueConstraint" errorCode="ERR_UNIQUE_VIOLATION" />
+  <bpmn:error id="Error_ServiceUnavailable" name="ServiceUnavailable" errorCode="ERR_SERVICE_UNAVAILABLE" />
+  <bpmn:error id="Error_AuditFailure" name="AuditFailure" errorCode="ERR_AUDIT_WRITE_FAIL" />
+  <bpmn:collaboration id="Collaboration_Hogaan_UserAuth">
+    <bpmn:documentation>Collaboration scope for User Authentication and Identity. Single pool ('Hogaan Coaching Platform') with two lanes used: Orchestration Engine and Data Layer. WhatsApp Gateway, LLM Service, and External Services lanes are not used in this process.</bpmn:documentation>
+    <bpmn:participant id="Participant_Hogaan" name="Hogaan Coaching Platform" processRef="Process_UserAuthIdentity" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_UserAuthIdentity" name="Hogaan User Authentication and Identity Process" isExecutable="false">
+    <bpmn:documentation>Hogaan User Authentication and Identity Process. The single source of truth for resolving "who is this?" across all entry points to the platform. Invoked at every external touchpoint where a user identity must be established or verified before further action: WhatsApp inbound messages (resolve phone number to user record), web session API calls (validate session token), web signup form submissions (provision or re-find user record).
+
+DESIGN PRINCIPLES:
+- Three distinct entry triggers funnel through a triage gateway that routes to either the phone-based path (WhatsApp + Web Signup) or the token-based path (Web Session)
+- Phone path is fully concurrency-safe: an advisory lock with 2s TTL is acquired in Step 4 before lookup, ensuring two simultaneous requests for the same phone number do not race; explicit lock release happens before the audit step
+- Idempotent insert with explicit race handling: Step 6 catches a unique-constraint violation (which means another concurrent process inserted the same phone number first) and re-reads the existing record by looping back to the Routing Decision
+- Audit log write at Step 8 is FAIL-CLOSED — if the audit log can't be written, the entire process terminates at E11 (AuditLogFailure) and the caller does NOT receive an authentication result, regardless of what would otherwise have happened. This is non-negotiable for compliance.
+- All 11 outcomes are explicitly enumerated as end events; every outcome (including failures) flows through the audit path so security events are always logged
+
+OWNERSHIP: Orchestration Engine runs all three start events, both decision paths' gateways, the triage logic, the routing decision, the token validation (which is primarily crypto + revocation lookup), and all 11 end events plus their setter tasks. Data Layer holds the suppression list (Redis), user record store (Postgres with phone-number unique constraint and advisory locks), and the immutable audit log. WhatsApp Gateway is not used in this process — the WhatsApp inbound trigger is delivered to the orchestrator as an event; we don't make outbound WA calls here. LLM Service and External Services are not used.
+
+ENGINE TARGET: This artifact is a SPECIFICATION not a deployment. isExecutable=false. Use as the source-of-truth functional spec for service implementation.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_UserAuth">
+      <bpmn:lane id="Lane_OrchestrationEngine" name="Orchestration Engine">
+        <bpmn:documentation>Orchestration Engine. Hosts the start events, triage gateway, phone-normalization script, all decision gateways, the routing-decision business rule task, the token validation task, all 11 end-event setter scripts, the final-dispatch routing gateway, and all 11 end events. Implementation: state machine in the application backend with crypto for token validation.</bpmn:documentation>
+        <bpmn:flowNodeRef>Start_WhatsApp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Start_WebSession</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Start_WebSignup</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Step1_Triage</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step2_PhoneNormalization</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Step2_Check</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Step3_Check</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step5_RoutingDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Step5_Decision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step7_TokenValidation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_Err_TokenUnavailable</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_Step7_Check</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E5</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E7</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E8</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E9</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E10</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Set_E1_Token</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_PreAudit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step9_OutputConstruction</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_FinalDispatch</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E2</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E3</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E4</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E5</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E6</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E7</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E8</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E9</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E10</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_E11</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_DataLayer" name="Data Layer">
+        <bpmn:documentation>Data Layer. Hosts every task that reads from or writes to persistent storage: suppression and block list checks (Redis), user-record lookup with advisory lock acquisition (Postgres), provisional-record idempotent insert with race handling, lock release, and the immutable audit log. Implementation: Redis for suppression sets and revocation list; Postgres with row-level advisory locks and unique constraint on phone_number; append-only audit log table (or external audit service).</bpmn:documentation>
+        <bpmn:flowNodeRef>Task_Step3_SuppressionCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_Err_SuppUnavailable</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step4_LookupLock</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_Err_LockContention</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_Err_LookupUnavailable</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step6_CreateProvisional</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_Err_UniqueConstraint</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReReadExisting</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_ReleaseLock</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step8_AuditLog</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_Err_AuditFailure</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:dataObject id="DO_Input" name="InputPayload" />
+    <bpmn:dataObjectReference id="Ref_Input" name="InputPayload" dataObjectRef="DO_Input">
+      <bpmn:documentation>InputPayload — what arrives from the trigger. For phone-based triggers (WhatsApp, Web Signup): phoneNumber (raw, may need normalization), triggerSource ('whatsapp' | 'web_signup'), inboundMessageId or formSubmissionId, timestamp. For token-based trigger (Web Session): sessionToken (JWT or opaque), triggerSource ('web_session'), timestamp.</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="DO_NormPhone" name="NormalizedPhone" />
+    <bpmn:dataObjectReference id="Ref_NormPhone" name="NormalizedPhone" dataObjectRef="DO_NormPhone">
+      <bpmn:documentation>NormalizedPhone — output of Step 2. Fields: phoneNumberE164 (normalized to +CCNNNNN format), countryCodeInferred (boolean — true if we had to infer +252 default), isPhoneValid (boolean), validationError (if invalid). Used as the lookup key for all subsequent steps in the phone path.</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="DO_UserRec" name="UserRecord" />
+    <bpmn:dataObjectReference id="Ref_UserRec" name="UserRecord" dataObjectRef="DO_UserRec">
+      <bpmn:documentation>UserRecord — the persistent user identity record. Fields: userId (UUID), phoneNumberE164 (unique), status (provisional | onboarding_started | onboarded | suppressed | blocked | onboarding_dormant | opted_out), createdAt, lastSeenAt, originalTriggerSource. Owned schema-wise by this process; consumed by Onboarding (Process #1), Coaching (Process #2), and others.</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="DO_Audit" name="AuditLogEntry" />
+    <bpmn:dataObjectReference id="Ref_Audit" name="AuditLogEntry" dataObjectRef="DO_Audit">
+      <bpmn:documentation>AuditLogEntry — the immutable record written to the audit log at Step 8. Fields: requestId (UUID), triggerSource, phoneHash (SHA-256 of phone, never raw phone), userId (if resolved), targetEndEvent (E1-E11), timestamp, ipAddress (for web triggers), inputErrors (if any). Stored append-only; no updates or deletes ever. Used for security incident review and compliance audit.</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="DO_Output" name="OutputBundle" />
+    <bpmn:dataObjectReference id="Ref_Output" name="OutputBundle" dataObjectRef="DO_Output">
+      <bpmn:documentation>OutputBundle — the response returned to the calling process. Shape varies by outcome: for E1/E2/E3 it includes userId, status, isResumed, isNew flags; for E4 it indicates duplicate-signup with original record reference; for E5/E6/E7/E8/E9/E10/E11 it includes only the outcome code and a sanitized error message (no PII).</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:startEvent id="Start_WhatsApp" name="WhatsApp Inbound Trigger">
+      <bpmn:documentation>Process trigger via inbound WhatsApp message from any phone number.
+
+EVENT TYPE: Message start event. Fired by the WhatsApp Gateway webhook receiver before any other handling.
+
+PAYLOAD: phoneNumber (raw from WhatsApp, in E.164 already), inboundMessageId, timestamp, triggerSource='whatsapp'.
+
+USED BY: Process #1 (Onboarding), Process #2 (Coaching) — both call this process at the very start of inbound message handling to resolve identity before deciding which downstream process to invoke.</bpmn:documentation>
+      <bpmn:outgoing>Flow_S1_Triage</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MsgDef_WA" messageRef="Message_WhatsApp" />
+    </bpmn:startEvent>
+    <bpmn:startEvent id="Start_WebSession" name="Web Session Token Request">
+      <bpmn:documentation>Process trigger via web API call carrying a session token.
+
+EVENT TYPE: Message start event. Fired by every web API endpoint that requires an authenticated user.
+
+PAYLOAD: sessionToken (JWT or opaque), originatingIp, userAgent, timestamp, triggerSource='web_session'.
+
+DIFFERENCE FROM WHATSAPP: Token path skips phone normalization entirely — the user is already known by token, just needs validation.</bpmn:documentation>
+      <bpmn:outgoing>Flow_S2_Triage</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MsgDef_WebSession" messageRef="Message_WebSession" />
+    </bpmn:startEvent>
+    <bpmn:startEvent id="Start_WebSignup" name="Web Signup Form">
+      <bpmn:documentation>Process trigger via web landing-page signup form submission.
+
+EVENT TYPE: Message start event. Fired when the web frontend POSTs a signup form.
+
+PAYLOAD: phoneNumber (raw, user-entered), originatingIp, formSubmissionId, timestamp, triggerSource='web_signup'.
+
+DIFFERENCE FROM WHATSAPP: Phone may be entered with or without country code; phone normalization step (Step 2) handles inference of +252 for Somalia default if user is detected as Somali (browser locale / IP geolocation).</bpmn:documentation>
+      <bpmn:outgoing>Flow_S3_Triage</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MsgDef_WebSignup" messageRef="Message_WebSignup" />
+    </bpmn:startEvent>
+    <bpmn:exclusiveGateway id="Gateway_Step1_Triage" name="Trigger Source?">
+      <bpmn:documentation>Step 1 — Triage gateway routing by trigger source.
+
+DECISION LOGIC (plain English):
+- PHONE PATH branch: triggerSource == 'whatsapp' OR triggerSource == 'web_signup' → route to Step 2 (Phone Normalization)
+- TOKEN PATH branch: triggerSource == 'web_session' → route to Step 7 (Token Validation)</bpmn:documentation>
+      <bpmn:incoming>Flow_S1_Triage</bpmn:incoming>
+      <bpmn:incoming>Flow_S2_Triage</bpmn:incoming>
+      <bpmn:incoming>Flow_S3_Triage</bpmn:incoming>
+      <bpmn:outgoing>Flow_Triage_Phone</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Triage_Token</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:scriptTask id="Task_Step2_PhoneNormalization" name="Step 2: Phone Normalization">
+      <bpmn:documentation>Step 2 — Phone Number Normalization.
+
+PURPOSE: Validate the input phone number and normalize to canonical E.164 format. Handles country-code inference for ambiguous inputs.
+
+LOGIC:
+- Strip whitespace, dashes, parentheses
+- If number starts with '+', validate E.164 pattern (^\+[1-9]\d{1,14}$)
+- If number starts with '00', convert to '+'
+- If number has no leading '+' or '00': attempt country-code inference. Default to +252 (Somalia) if browser locale or IP geolocation indicates Somali user; otherwise reject as invalid.
+- Set isPhoneValid based on final E.164 conformance and length sanity checks (minimum 8 digits after country code)
+
+OUTPUT: phoneNumberE164, countryCodeInferred (boolean), isPhoneValid (boolean), validationError (string).
+
+IMPLEMENTATION HINT: Pure script task using a phone parsing library (libphonenumber). No external calls. Sub-millisecond latency.</bpmn:documentation>
+      <bpmn:incoming>Flow_Triage_Phone</bpmn:incoming>
+      <bpmn:outgoing>Flow_Norm_Check</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:exclusiveGateway id="Gateway_Step2_Check" name="Phone Valid?" default="Flow_Norm_Invalid">
+      <bpmn:documentation>Routes based on phone normalization result.
+
+DECISION LOGIC:
+- VALID branch: isPhoneValid == true → proceed to Step 3 (Suppression Check)
+- INVALID branch (default): isPhoneValid == false → set targetEndEvent = E7 (MalformedPhoneNumber); flow continues to audit</bpmn:documentation>
+      <bpmn:incoming>Flow_Norm_Check</bpmn:incoming>
+      <bpmn:outgoing>Flow_Norm_Valid</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Norm_Invalid</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Step3_SuppressionCheck" name="Step 3: Suppression &#38; Block Check">
+      <bpmn:documentation>Step 3 — Suppression and Block List Check (PARALLEL LOOKUPS).
+
+PURPOSE: Verify that the phone number is not on the suppression list (opted out) or block list (banned for abuse, compliance reasons, etc.).
+
+LOGIC: Two parallel Redis lookups against suppression set and block set, keyed on phoneNumberE164. Both lookups must complete; either match results in non-clean status. Suppression takes precedence over Block in reporting (although both result in a stop).
+
+OUTPUT: suppressionStatus ('clean' | 'suppressed' | 'blocked').
+
+IMPLEMENTATION HINT: Service task with two concurrent Redis SISMEMBER calls. Sub-10ms p99 latency. Cache TTL on hits is 60 seconds — opt-out events from elsewhere need to invalidate this cache promptly.
+
+ERROR BOUNDARY: If Redis is unavailable, route via Event_Err_SuppUnavailable to set E10 (IdentityServiceUnavailable). Fail-closed — do NOT proceed without suppression verification.</bpmn:documentation>
+      <bpmn:incoming>Flow_Norm_Valid</bpmn:incoming>
+      <bpmn:outgoing>Flow_Supp_Check</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_Step3_Check" name="List Status?" default="Flow_Supp_Clean">
+      <bpmn:documentation>Routes based on suppression check result.
+
+DECISION LOGIC:
+- CLEAN branch (default): suppressionStatus == 'clean' → proceed to Step 4 (Lookup &amp; Lock)
+- SUPPRESSED branch: suppressionStatus == 'suppressed' → set targetEndEvent = E5 (SuppressedUser); flow continues to audit (lock NOT acquired so no release needed)
+- BLOCKED branch: suppressionStatus == 'blocked' → set targetEndEvent = E6 (BlockedUser); flow continues to audit</bpmn:documentation>
+      <bpmn:incoming>Flow_Supp_Check</bpmn:incoming>
+      <bpmn:outgoing>Flow_Supp_Clean</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Supp_Suppressed</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Supp_Blocked</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Step4_LookupLock" name="Step 4: Record Lookup &#38; Lock Acquire">
+      <bpmn:documentation>Step 4 — User Record Lookup with Advisory Lock.
+
+PURPOSE: Acquire an advisory lock on the phone number (preventing concurrent provisioning races) and look up the user record in the same atomic operation.
+
+LOGIC:
+1. Acquire Postgres advisory lock keyed on hash(phoneNumberE164) with 2-second TTL
+2. SELECT user record by phoneNumberE164
+3. Return the record (or null if not found) along with the lock handle for later release
+
+CONCURRENCY: If another process is currently holding the lock for the same phone number, this task waits up to 2 seconds; if still locked after that, raises LockContention error. This is the case where two requests for the same phone arrived ~simultaneously.
+
+OUTPUT: userRecord (or null), lockAcquired (boolean — true), lockHandle.
+
+IMPLEMENTATION HINT: Service task with Postgres `SELECT ... FROM user WHERE phone_number = ? FOR UPDATE NOWAIT` — or pg_advisory_lock pattern. Lock is released explicitly later, NOT auto-released by transaction commit.
+
+ERROR BOUNDARIES:
+- Event_Err_LockContention: lock unavailable after 2s wait → set E8 (ConcurrentRequestRejected)
+- Event_Err_LookupUnavailable: DB unavailable → set E10 (IdentityServiceUnavailable)</bpmn:documentation>
+      <bpmn:incoming>Flow_Supp_Clean</bpmn:incoming>
+      <bpmn:outgoing>Flow_Lookup_Decision</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:businessRuleTask id="Task_Step5_RoutingDecision" name="Step 5: Routing Decision">
+      <bpmn:documentation>Step 5 — Routing Decision (Decision Table).
+
+PURPOSE: Determine the routing outcome based on the user record state and trigger source.
+
+DECISION TABLE:
+- userRecord exists AND status == 'onboarded' AND triggerSource == 'whatsapp' → existing_onboarded (E1)
+- userRecord exists AND status == 'onboarded' AND triggerSource == 'web_signup' → duplicate_signup (E4)
+- userRecord exists AND status in ['onboarding_started', 'onboarding_dormant'] → resume_onboarding (E3)
+- userRecord does NOT exist → new_user (continues to Step 6 to create provisional record)
+
+OUTPUT: routingOutcome ('existing_onboarded' | 'duplicate_signup' | 'resume_onboarding' | 'new_user').
+
+IMPLEMENTATION HINT: Business rule task. Pure logic — uses already-loaded userRecord; no further DB calls.
+
+LOOPBACK ENTRY: This task is also re-entered from Task_ReReadExisting after a unique-constraint race in Step 6. On loopback the userRecord will exist and routing will pick the right branch.</bpmn:documentation>
+      <bpmn:incoming>Flow_Lookup_Decision</bpmn:incoming>
+      <bpmn:incoming>Flow_ReRead_Loop</bpmn:incoming>
+      <bpmn:outgoing>Flow_Routing_Check</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="Gateway_Step5_Decision" name="Routing Outcome?" default="Flow_Routing_New">
+      <bpmn:documentation>Routes based on routing decision.
+
+DECISION LOGIC:
+- EXISTING branch: routingOutcome == 'existing_onboarded' → set E1 (ExistingUserAuthenticated); release lock; audit; output
+- DUPLICATE branch: routingOutcome == 'duplicate_signup' → set E4 (DuplicateSignupDetected); release lock; audit; output
+- RESUME branch: routingOutcome == 'resume_onboarding' → set E3 (ResumeOnboardingDetected); release lock; audit; output
+- NEW USER branch (default): routingOutcome == 'new_user' → proceed to Step 6 (Create Provisional Record)</bpmn:documentation>
+      <bpmn:incoming>Flow_Routing_Check</bpmn:incoming>
+      <bpmn:outgoing>Flow_Routing_Existing</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Routing_Dup</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Routing_Resume</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Routing_New</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Step6_CreateProvisional" name="Step 6: Create Provisional Record">
+      <bpmn:documentation>Step 6 — Create Provisional User Record (IDEMPOTENT INSERT).
+
+PURPOSE: For new users, insert a provisional user record into the user-record store. The record is the seed for downstream Onboarding to flesh out.
+
+LOGIC: INSERT into user table with phoneNumberE164, status='provisional', createdAt=now(), originalTriggerSource. The phone_number column has a UNIQUE constraint, so concurrent inserts from another instance are caught and routed to re-read.
+
+OUTPUT: New userRecord with userId.
+
+IMPLEMENTATION HINT: Service task with Postgres INSERT and ON CONFLICT clause OR explicit error catching on unique constraint violation. The advisory lock from Step 4 protects against most races, but the unique constraint provides defense-in-depth in case of lock-acquisition timing issues.
+
+ERROR BOUNDARY: Event_Err_UniqueConstraint catches the case where another process inserted the same phone number before this one (rare given the lock, but possible at lock-handoff edges). Routes to Task_ReReadExisting which re-reads and loops back to Step 5 routing.</bpmn:documentation>
+      <bpmn:incoming>Flow_Routing_New</bpmn:incoming>
+      <bpmn:outgoing>Flow_Create_E2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_ReReadExisting" name="Re-Read Existing Record">
+      <bpmn:documentation>Re-read existing user record after unique-constraint race.
+
+PURPOSE: After Step 6 hits a unique-constraint violation, fetch the now-existing record (inserted by the concurrent process) so we can route to the correct outcome.
+
+LOGIC: SELECT user record by phoneNumberE164 — should always succeed at this point because the concurrent insert just completed.
+
+OUTPUT: userRecord populated; loops back to Step 5 (Routing Decision).
+
+IMPLEMENTATION HINT: Service task with simple SELECT. The race window is microseconds long.</bpmn:documentation>
+      <bpmn:incoming>Flow_ReRead_Exec</bpmn:incoming>
+      <bpmn:outgoing>Flow_ReRead_Loop</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Step7_TokenValidation" name="Step 7: Token Validation">
+      <bpmn:documentation>Step 7 — Session Token Validation.
+
+PURPOSE: Validate the JWT or opaque session token. Verifies signature, expiry, and revocation status.
+
+LOGIC:
+- For JWT: verify signature against known issuer key; check exp/iat/nbf claims; check audience and issuer claims match expected values
+- For opaque token: look up token in token store; verify not expired and not revoked
+- Check revocation list (Redis) — token may have been revoked by user logout or admin action since issuance
+
+OUTPUT: isTokenValid (boolean), userId (extracted from token claim if valid), validationError (string if invalid).
+
+IMPLEMENTATION HINT: Service task with crypto verification (JWT library) and one Redis lookup for revocation. Sub-50ms latency.
+
+ERROR BOUNDARY: Event_Err_TokenUnavailable catches ServiceUnavailable when Redis or signing-key service is down. Routes to Task_Set_E10.</bpmn:documentation>
+      <bpmn:incoming>Flow_Triage_Token</bpmn:incoming>
+      <bpmn:outgoing>Flow_Token_Check</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_Step7_Check" name="Token Valid?" default="Flow_Token_Invalid">
+      <bpmn:documentation>Routes based on token validation result.
+
+DECISION LOGIC:
+- VALID branch: isTokenValid == true → set E1 (ExistingUserAuthenticated, web variant); audit; output
+- INVALID branch (default): isTokenValid == false → set E9 (WebSessionInvalid); audit; output</bpmn:documentation>
+      <bpmn:incoming>Flow_Token_Check</bpmn:incoming>
+      <bpmn:outgoing>Flow_Token_Valid</bpmn:outgoing>
+      <bpmn:outgoing>Flow_Token_Invalid</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:scriptTask id="Task_Set_E1" name="Set targetEndEvent = E1">
+      <bpmn:documentation>Set targetEndEvent='E1' (ExistingUserAuthenticated, phone path). Pure script task, no I/O. Followed by ReleaseLock since the lock was acquired in Step 4.</bpmn:documentation>
+      <bpmn:incoming>Flow_Routing_Existing</bpmn:incoming>
+      <bpmn:outgoing>Flow_LockRelease_1</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="Task_Set_E2" name="Set targetEndEvent = E2">
+      <bpmn:documentation>Set targetEndEvent='E2' (NewUserProvisioned). Pure script task. Followed by ReleaseLock since the lock was acquired in Step 4.</bpmn:documentation>
+      <bpmn:incoming>Flow_Create_E2</bpmn:incoming>
+      <bpmn:outgoing>Flow_LockRelease_2</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="Task_Set_E3" name="Set targetEndEvent = E3">
+      <bpmn:documentation>Set targetEndEvent='E3' (ResumeOnboardingDetected). Pure script. Followed by ReleaseLock.</bpmn:documentation>
+      <bpmn:incoming>Flow_Routing_Resume</bpmn:incoming>
+      <bpmn:outgoing>Flow_LockRelease_3</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="Task_Set_E4" name="Set targetEndEvent = E4">
+      <bpmn:documentation>Set targetEndEvent='E4' (DuplicateSignupDetected). Pure script. Followed by ReleaseLock.</bpmn:documentation>
+      <bpmn:incoming>Flow_Routing_Dup</bpmn:incoming>
+      <bpmn:outgoing>Flow_LockRelease_4</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="Task_Set_E5" name="Set targetEndEvent = E5">
+      <bpmn:documentation>Set targetEndEvent='E5' (SuppressedUser). Pure script. NOT followed by ReleaseLock — lock was never acquired (suppression check happens before Step 4).</bpmn:documentation>
+      <bpmn:incoming>Flow_Supp_Suppressed</bpmn:incoming>
+      <bpmn:outgoing>Flow_Merge_E5</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="Task_Set_E6" name="Set targetEndEvent = E6">
+      <bpmn:documentation>Set targetEndEvent='E6' (BlockedUser). Pure script. NOT followed by ReleaseLock.</bpmn:documentation>
+      <bpmn:incoming>Flow_Supp_Blocked</bpmn:incoming>
+      <bpmn:outgoing>Flow_Merge_E6</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="Task_Set_E7" name="Set targetEndEvent = E7">
+      <bpmn:documentation>Set targetEndEvent='E7' (MalformedPhoneNumber). Pure script. NOT followed by ReleaseLock — phone validation happens before Step 4.</bpmn:documentation>
+      <bpmn:incoming>Flow_Norm_Invalid</bpmn:incoming>
+      <bpmn:outgoing>Flow_Merge_E7</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="Task_Set_E8" name="Set targetEndEvent = E8">
+      <bpmn:documentation>Set targetEndEvent='E8' (ConcurrentRequestRejected). Pure script. NOT followed by ReleaseLock — lock was never acquired (we hit contention).</bpmn:documentation>
+      <bpmn:incoming>Flow_Err_LockContent</bpmn:incoming>
+      <bpmn:outgoing>Flow_Merge_E8</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="Task_Set_E9" name="Set targetEndEvent = E9">
+      <bpmn:documentation>Set targetEndEvent='E9' (WebSessionInvalid). Pure script. NOT followed by ReleaseLock — token path doesn't acquire the phone-record lock.</bpmn:documentation>
+      <bpmn:incoming>Flow_Token_Invalid</bpmn:incoming>
+      <bpmn:outgoing>Flow_Merge_E9</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="Task_Set_E10" name="Set targetEndEvent = E10">
+      <bpmn:documentation>Set targetEndEvent='E10' (IdentityServiceUnavailable). Pure script. NOT followed by ReleaseLock — service errors happen before or independent of lock acquisition.</bpmn:documentation>
+      <bpmn:incoming>Flow_Err_SuppUnavail</bpmn:incoming>
+      <bpmn:incoming>Flow_Err_LookUnavail</bpmn:incoming>
+      <bpmn:incoming>Flow_Err_TokenUnavail</bpmn:incoming>
+      <bpmn:outgoing>Flow_Merge_E10</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:scriptTask id="Task_Set_E1_Token" name="Set targetEndEvent = E1 (Token)">
+      <bpmn:documentation>Set targetEndEvent='E1' (ExistingUserAuthenticated, token path). Pure script. NOT followed by ReleaseLock — token path doesn't acquire the phone-record lock.</bpmn:documentation>
+      <bpmn:incoming>Flow_Token_Valid</bpmn:incoming>
+      <bpmn:outgoing>Flow_Merge_E1Token</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:serviceTask id="Task_ReleaseLock" name="Release Advisory Lock">
+      <bpmn:documentation>Release the advisory lock acquired at Step 4.
+
+PURPOSE: Explicitly release the phone-number advisory lock. Reached after E1, E2, E3, or E4 have been set (the four outcomes that acquired the lock).
+
+LOGIC: pg_advisory_unlock with the same key used to acquire. Idempotent: harmless if lock has already auto-released due to TTL.
+
+IMPLEMENTATION HINT: Service task. MUST run before any further work to free the lock for other waiters. Single Postgres call, sub-5ms.</bpmn:documentation>
+      <bpmn:incoming>Flow_LockRelease_1</bpmn:incoming>
+      <bpmn:incoming>Flow_LockRelease_2</bpmn:incoming>
+      <bpmn:incoming>Flow_LockRelease_3</bpmn:incoming>
+      <bpmn:incoming>Flow_LockRelease_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_Merge_RL</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_PreAudit" name="Merge to Audit">
+      <bpmn:documentation>Convergence point for ALL outcome paths. 8 incoming flows merge here: from ReleaseLock (E1/E2/E3/E4 paths), Set_E5, Set_E6, Set_E7, Set_E8, Set_E10, Set_E1_Token, Set_E9. Single outgoing flow to Audit Log Write.
+
+PURPOSE: Ensure every outcome (success or failure) flows through the audit log. Security requirement.</bpmn:documentation>
+      <bpmn:incoming>Flow_Merge_RL</bpmn:incoming>
+      <bpmn:incoming>Flow_Merge_E5</bpmn:incoming>
+      <bpmn:incoming>Flow_Merge_E6</bpmn:incoming>
+      <bpmn:incoming>Flow_Merge_E7</bpmn:incoming>
+      <bpmn:incoming>Flow_Merge_E8</bpmn:incoming>
+      <bpmn:incoming>Flow_Merge_E10</bpmn:incoming>
+      <bpmn:incoming>Flow_Merge_E1Token</bpmn:incoming>
+      <bpmn:incoming>Flow_Merge_E9</bpmn:incoming>
+      <bpmn:outgoing>Flow_PreAudit_Audit</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Step8_AuditLog" name="Step 8: Write Audit Log (Fail-Closed)">
+      <bpmn:documentation>Step 8 — Immutable Audit Log Write (FAIL-CLOSED).
+
+PURPOSE: Write a permanent, append-only record of this authentication attempt and its outcome to the audit log.
+
+LOGIC: INSERT into audit_log table with requestId, triggerSource, hash(phoneNumberE164) [NEVER raw phone], userId (if resolved), targetEndEvent, timestamp, ipAddress (web only), inputErrors. The audit_log table is append-only with no UPDATE or DELETE permissions.
+
+OUTPUT: auditLogEntryId.
+
+IMPLEMENTATION HINT: Service task with Postgres INSERT or call to external audit service (cloud-based audit log like AWS CloudTrail equivalent). Synchronous — must complete before output.
+
+CRITICAL: This step is FAIL-CLOSED. If the audit write fails (DB unavailable, capacity exhausted, permission error), the entire process terminates at E11 (AuditLogFailure) — the caller does NOT receive any authentication result, regardless of what would otherwise have happened. This protects against silent security incidents.</bpmn:documentation>
+      <bpmn:incoming>Flow_PreAudit_Audit</bpmn:incoming>
+      <bpmn:outgoing>Flow_Audit_Output</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:scriptTask id="Task_Step9_OutputConstruction" name="Step 9: Construct Output Bundle">
+      <bpmn:documentation>Step 9 — Output Bundle Construction.
+
+PURPOSE: Assemble the response object that will be returned to the calling process based on targetEndEvent.
+
+LOGIC: Switch on targetEndEvent to construct the appropriate response shape:
+- E1/E2/E3: include userId, status, isResumed/isNew flags
+- E4: include outcome code and original record reference
+- E5/E6/E7/E8/E9/E10: include only outcome code and sanitized error message (no PII, no internal details)
+
+OUTPUT: outputBundle ready for return.
+
+IMPLEMENTATION HINT: Pure script task. No I/O. Sub-millisecond.</bpmn:documentation>
+      <bpmn:incoming>Flow_Audit_Output</bpmn:incoming>
+      <bpmn:outgoing>Flow_Output_Dispatch</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:exclusiveGateway id="Gateway_FinalDispatch" name="Dispatch by targetEndEvent" default="Flow_End_E1">
+      <bpmn:documentation>Final dispatch routing 10-way to specific end events based on targetEndEvent.
+
+DECISION LOGIC: Pure switch on targetEndEvent variable:
+- E1 → EndEvent_E1
+- E2 → EndEvent_E2
+- E3 → EndEvent_E3
+- E4 → EndEvent_E4
+- E5 → EndEvent_E5
+- E6 → EndEvent_E6
+- E7 → EndEvent_E7
+- E8 → EndEvent_E8
+- E9 → EndEvent_E9
+- E10 → EndEvent_E10
+
+E11 (AuditLogFailure) is NOT routed through this gateway — it is reached directly from Event_Err_AuditFailure boundary, bypassing Output Construction.</bpmn:documentation>
+      <bpmn:incoming>Flow_Output_Dispatch</bpmn:incoming>
+      <bpmn:outgoing>Flow_End_E1</bpmn:outgoing>
+      <bpmn:outgoing>Flow_End_E2</bpmn:outgoing>
+      <bpmn:outgoing>Flow_End_E3</bpmn:outgoing>
+      <bpmn:outgoing>Flow_End_E4</bpmn:outgoing>
+      <bpmn:outgoing>Flow_End_E5</bpmn:outgoing>
+      <bpmn:outgoing>Flow_End_E6</bpmn:outgoing>
+      <bpmn:outgoing>Flow_End_E7</bpmn:outgoing>
+      <bpmn:outgoing>Flow_End_E8</bpmn:outgoing>
+      <bpmn:outgoing>Flow_End_E9</bpmn:outgoing>
+      <bpmn:outgoing>Flow_End_E10</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="Event_E1" name="E1: Existing User Authenticated">
+      <bpmn:documentation>E1: ExistingUserAuthenticated. Existing onboarded user resolved successfully. For phone path: userId returned to caller (Process #2 Coaching). For token path: userId from token claim returned. Lock released (phone path only).</bpmn:documentation>
+      <bpmn:incoming>Flow_End_E1</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Event_E2" name="E2: New User Provisioned">
+      <bpmn:documentation>E2: NewUserProvisioned. New user record created with status='provisional'. Caller (typically Process #1 Onboarding) receives the userId and proceeds with onboarding flow. Lock released.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_E2</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Event_E3" name="E3: Resume Onboarding Detected">
+      <bpmn:documentation>E3: ResumeOnboardingDetected. User has an in-progress onboarding (status in ['onboarding_started', 'onboarding_dormant']). Caller (Process #1) receives userId and resumes from lastCompletedStep. Lock released.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_E3</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Event_E4" name="E4: Duplicate Signup Detected">
+      <bpmn:documentation>E4: DuplicateSignupDetected. User attempting web signup but is already onboarded. Caller (web frontend) receives outcome code and prompts user to log in instead. Lock released.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_E4</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Event_E5" name="E5: Suppressed User">
+      <bpmn:documentation>E5: SuppressedUser. Phone number on suppression list (opt-out). No further interaction will occur. Caller informed; compliance audit log written.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_E5</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Event_E6" name="E6: Blocked User">
+      <bpmn:documentation>E6: BlockedUser. Phone number on block list (banned for abuse, compliance, etc.). No further interaction. Caller informed.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_E6</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Event_E7" name="E7: Malformed Phone Number">
+      <bpmn:documentation>E7: MalformedPhoneNumber. Phone number failed normalization or validity check. Caller receives error with sanitized validation message.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_E7</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Event_E8" name="E8: Concurrent Request Rejected">
+      <bpmn:documentation>E8: ConcurrentRequestRejected. Could not acquire advisory lock within 2s — another process is currently provisioning the same phone number. Caller should retry with backoff.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_E8</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Event_E9" name="E9: Web Session Invalid">
+      <bpmn:documentation>E9: WebSessionInvalid. Token path: token signature, expiry, or revocation check failed. Caller (web API) returns 401 to client.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_E9</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Event_E10" name="E10: Identity Service Unavailable">
+      <bpmn:documentation>E10: IdentityServiceUnavailable. Underlying infrastructure unavailable (Redis, Postgres, signing service). Caller should retry with backoff. Engineering alerted.</bpmn:documentation>
+      <bpmn:incoming>Flow_End_E10</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="Event_E11" name="E11: Audit Log Failure">
+      <bpmn:documentation>E11: AuditLogFailure. Audit log could not be written. Authentication result is NOT returned to caller — caller must treat this as a hard failure and retry. HIGH-severity incident requiring engineering attention before service can resume normally.</bpmn:documentation>
+      <bpmn:incoming>Flow_Audit_Fail_E11</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:boundaryEvent id="Event_Err_SuppUnavailable" name="Service Unavailable" attachedToRef="Task_Step3_SuppressionCheck">
+      <bpmn:documentation>Error boundary on Suppression Check. Catches ServiceUnavailable when Redis is down, network partitioned, or response timeout. Routes to Task_Set_E10. Fail-closed semantics: NO authentication can proceed if suppression cannot be verified, because that risks contacting opted-out users.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Err_SuppUnavail</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Event_Err_SuppUnavailable" errorRef="Error_ServiceUnavailable" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Event_Err_LockContention" name="Lock Contention" attachedToRef="Task_Step4_LookupLock">
+      <bpmn:documentation>Error boundary on Lookup &amp; Lock. Catches LockContention when another process is holding the lock for the same phoneNumberE164 longer than the 2s wait limit. Routes to Task_Set_E8. The caller should retry with backoff.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Err_LockContent</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Event_Err_LockContention" errorRef="Error_LockContention" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Event_Err_LookupUnavailable" name="Lookup Service Unavailable" attachedToRef="Task_Step4_LookupLock">
+      <bpmn:documentation>Error boundary on Lookup &amp; Lock. Catches ServiceUnavailable when the user-record DB is unreachable or response timeout. Routes to Task_Set_E10.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Err_LookUnavail</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Event_Err_LookupUnavailable" errorRef="Error_ServiceUnavailable" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Event_Err_UniqueConstraint" name="Unique Constraint (Race)" attachedToRef="Task_Step6_CreateProvisional">
+      <bpmn:documentation>Error boundary on Create Provisional Record. Catches UniqueConstraint violation indicating a concurrent insert by another process. Routes to Task_ReReadExisting to re-read the now-existing record and loop back to Step 5 for re-routing (the routing decision will pick the right outcome based on the existing record).</bpmn:documentation>
+      <bpmn:outgoing>Flow_ReRead_Exec</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Event_Err_UniqueConstraint" errorRef="Error_UniqueConstraint" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Event_Err_TokenUnavailable" name="Token Service Unavailable" attachedToRef="Task_Step7_TokenValidation">
+      <bpmn:documentation>Error boundary on Token Validation. Catches ServiceUnavailable when Redis (revocation list) or signing-key service is unreachable. Routes to Task_Set_E10. Fail-closed: cannot authenticate without revocation check.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Err_TokenUnavail</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Event_Err_TokenUnavailable" errorRef="Error_ServiceUnavailable" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="Event_Err_AuditFailure" name="Audit Write Failure" attachedToRef="Task_Step8_AuditLog">
+      <bpmn:documentation>Error boundary on Audit Log Write. Catches AuditFailure when the audit log cannot be written. Routes DIRECTLY to E11 (AuditLogFailure) — bypasses Output Construction since no result is being returned to the caller. HIGH-severity incident.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Audit_Fail_E11</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_Event_Err_AuditFailure" errorRef="Error_AuditFailure" />
+    </bpmn:boundaryEvent>
+    <bpmn:sequenceFlow id="Flow_S1_Triage" sourceRef="Start_WhatsApp" targetRef="Gateway_Step1_Triage">
+      <bpmn:documentation>WhatsApp inbound trigger; route to triage.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S2_Triage" sourceRef="Start_WebSession" targetRef="Gateway_Step1_Triage">
+      <bpmn:documentation>Web session token request; route to triage.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S3_Triage" sourceRef="Start_WebSignup" targetRef="Gateway_Step1_Triage">
+      <bpmn:documentation>Web signup form submission; route to triage.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Triage_Phone" sourceRef="Gateway_Step1_Triage" targetRef="Task_Step2_PhoneNormalization">
+      <bpmn:documentation>Phone-based trigger; route to phone normalization.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">triggerSource is 'whatsapp' OR 'web_signup' (phone-based)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Triage_Token" sourceRef="Gateway_Step1_Triage" targetRef="Task_Step7_TokenValidation">
+      <bpmn:documentation>Token-based trigger; route to token validation.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">triggerSource is 'web_session' (token-based)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Norm_Check" sourceRef="Task_Step2_PhoneNormalization" targetRef="Gateway_Step2_Check">
+      <bpmn:documentation>Normalization complete; route by validity.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Norm_Valid" sourceRef="Gateway_Step2_Check" targetRef="Task_Step3_SuppressionCheck">
+      <bpmn:documentation>Phone is valid E.164; check suppression and block lists.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Phone valid (isPhoneValid == true)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Norm_Invalid" sourceRef="Gateway_Step2_Check" targetRef="Task_Set_E7">
+      <bpmn:documentation>Phone failed validation; set E7 (MalformedPhoneNumber). Lock not yet acquired.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Phone invalid (default branch)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Supp_Check" sourceRef="Task_Step3_SuppressionCheck" targetRef="Gateway_Step3_Check">
+      <bpmn:documentation>Suppression and block list check complete; route by status.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Supp_Clean" sourceRef="Gateway_Step3_Check" targetRef="Task_Step4_LookupLock">
+      <bpmn:documentation>User clear; proceed to lookup with advisory lock acquisition.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Status is 'clean' (default branch)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Supp_Suppressed" sourceRef="Gateway_Step3_Check" targetRef="Task_Set_E5">
+      <bpmn:documentation>User on suppression list; set E5 (SuppressedUser). Lock not acquired.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Status is 'suppressed'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Supp_Blocked" sourceRef="Gateway_Step3_Check" targetRef="Task_Set_E6">
+      <bpmn:documentation>User on block list; set E6 (BlockedUser). Lock not acquired.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Status is 'blocked'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Lookup_Decision" sourceRef="Task_Step4_LookupLock" targetRef="Task_Step5_RoutingDecision">
+      <bpmn:documentation>Lock acquired and record fetched; evaluate routing decision.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Routing_Check" sourceRef="Task_Step5_RoutingDecision" targetRef="Gateway_Step5_Decision">
+      <bpmn:documentation>Routing decision complete; route by outcome.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Routing_Existing" sourceRef="Gateway_Step5_Decision" targetRef="Task_Set_E1">
+      <bpmn:documentation>Existing onboarded user; set E1. Lock will be released after this.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">routingOutcome == 'existing_onboarded'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Routing_Dup" sourceRef="Gateway_Step5_Decision" targetRef="Task_Set_E4">
+      <bpmn:documentation>Already-onboarded user attempting web signup; set E4. Lock will be released.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">routingOutcome == 'duplicate_signup'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Routing_Resume" sourceRef="Gateway_Step5_Decision" targetRef="Task_Set_E3">
+      <bpmn:documentation>User has in-progress onboarding; set E3. Lock will be released.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">routingOutcome == 'resume_onboarding'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Routing_New" sourceRef="Gateway_Step5_Decision" targetRef="Task_Step6_CreateProvisional">
+      <bpmn:documentation>New user; create provisional record.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">routingOutcome == 'new_user' (default branch)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Create_E2" sourceRef="Task_Step6_CreateProvisional" targetRef="Task_Set_E2">
+      <bpmn:documentation>Provisional record created; set E2 (NewUserProvisioned). Lock will be released.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ReRead_Exec" sourceRef="Event_Err_UniqueConstraint" targetRef="Task_ReReadExisting">
+      <bpmn:documentation>Unique-constraint race: another process inserted same phone first; re-read the existing record.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_ReRead_Loop" sourceRef="Task_ReReadExisting" targetRef="Task_Step5_RoutingDecision">
+      <bpmn:documentation>Existing record now loaded; loop back to routing decision (will pick correct outcome).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Token_Check" sourceRef="Task_Step7_TokenValidation" targetRef="Gateway_Step7_Check">
+      <bpmn:documentation>Token validation complete; route by validity.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Token_Valid" sourceRef="Gateway_Step7_Check" targetRef="Task_Set_E1_Token">
+      <bpmn:documentation>Token verified; set E1 (web variant). No lock to release.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Token valid (isTokenValid == true)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Token_Invalid" sourceRef="Gateway_Step7_Check" targetRef="Task_Set_E9">
+      <bpmn:documentation>Token failed validation; set E9 (WebSessionInvalid). No lock to release.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Token invalid (default branch)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LockRelease_1" sourceRef="Task_Set_E1" targetRef="Task_ReleaseLock">
+      <bpmn:documentation>E1 set; release advisory lock.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LockRelease_2" sourceRef="Task_Set_E2" targetRef="Task_ReleaseLock">
+      <bpmn:documentation>E2 set; release advisory lock.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LockRelease_3" sourceRef="Task_Set_E3" targetRef="Task_ReleaseLock">
+      <bpmn:documentation>E3 set; release advisory lock.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_LockRelease_4" sourceRef="Task_Set_E4" targetRef="Task_ReleaseLock">
+      <bpmn:documentation>E4 set; release advisory lock.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Err_SuppUnavail" sourceRef="Event_Err_SuppUnavailable" targetRef="Task_Set_E10">
+      <bpmn:documentation>Suppression service unavailable; set E10. Fail-closed.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Err_LockContent" sourceRef="Event_Err_LockContention" targetRef="Task_Set_E8">
+      <bpmn:documentation>Lock contention timeout; set E8. Caller should retry.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Err_LookUnavail" sourceRef="Event_Err_LookupUnavailable" targetRef="Task_Set_E10">
+      <bpmn:documentation>User-record DB unavailable; set E10.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Err_TokenUnavail" sourceRef="Event_Err_TokenUnavailable" targetRef="Task_Set_E10">
+      <bpmn:documentation>Token service unavailable; set E10. Fail-closed.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Merge_RL" sourceRef="Task_ReleaseLock" targetRef="Gateway_PreAudit">
+      <bpmn:documentation>Lock released; converge for audit.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Merge_E5" sourceRef="Task_Set_E5" targetRef="Gateway_PreAudit">
+      <bpmn:documentation>E5 path; converge for audit (no lock to release).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Merge_E6" sourceRef="Task_Set_E6" targetRef="Gateway_PreAudit">
+      <bpmn:documentation>E6 path; converge for audit (no lock to release).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Merge_E7" sourceRef="Task_Set_E7" targetRef="Gateway_PreAudit">
+      <bpmn:documentation>E7 path; converge for audit (no lock to release).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Merge_E8" sourceRef="Task_Set_E8" targetRef="Gateway_PreAudit">
+      <bpmn:documentation>E8 path; converge for audit (no lock to release).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Merge_E10" sourceRef="Task_Set_E10" targetRef="Gateway_PreAudit">
+      <bpmn:documentation>E10 path; converge for audit (no lock to release).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Merge_E1Token" sourceRef="Task_Set_E1_Token" targetRef="Gateway_PreAudit">
+      <bpmn:documentation>E1 (token path); converge for audit (no lock to release).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Merge_E9" sourceRef="Task_Set_E9" targetRef="Gateway_PreAudit">
+      <bpmn:documentation>E9 path; converge for audit (no lock to release).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_PreAudit_Audit" sourceRef="Gateway_PreAudit" targetRef="Task_Step8_AuditLog">
+      <bpmn:documentation>All paths converged; write immutable audit log entry.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Audit_Fail_E11" sourceRef="Event_Err_AuditFailure" targetRef="Event_E11">
+      <bpmn:documentation>Audit write failed; FAIL-CLOSED to E11. Caller does NOT receive any authentication result.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Audit_Output" sourceRef="Task_Step8_AuditLog" targetRef="Task_Step9_OutputConstruction">
+      <bpmn:documentation>Audit log written; construct output bundle.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Output_Dispatch" sourceRef="Task_Step9_OutputConstruction" targetRef="Gateway_FinalDispatch">
+      <bpmn:documentation>Output bundle ready; dispatch to specific end event by targetEndEvent variable.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_E1" sourceRef="Gateway_FinalDispatch" targetRef="Event_E1">
+      <bpmn:documentation>Terminate at E1: ExistingUserAuthenticated.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">targetEndEvent == 'E1' (default branch)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_E2" sourceRef="Gateway_FinalDispatch" targetRef="Event_E2">
+      <bpmn:documentation>Terminate at E2: NewUserProvisioned.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">targetEndEvent == 'E2'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_E3" sourceRef="Gateway_FinalDispatch" targetRef="Event_E3">
+      <bpmn:documentation>Terminate at E3: ResumeOnboardingDetected.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">targetEndEvent == 'E3'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_E4" sourceRef="Gateway_FinalDispatch" targetRef="Event_E4">
+      <bpmn:documentation>Terminate at E4: DuplicateSignupDetected.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">targetEndEvent == 'E4'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_E5" sourceRef="Gateway_FinalDispatch" targetRef="Event_E5">
+      <bpmn:documentation>Terminate at E5: SuppressedUser.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">targetEndEvent == 'E5'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_E6" sourceRef="Gateway_FinalDispatch" targetRef="Event_E6">
+      <bpmn:documentation>Terminate at E6: BlockedUser.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">targetEndEvent == 'E6'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_E7" sourceRef="Gateway_FinalDispatch" targetRef="Event_E7">
+      <bpmn:documentation>Terminate at E7: MalformedPhoneNumber.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">targetEndEvent == 'E7'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_E8" sourceRef="Gateway_FinalDispatch" targetRef="Event_E8">
+      <bpmn:documentation>Terminate at E8: ConcurrentRequestRejected.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">targetEndEvent == 'E8'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_E9" sourceRef="Gateway_FinalDispatch" targetRef="Event_E9">
+      <bpmn:documentation>Terminate at E9: WebSessionInvalid.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">targetEndEvent == 'E9'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_End_E10" sourceRef="Gateway_FinalDispatch" targetRef="Event_E10">
+      <bpmn:documentation>Terminate at E10: IdentityServiceUnavailable.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">targetEndEvent == 'E10'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_UserAuth">
+    <bpmndi:BPMNPlane id="BPMNPlane_UserAuth" bpmnElement="Collaboration_Hogaan_UserAuth">
+      <bpmndi:BPMNShape id="Pool_di" bpmnElement="Participant_Hogaan" isHorizontal="true">
+        <dc:Bounds x="50" y="50" width="2900" height="1000" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_OrchestrationEngine_di" bpmnElement="Lane_OrchestrationEngine" isHorizontal="true">
+        <dc:Bounds x="80" y="50" width="2870" height="600" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_DataLayer_di" bpmnElement="Lane_DataLayer" isHorizontal="true">
+        <dc:Bounds x="80" y="650" width="2870" height="400" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_WhatsApp_di" bpmnElement="Start_WhatsApp">
+        <dc:Bounds x="130" y="202" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="100" y="243" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_WebSignup_di" bpmnElement="Start_WebSignup">
+        <dc:Bounds x="130" y="280" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="100" y="321" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_WebSession_di" bpmnElement="Start_WebSession">
+        <dc:Bounds x="130" y="362" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="100" y="403" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Step1_Triage_di" bpmnElement="Gateway_Step1_Triage" isMarkerVisible="true">
+        <dc:Bounds x="220" y="275" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="195" y="250" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step2_PhoneNormalization_di" bpmnElement="Task_Step2_PhoneNormalization">
+        <dc:Bounds x="310" y="180" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Step2_Check_di" bpmnElement="Gateway_Step2_Check" isMarkerVisible="true">
+        <dc:Bounds x="470" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="445" y="170" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Step3_Check_di" bpmnElement="Gateway_Step3_Check" isMarkerVisible="true">
+        <dc:Bounds x="700" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="675" y="170" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step5_RoutingDecision_di" bpmnElement="Task_Step5_RoutingDecision">
+        <dc:Bounds x="920" y="180" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Step5_Decision_di" bpmnElement="Gateway_Step5_Decision" isMarkerVisible="true">
+        <dc:Bounds x="1080" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1055" y="170" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step3_SuppressionCheck_di" bpmnElement="Task_Step3_SuppressionCheck">
+        <dc:Bounds x="570" y="770" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Err_SuppUnavailable_di" bpmnElement="Event_Err_SuppUnavailable">
+        <dc:Bounds x="605" y="832" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="575" y="873" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step4_LookupLock_di" bpmnElement="Task_Step4_LookupLock">
+        <dc:Bounds x="770" y="770" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Err_LockContention_di" bpmnElement="Event_Err_LockContention">
+        <dc:Bounds x="790" y="832" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="760" y="873" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Err_LookupUnavailable_di" bpmnElement="Event_Err_LookupUnavailable">
+        <dc:Bounds x="838" y="832" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="808" y="873" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step6_CreateProvisional_di" bpmnElement="Task_Step6_CreateProvisional">
+        <dc:Bounds x="1170" y="770" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Err_UniqueConstraint_di" bpmnElement="Event_Err_UniqueConstraint">
+        <dc:Bounds x="1205" y="832" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1175" y="873" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReReadExisting_di" bpmnElement="Task_ReReadExisting">
+        <dc:Bounds x="1170" y="900" width="110" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step7_TokenValidation_di" bpmnElement="Task_Step7_TokenValidation">
+        <dc:Bounds x="310" y="340" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Err_TokenUnavailable_di" bpmnElement="Event_Err_TokenUnavailable">
+        <dc:Bounds x="370" y="402" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="340" y="443" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_Step7_Check_di" bpmnElement="Gateway_Step7_Check" isMarkerVisible="true">
+        <dc:Bounds x="470" y="355" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="445" y="330" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E1_di" bpmnElement="Task_Set_E1">
+        <dc:Bounds x="1330" y="430" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E2_di" bpmnElement="Task_Set_E2">
+        <dc:Bounds x="1330" y="485" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E3_di" bpmnElement="Task_Set_E3">
+        <dc:Bounds x="1430" y="430" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E4_di" bpmnElement="Task_Set_E4">
+        <dc:Bounds x="1430" y="485" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E7_di" bpmnElement="Task_Set_E7">
+        <dc:Bounds x="1330" y="540" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E5_di" bpmnElement="Task_Set_E5">
+        <dc:Bounds x="1430" y="540" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E6_di" bpmnElement="Task_Set_E6">
+        <dc:Bounds x="1530" y="540" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E8_di" bpmnElement="Task_Set_E8">
+        <dc:Bounds x="1530" y="430" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E10_di" bpmnElement="Task_Set_E10">
+        <dc:Bounds x="1530" y="485" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E1_Token_di" bpmnElement="Task_Set_E1_Token">
+        <dc:Bounds x="1630" y="485" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Set_E9_di" bpmnElement="Task_Set_E9">
+        <dc:Bounds x="1630" y="540" width="80" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_ReleaseLock_di" bpmnElement="Task_ReleaseLock">
+        <dc:Bounds x="1740" y="770" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_PreAudit_di" bpmnElement="Gateway_PreAudit" isMarkerVisible="true">
+        <dc:Bounds x="1900" y="505" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1875" y="480" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step8_AuditLog_di" bpmnElement="Task_Step8_AuditLog">
+        <dc:Bounds x="1990" y="770" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_Err_AuditFailure_di" bpmnElement="Event_Err_AuditFailure">
+        <dc:Bounds x="2050" y="832" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2020" y="873" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step9_OutputConstruction_di" bpmnElement="Task_Step9_OutputConstruction">
+        <dc:Bounds x="2160" y="380" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_FinalDispatch_di" bpmnElement="Gateway_FinalDispatch" isMarkerVisible="true">
+        <dc:Bounds x="2320" y="395" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2295" y="370" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E1_di" bpmnElement="Event_E1">
+        <dc:Bounds x="2410" y="160" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2380" y="201" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E2_di" bpmnElement="Event_E2">
+        <dc:Bounds x="2410" y="210" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2380" y="251" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E3_di" bpmnElement="Event_E3">
+        <dc:Bounds x="2410" y="260" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2380" y="301" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E4_di" bpmnElement="Event_E4">
+        <dc:Bounds x="2410" y="310" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2380" y="351" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E5_di" bpmnElement="Event_E5">
+        <dc:Bounds x="2410" y="360" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2380" y="401" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E6_di" bpmnElement="Event_E6">
+        <dc:Bounds x="2410" y="410" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2380" y="451" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E7_di" bpmnElement="Event_E7">
+        <dc:Bounds x="2410" y="460" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2380" y="501" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E8_di" bpmnElement="Event_E8">
+        <dc:Bounds x="2410" y="510" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2380" y="551" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E9_di" bpmnElement="Event_E9">
+        <dc:Bounds x="2410" y="560" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2380" y="601" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E10_di" bpmnElement="Event_E10">
+        <dc:Bounds x="2410" y="610" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2380" y="651" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_E11_di" bpmnElement="Event_E11">
+        <dc:Bounds x="2090" y="930" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2060" y="971" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_S1_Triage_di" bpmnElement="Flow_S1_Triage">
+        <di:waypoint x="166" y="220" />
+        <di:waypoint x="200" y="202" />
+        <di:waypoint x="200" y="270" />
+        <di:waypoint x="220" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S2_Triage_di" bpmnElement="Flow_S2_Triage">
+        <di:waypoint x="166" y="380" />
+        <di:waypoint x="200" y="358" />
+        <di:waypoint x="200" y="270" />
+        <di:waypoint x="220" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S3_Triage_di" bpmnElement="Flow_S3_Triage">
+        <di:waypoint x="166" y="298" />
+        <di:waypoint x="220" y="300" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Triage_Phone_di" bpmnElement="Flow_Triage_Phone">
+        <di:waypoint x="245" y="275" />
+        <di:waypoint x="245" y="170" />
+        <di:waypoint x="310" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Triage_Token_di" bpmnElement="Flow_Triage_Token">
+        <di:waypoint x="245" y="325" />
+        <di:waypoint x="245" y="330" />
+        <di:waypoint x="310" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Norm_Check_di" bpmnElement="Flow_Norm_Check">
+        <di:waypoint x="420" y="220" />
+        <di:waypoint x="470" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Norm_Valid_di" bpmnElement="Flow_Norm_Valid">
+        <di:waypoint x="495" y="245" />
+        <di:waypoint x="495" y="580" />
+        <di:waypoint x="565" y="580" />
+        <di:waypoint x="565" y="760" />
+        <di:waypoint x="570" y="810" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Norm_Invalid_di" bpmnElement="Flow_Norm_Invalid">
+        <di:waypoint x="520" y="220" />
+        <di:waypoint x="1370" y="190" />
+        <di:waypoint x="1330" y="565" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Supp_Check_di" bpmnElement="Flow_Supp_Check">
+        <di:waypoint x="680" y="810" />
+        <di:waypoint x="705" y="760" />
+        <di:waypoint x="705" y="580" />
+        <di:waypoint x="725" y="580" />
+        <di:waypoint x="725" y="205" />
+        <di:waypoint x="725" y="245" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Supp_Clean_di" bpmnElement="Flow_Supp_Clean">
+        <di:waypoint x="725" y="245" />
+        <di:waypoint x="725" y="580" />
+        <di:waypoint x="765" y="580" />
+        <di:waypoint x="765" y="760" />
+        <di:waypoint x="770" y="810" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Supp_Suppressed_di" bpmnElement="Flow_Supp_Suppressed">
+        <di:waypoint x="750" y="220" />
+        <di:waypoint x="1470" y="190" />
+        <di:waypoint x="1430" y="565" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Supp_Blocked_di" bpmnElement="Flow_Supp_Blocked">
+        <di:waypoint x="750" y="220" />
+        <di:waypoint x="1570" y="190" />
+        <di:waypoint x="1530" y="565" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Lookup_Decision_di" bpmnElement="Flow_Lookup_Decision">
+        <di:waypoint x="880" y="810" />
+        <di:waypoint x="910" y="760" />
+        <di:waypoint x="910" y="580" />
+        <di:waypoint x="915" y="580" />
+        <di:waypoint x="915" y="170" />
+        <di:waypoint x="920" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Routing_Check_di" bpmnElement="Flow_Routing_Check">
+        <di:waypoint x="1030" y="220" />
+        <di:waypoint x="1080" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Routing_Existing_di" bpmnElement="Flow_Routing_Existing">
+        <di:waypoint x="1130" y="220" />
+        <di:waypoint x="1300" y="205" />
+        <di:waypoint x="1300" y="430" />
+        <di:waypoint x="1370" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Routing_Dup_di" bpmnElement="Flow_Routing_Dup">
+        <di:waypoint x="1130" y="220" />
+        <di:waypoint x="1300" y="205" />
+        <di:waypoint x="1300" y="485" />
+        <di:waypoint x="1470" y="485" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Routing_Resume_di" bpmnElement="Flow_Routing_Resume">
+        <di:waypoint x="1130" y="220" />
+        <di:waypoint x="1300" y="205" />
+        <di:waypoint x="1300" y="430" />
+        <di:waypoint x="1470" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Routing_New_di" bpmnElement="Flow_Routing_New">
+        <di:waypoint x="1105" y="245" />
+        <di:waypoint x="1105" y="580" />
+        <di:waypoint x="1165" y="580" />
+        <di:waypoint x="1165" y="760" />
+        <di:waypoint x="1170" y="810" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Create_E2_di" bpmnElement="Flow_Create_E2">
+        <di:waypoint x="1225" y="770" />
+        <di:waypoint x="1225" y="580" />
+        <di:waypoint x="1370" y="580" />
+        <di:waypoint x="1370" y="485" />
+        <di:waypoint x="1370" y="485" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReRead_Exec_di" bpmnElement="Flow_ReRead_Exec">
+        <di:waypoint x="1223" y="868" />
+        <di:waypoint x="1170" y="930" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ReRead_Loop_di" bpmnElement="Flow_ReRead_Loop">
+        <di:waypoint x="1170" y="930" />
+        <di:waypoint x="1145" y="880" />
+        <di:waypoint x="945" y="880" />
+        <di:waypoint x="945" y="260" />
+        <di:waypoint x="975" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Token_Check_di" bpmnElement="Flow_Token_Check">
+        <di:waypoint x="420" y="380" />
+        <di:waypoint x="470" y="380" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Token_Valid_di" bpmnElement="Flow_Token_Valid">
+        <di:waypoint x="520" y="380" />
+        <di:waypoint x="1670" y="330" />
+        <di:waypoint x="1670" y="485" />
+        <di:waypoint x="1670" y="485" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Token_Invalid_di" bpmnElement="Flow_Token_Invalid">
+        <di:waypoint x="495" y="405" />
+        <di:waypoint x="495" y="530" />
+        <di:waypoint x="1670" y="530" />
+        <di:waypoint x="1670" y="540" />
+        <di:waypoint x="1670" y="540" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_LockRelease_1_di" bpmnElement="Flow_LockRelease_1">
+        <di:waypoint x="1370" y="480" />
+        <di:waypoint x="1370" y="700" />
+        <di:waypoint x="1735" y="700" />
+        <di:waypoint x="1735" y="760" />
+        <di:waypoint x="1740" y="810" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_LockRelease_2_di" bpmnElement="Flow_LockRelease_2">
+        <di:waypoint x="1370" y="535" />
+        <di:waypoint x="1370" y="700" />
+        <di:waypoint x="1735" y="700" />
+        <di:waypoint x="1735" y="760" />
+        <di:waypoint x="1740" y="810" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_LockRelease_3_di" bpmnElement="Flow_LockRelease_3">
+        <di:waypoint x="1470" y="480" />
+        <di:waypoint x="1470" y="700" />
+        <di:waypoint x="1735" y="700" />
+        <di:waypoint x="1735" y="760" />
+        <di:waypoint x="1740" y="810" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_LockRelease_4_di" bpmnElement="Flow_LockRelease_4">
+        <di:waypoint x="1470" y="535" />
+        <di:waypoint x="1470" y="700" />
+        <di:waypoint x="1735" y="700" />
+        <di:waypoint x="1735" y="760" />
+        <di:waypoint x="1740" y="810" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Err_SuppUnavail_di" bpmnElement="Flow_Err_SuppUnavail">
+        <di:waypoint x="623" y="868" />
+        <di:waypoint x="623" y="880" />
+        <di:waypoint x="1570" y="880" />
+        <di:waypoint x="1570" y="535" />
+        <di:waypoint x="1570" y="535" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Err_LockContent_di" bpmnElement="Flow_Err_LockContent">
+        <di:waypoint x="808" y="868" />
+        <di:waypoint x="808" y="880" />
+        <di:waypoint x="1570" y="880" />
+        <di:waypoint x="1570" y="480" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Err_LookUnavail_di" bpmnElement="Flow_Err_LookUnavail">
+        <di:waypoint x="856" y="868" />
+        <di:waypoint x="856" y="880" />
+        <di:waypoint x="1570" y="880" />
+        <di:waypoint x="1570" y="535" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Err_TokenUnavail_di" bpmnElement="Flow_Err_TokenUnavail">
+        <di:waypoint x="388" y="438" />
+        <di:waypoint x="388" y="530" />
+        <di:waypoint x="1570" y="530" />
+        <di:waypoint x="1570" y="485" />
+        <di:waypoint x="1570" y="485" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Merge_RL_di" bpmnElement="Flow_Merge_RL">
+        <di:waypoint x="1850" y="810" />
+        <di:waypoint x="1875" y="760" />
+        <di:waypoint x="1875" y="510" />
+        <di:waypoint x="1900" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Merge_E5_di" bpmnElement="Flow_Merge_E5">
+        <di:waypoint x="1510" y="565" />
+        <di:waypoint x="1830" y="540" />
+        <di:waypoint x="1830" y="510" />
+        <di:waypoint x="1900" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Merge_E6_di" bpmnElement="Flow_Merge_E6">
+        <di:waypoint x="1610" y="565" />
+        <di:waypoint x="1820" y="540" />
+        <di:waypoint x="1820" y="510" />
+        <di:waypoint x="1900" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Merge_E7_di" bpmnElement="Flow_Merge_E7">
+        <di:waypoint x="1410" y="565" />
+        <di:waypoint x="1840" y="540" />
+        <di:waypoint x="1840" y="510" />
+        <di:waypoint x="1900" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Merge_E8_di" bpmnElement="Flow_Merge_E8">
+        <di:waypoint x="1610" y="455" />
+        <di:waypoint x="1810" y="430" />
+        <di:waypoint x="1810" y="510" />
+        <di:waypoint x="1900" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Merge_E10_di" bpmnElement="Flow_Merge_E10">
+        <di:waypoint x="1610" y="510" />
+        <di:waypoint x="1810" y="485" />
+        <di:waypoint x="1810" y="510" />
+        <di:waypoint x="1900" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Merge_E1Token_di" bpmnElement="Flow_Merge_E1Token">
+        <di:waypoint x="1710" y="510" />
+        <di:waypoint x="1850" y="485" />
+        <di:waypoint x="1850" y="510" />
+        <di:waypoint x="1900" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Merge_E9_di" bpmnElement="Flow_Merge_E9">
+        <di:waypoint x="1710" y="565" />
+        <di:waypoint x="1880" y="540" />
+        <di:waypoint x="1880" y="510" />
+        <di:waypoint x="1900" y="530" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PreAudit_Audit_di" bpmnElement="Flow_PreAudit_Audit">
+        <di:waypoint x="1925" y="555" />
+        <di:waypoint x="1925" y="760" />
+        <di:waypoint x="1990" y="810" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Audit_Fail_E11_di" bpmnElement="Flow_Audit_Fail_E11">
+        <di:waypoint x="2068" y="868" />
+        <di:waypoint x="2108" y="930" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Audit_Output_di" bpmnElement="Flow_Audit_Output">
+        <di:waypoint x="2100" y="810" />
+        <di:waypoint x="2130" y="760" />
+        <di:waypoint x="2130" y="420" />
+        <di:waypoint x="2160" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Output_Dispatch_di" bpmnElement="Flow_Output_Dispatch">
+        <di:waypoint x="2270" y="420" />
+        <di:waypoint x="2320" y="420" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_E1_di" bpmnElement="Flow_End_E1">
+        <di:waypoint x="2370" y="420" />
+        <di:waypoint x="2390" y="395" />
+        <di:waypoint x="2390" y="178" />
+        <di:waypoint x="2410" y="178" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_E2_di" bpmnElement="Flow_End_E2">
+        <di:waypoint x="2370" y="420" />
+        <di:waypoint x="2390" y="395" />
+        <di:waypoint x="2390" y="228" />
+        <di:waypoint x="2410" y="228" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_E3_di" bpmnElement="Flow_End_E3">
+        <di:waypoint x="2370" y="420" />
+        <di:waypoint x="2390" y="395" />
+        <di:waypoint x="2390" y="278" />
+        <di:waypoint x="2410" y="278" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_E4_di" bpmnElement="Flow_End_E4">
+        <di:waypoint x="2370" y="420" />
+        <di:waypoint x="2390" y="395" />
+        <di:waypoint x="2390" y="328" />
+        <di:waypoint x="2410" y="328" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_E5_di" bpmnElement="Flow_End_E5">
+        <di:waypoint x="2370" y="420" />
+        <di:waypoint x="2390" y="395" />
+        <di:waypoint x="2390" y="378" />
+        <di:waypoint x="2410" y="378" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_E6_di" bpmnElement="Flow_End_E6">
+        <di:waypoint x="2370" y="420" />
+        <di:waypoint x="2390" y="395" />
+        <di:waypoint x="2390" y="428" />
+        <di:waypoint x="2410" y="428" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_E7_di" bpmnElement="Flow_End_E7">
+        <di:waypoint x="2370" y="420" />
+        <di:waypoint x="2390" y="395" />
+        <di:waypoint x="2390" y="478" />
+        <di:waypoint x="2410" y="478" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_E8_di" bpmnElement="Flow_End_E8">
+        <di:waypoint x="2370" y="420" />
+        <di:waypoint x="2390" y="395" />
+        <di:waypoint x="2390" y="528" />
+        <di:waypoint x="2410" y="528" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_E9_di" bpmnElement="Flow_End_E9">
+        <di:waypoint x="2370" y="420" />
+        <di:waypoint x="2390" y="395" />
+        <di:waypoint x="2390" y="578" />
+        <di:waypoint x="2410" y="578" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_End_E10_di" bpmnElement="Flow_End_E10">
+        <di:waypoint x="2370" y="420" />
+        <di:waypoint x="2390" y="395" />
+        <di:waypoint x="2390" y="628" />
+        <di:waypoint x="2410" y="628" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

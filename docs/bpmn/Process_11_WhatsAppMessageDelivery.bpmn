@@ -1,0 +1,1418 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_HogaanWADelivery" targetNamespace="http://hogaan.app/processes" exporter="Hogaan Process Specification" exporterVersion="1.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.9.0">
+  <bpmn:message id="Message_Outbound" name="OutboundMessageRequested" />
+  <bpmn:message id="Message_Webhook" name="WhatsAppStatusWebhookReceived" />
+  <bpmn:error id="Error_Idempotency" name="IdempotencyStoreFailure" errorCode="500" />
+  <bpmn:error id="Error_401" name="AuthError" errorCode="401" />
+  <bpmn:error id="Error_429" name="RateLimitFromAPI" errorCode="429" />
+  <bpmn:error id="Error_4xx" name="PermanentFailure" errorCode="400" />
+  <bpmn:error id="Error_5xx" name="TransientFailure" errorCode="500" />
+  <bpmn:escalation id="Escalation_401" name="AccountSuspended" escalationCode="401" />
+  <bpmn:escalation id="Escalation_4xx" name="PermanentFailureEscalation" escalationCode="400" />
+  <bpmn:escalation id="Escalation_429" name="RateLimitEscalation" escalationCode="429" />
+  <bpmn:escalation id="Escalation_Transient" name="TransientExhaustedEscalation" escalationCode="503" />
+  <bpmn:collaboration id="Collaboration_Hogaan_WADelivery">
+    <bpmn:documentation>Collaboration scope for the WhatsApp Message Delivery process. Single pool ('Hogaan Coaching Platform') with three lanes: Orchestration Engine, WhatsApp Gateway, Data Layer. LLM Service and External Services lanes are not used in this process.</bpmn:documentation>
+    <bpmn:participant id="Participant_Hogaan" name="Hogaan Coaching Platform" processRef="Process_WhatsAppMessageDelivery" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_WhatsAppMessageDelivery" name="Hogaan WhatsApp Message Delivery Process" isExecutable="false">
+    <bpmn:documentation>Hogaan WhatsApp Message Delivery Process. The single chokepoint for all outbound messaging from Hogaan to users via WhatsApp Business Platform. Invoked by every other Hogaan process that needs to send a user-facing message (Onboarding welcome/consent/prompts, Coaching responses, Daily Prompts, Scenarios, Re-engagement nudges, Crisis resources).
+
+DESIGN PRINCIPLES:
+- Idempotency enforced at three points (Step 2 check, Step 7 record creation, Step 9 update) — same correlationId never results in duplicate sends
+- Suppression list check (Step 3) is non-bypassable, even by Critical priority — opt-out compliance is absolute
+- 24-hour customer service window (Step 4) enforces WhatsApp's free-form messaging rule; FreeForm messages outside window are blocked, only Templates allowed
+- Rate limiting (Step 6) honors per-second, per-day, per-user limits with priority-aware queueing (Critical &gt; High &gt; Normal); Critical bypasses per-user limits
+- API retry logic (Step 8 subprocess) handles transient failures with exponential backoff (3 retries: 1s, 3s, 9s); permanent failures fail fast
+- Webhook reconciliation (Step 12 event subprocess) handles asynchronous delivery status updates, reconciles to log, supports out-of-order webhooks
+
+OWNERSHIP: Orchestration Engine runs the process spine, all gateways, the queue timer, and the webhook reconciliation event subprocess. WhatsApp Gateway hosts the API dispatch subprocess and its outer boundary events (the actual WhatsApp Business API integration). Data Layer holds all state: idempotency store, suppression list, window state lookups, template catalog, message log, correlation store. LLM Service and External Services lanes are not used in this process and are omitted from the diagram.
+
+ENGINE TARGET: This artifact is a SPECIFICATION not a deployment. isExecutable=false. Use as the source-of-truth functional spec for service implementation. Implementation can use Twilio's WhatsApp Business API or Meta Cloud API directly — both fit this BPMN structure.</bpmn:documentation>
+    <bpmn:laneSet id="LaneSet_WADelivery">
+      <bpmn:lane id="Lane_OrchestrationEngine" name="Orchestration Engine">
+        <bpmn:documentation>Orchestration Engine. Hosts the process control flow: validation script, all gateways, the queue retry timer, the dispatch state final routing, and the entire Webhook Reconciliation event subprocess (which runs asynchronously when WhatsApp posts a status webhook). Implementation: state machine in the application backend.</bpmn:documentation>
+        <bpmn:flowNodeRef>StartEvent_OutboundRequested</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step1_Validate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW1_Valid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW2_Duplicate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW3_Suppressed</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW4_WindowValid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW5_IsTemplate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW6_TemplateValid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW_MergeToRateLimit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW7_RateDecision</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step6_RateLimitCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_QueueTimer</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_EscalateCriticalLimit</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Event_NotifyCaller</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>GW9_DispatchState</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_MalformedRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_DuplicateRequest</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_SuppressedRecipient</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_WindowClosedFreeFormBlocked</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_TemplateInvalid</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_RateLimitExceeded</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_MessageDispatched</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_MessageDispatchedAfterRetry</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_MessageDispatchedQueued</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>SubProcess_Step12_Reconciliation</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_WhatsAppGateway" name="WhatsApp Gateway">
+        <bpmn:documentation>WhatsApp Gateway. Hosts the API Dispatch subprocess (Step 8) — the actual WhatsApp Business API integration with retry logic — and the four outer boundary events that catch escalations from the subprocess (auth failures, permanent 4xx errors, transient exhausted, rate-limit-from-API). Three end events live here because they represent terminal failures from API dispatch attempts. Implementation: WhatsApp Business API client (Twilio or Meta Cloud API). All HTTP calls and HTTP error handling live in this lane.</bpmn:documentation>
+        <bpmn:flowNodeRef>SubProcess_Step8_APIDispatch</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>OuterBound_401</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>OuterBound_4xx</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>OuterBound_429</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>OuterBound_Transient</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_AccountSuspended</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_PermanentFailure</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_TransientExhausted</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_DataLayer" name="Data Layer">
+        <bpmn:documentation>Data Layer. Hosts every task that reads from or writes to persistent state: idempotency store (Steps 2, 7, 9), suppression list (Step 3), customer-service-window state (Step 4), template catalog (Step 5), message log (Step 9), correlation store (Step 10). Implementation: Redis for idempotency (24h TTL) and rate counters, Postgres for suppression list, message log, and template catalog.</bpmn:documentation>
+        <bpmn:flowNodeRef>Task_Step2_IdempotencyCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step3_SuppressionCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step4_WindowCheck</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step5_TemplateValidation</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step7_IdempotencyCreate</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Boundary_S7_Error</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_IdempotencyStoreFailure</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step9_RecordReceipt</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Step10_WebhookSub</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:dataObject id="DataObject_Request" name="OutboundRequest" />
+    <bpmn:dataObjectReference id="Ref_Request" name="OutboundRequest" dataObjectRef="DataObject_Request">
+      <bpmn:documentation>OutboundRequest — the trigger payload passed in by the calling process. Fields: userId, phoneNumber (E.164), messageType (FreeForm | Template), messageContent (text for FreeForm; templateName + templateParams for Template), priority (Normal | High | Critical), callerProcessId (for traceability), correlationId (idempotency key — same correlationId must not result in duplicate sends).</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="DataObject_Suppression" name="SuppressionStatus" />
+    <bpmn:dataObjectReference id="Ref_Suppression" name="SuppressionStatus" dataObjectRef="DataObject_Suppression">
+      <bpmn:documentation>SuppressionStatus — output of Step 3 (Suppression Check). Fields: isSuppressed (boolean), suppressionReason (opt-out | blocked | compliance-flagged), suppressionTimestamp. Drawn from the global suppression list maintained by Process #1 (User Onboarding) and Process #18 (Incident Handling).</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="DataObject_Window" name="WindowState" />
+    <bpmn:dataObjectReference id="Ref_Window" name="WindowState" dataObjectRef="DataObject_Window">
+      <bpmn:documentation>WindowState — output of Step 4 (Window State Check). Fields: windowState (OPEN | CLOSED), lastInboundMessageAt (timestamp). Window is OPEN if user sent any message within the last 24 hours; CLOSED otherwise. Determined by querying the user's inbound message history.</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="DataObject_RateDecision" name="RateLimitDecision" />
+    <bpmn:dataObjectReference id="Ref_RateDecision" name="RateLimitDecision" dataObjectRef="DataObject_RateDecision">
+      <bpmn:documentation>RateLimitDecision — output of Step 6 (Rate Limit Check). Fields: rateAction (PROCEED | QUEUE | REJECT), limitType (PER_SECOND | PER_DAY | PER_USER | none), currentRate, limit. Action depends on which limit was hit and the message's priority.</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="DataObject_Idempotency" name="IdempotencyRecord" />
+    <bpmn:dataObjectReference id="Ref_Idempotency" name="IdempotencyRecord" dataObjectRef="DataObject_Idempotency">
+      <bpmn:documentation>IdempotencyRecord — managed across Steps 2 (read), 7 (write 'dispatching' state), 9 (update to 'sent' with WhatsApp message ID). Fields: correlationId, state (dispatching | sent | failed), waMessageId, createdAt, ttlExpiresAt (24h after creation). Stored in Redis or equivalent KV store.</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:dataObject id="DataObject_DeliveryLog" name="DeliveryRecord" />
+    <bpmn:dataObjectReference id="Ref_DeliveryLog" name="DeliveryRecord" dataObjectRef="DataObject_DeliveryLog">
+      <bpmn:documentation>DeliveryRecord — persisted to message log store at Step 9 with full payload and metadata for compliance and debugging. Fields: correlationId, waMessageId, userId, phoneNumber (hashed), messageType, messagePayload (encrypted), priority, callerProcessId, dispatchedAt, lastStatusUpdate, statusHistory (array of status events from webhooks).</bpmn:documentation>
+    </bpmn:dataObjectReference>
+    <bpmn:startEvent id="StartEvent_OutboundRequested" name="Outbound Message Requested">
+      <bpmn:documentation>Process trigger. Fired by any other Hogaan process that needs to send a message via WhatsApp.
+
+PAYLOAD: see DataObject_Request — userId, phoneNumber (E.164), messageType, messageContent, priority, callerProcessId, correlationId (REQUIRED — idempotency key).
+
+EVENT TYPE: Message start event. Triggered programmatically by upstream processes via Message_Outbound — this is not a user-facing event.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Start_S1</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MsgDef_Outbound" messageRef="Message_Outbound" />
+    </bpmn:startEvent>
+    <bpmn:scriptTask id="Task_Step1_Validate" name="Step 1: Validate Request">
+      <bpmn:documentation>Step 1 — Request Validation.
+
+PURPOSE: Validate the incoming payload schema before any external calls.
+
+CHECKS:
+- userId present and valid format
+- phoneNumber present and matches E.164 format (^\+[1-9]\d{1,14}$)
+- messageType in [FreeForm, Template]
+- messageContent matches messageType (text for FreeForm; templateName + params for Template)
+- priority in [Normal, High, Critical]
+- correlationId present and non-empty
+- callerProcessId present (for traceability)
+
+OUTPUT: isValid (boolean), validationErrors (array, populated on failure for incident logging).
+
+IMPLEMENTATION HINT: Pure script task with JSON schema validator. Fail fast on first violation. Validation failures indicate upstream bugs and are logged as high-severity incidents.</bpmn:documentation>
+      <bpmn:incoming>Flow_Start_S1</bpmn:incoming>
+      <bpmn:outgoing>Flow_S1_GW1</bpmn:outgoing>
+    </bpmn:scriptTask>
+    <bpmn:exclusiveGateway id="GW1_Valid" name="Payload Valid?">
+      <bpmn:documentation>Routes based on Step 1 validation result.
+
+DECISION LOGIC (plain English):
+- VALID branch: isValid == true → proceed to Step 2 (Idempotency Check)
+- INVALID branch: isValid == false → terminate at EndEvent_MalformedRequest (E6); incident logged with validation errors</bpmn:documentation>
+      <bpmn:incoming>Flow_S1_GW1</bpmn:incoming>
+      <bpmn:outgoing>Flow_GW1_No</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW1_Yes</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_MalformedRequest" name="E6: Malformed Request">
+      <bpmn:documentation>E6: MalformedRequest. Payload validation failed at Step 1. No dispatch attempted. Caller receives error with validationErrors. High-severity incident logged because malformed input indicates upstream bug.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW1_No</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_Step2_IdempotencyCheck" name="Step 2: Idempotency Check">
+      <bpmn:documentation>Step 2 — Idempotency Check.
+
+PURPOSE: Prevent duplicate sends from the same correlationId within a 24-hour window.
+
+LOGIC: Look up correlationId in the idempotency store (Redis with 24h TTL). If found, this is a duplicate request — do NOT resend. Return the original delivery receipt to the caller via the response.
+
+OUTPUT: isDuplicate (boolean), originalReceipt (if duplicate found).
+
+IMPLEMENTATION HINT: Service task with Redis GET. Sub-10ms latency expected. Idempotency keys are prefixed by correlationId; values include initial state (dispatching/sent/failed) and the original WhatsApp message ID.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW1_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_S2_GW2</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GW2_Duplicate" name="Is Duplicate?">
+      <bpmn:documentation>Routes based on duplicate detection.
+
+DECISION LOGIC:
+- DUPLICATE branch: isDuplicate == true → terminate at EndEvent_DuplicateRequest (E5); return original receipt
+- UNIQUE branch: isDuplicate == false → proceed to Step 3 (Suppression Check)</bpmn:documentation>
+      <bpmn:incoming>Flow_S2_GW2</bpmn:incoming>
+      <bpmn:outgoing>Flow_GW2_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW2_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_DuplicateRequest" name="E5: Duplicate Request">
+      <bpmn:documentation>E5: DuplicateRequest. Same correlationId already processed within last 24h. Original receipt returned to caller. No new dispatch attempted. Useful for monitoring caller retry behavior.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW2_Yes</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_Step3_SuppressionCheck" name="Step 3: Suppression Check">
+      <bpmn:documentation>Step 3 — Suppression and Block List Check (NON-BYPASSABLE).
+
+PURPOSE: Verify the recipient's phone number is not on the suppression list (opted out) or block list (abusive, compliance-flagged). This check CANNOT be bypassed by any priority level — even Critical priority messages stop here for suppressed users.
+
+LOGIC: Query suppression list and block list (managed by Process #1 Onboarding and Process #18 Incident Handling). Both lookups must succeed. Any match results in non-delivery.
+
+OUTPUT: isSuppressed (boolean), suppressionReason (opt-out | blocked | compliance-flagged).
+
+IMPLEMENTATION HINT: Service task. Must be implemented as cached read with short TTL (60s) since suppression list updates need to propagate quickly. Database write of opt-out events from elsewhere should invalidate this cache.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW2_No</bpmn:incoming>
+      <bpmn:outgoing>Flow_S3_GW3</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GW3_Suppressed" name="Is Suppressed?">
+      <bpmn:documentation>Routes based on suppression check.
+
+DECISION LOGIC:
+- SUPPRESSED branch: isSuppressed == true → terminate at EndEvent_SuppressedRecipient (E7); compliance audit log entry written; caller notified via response
+- CLEAR branch: isSuppressed == false → proceed to Step 4 (Window Check)</bpmn:documentation>
+      <bpmn:incoming>Flow_S3_GW3</bpmn:incoming>
+      <bpmn:outgoing>Flow_GW3_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW3_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_SuppressedRecipient" name="E7: Suppressed Recipient">
+      <bpmn:documentation>E7: SuppressedRecipient. Phone number on suppression list (opted out, blocked, or compliance-flagged). No dispatch attempted regardless of priority. Compliance audit log entry written. Caller informed.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW3_Yes</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_Step4_WindowCheck" name="Step 4: 24h Window Check">
+      <bpmn:documentation>Step 4 — 24-Hour Customer Service Window State Check.
+
+PURPOSE: Determine whether the user is currently inside the 24-hour customer service window during which free-form messages are allowed by WhatsApp Business Platform.
+
+LOGIC: Query the user's last inbound message timestamp. If within last 24 hours, window is OPEN — both FreeForm and Template messages allowed. If outside, window is CLOSED — only Template messages allowed.
+
+OUTPUT: windowState (OPEN | CLOSED), lastInboundMessageAt (timestamp or null).
+
+IMPLEMENTATION HINT: Service task. Read from inbound message log indexed by userId. Sub-50ms latency.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW3_No</bpmn:incoming>
+      <bpmn:outgoing>Flow_S4_GW4</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GW4_WindowValid" name="Window Violation?">
+      <bpmn:documentation>Routes based on window state and message type.
+
+DECISION LOGIC (plain English):
+- BLOCKED branch: windowState == 'CLOSED' AND messageType == 'FreeForm' → terminate at EndEvent_WindowClosedFreeFormBlocked (E8); caller advised to retry with Template
+- ALLOWED branch: windowState == 'OPEN' OR messageType == 'Template' → proceed to template type check</bpmn:documentation>
+      <bpmn:incoming>Flow_S4_GW4</bpmn:incoming>
+      <bpmn:outgoing>Flow_GW4_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW4_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_WindowClosedFreeFormBlocked" name="E8: Window Closed FreeForm Blocked">
+      <bpmn:documentation>E8: WindowClosedFreeFormBlocked. User outside 24-hour customer service window AND message is FreeForm. WhatsApp policy disallows FreeForm outside window. Caller advised to retry with Template message.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW4_Yes</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="GW5_IsTemplate" name="Is Template Message?">
+      <bpmn:documentation>Routes based on whether the request is a Template message.
+
+DECISION LOGIC:
+- TEMPLATE branch: messageType == 'Template' → proceed to Step 5 (Template Validation)
+- FREEFORM branch: messageType == 'FreeForm' → bypass template validation, proceed to rate limit merge</bpmn:documentation>
+      <bpmn:incoming>Flow_GW4_No</bpmn:incoming>
+      <bpmn:outgoing>Flow_GW5_Yes</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW5_No</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:businessRuleTask id="Task_Step5_TemplateValidation" name="Step 5: Validate Template">
+      <bpmn:documentation>Step 5 — Template Validation (conditional, only for Template messageType).
+
+PURPOSE: Validate that the requested template exists, is currently active, and the provided parameters match the template's slots.
+
+LOGIC: Look up templateName in the approved template catalog (managed by Process #17 Prompt &amp; Content Management). Verify:
+- Template exists
+- Template is currently active (not deprecated)
+- templateParams count matches template's slot count
+- templateParams types match slot types
+- templateParams length within slot limits
+
+OUTPUT: templateValid (boolean), validationError (string).
+
+IMPLEMENTATION HINT: Business rule task with template catalog lookup. The catalog has a small number of pre-approved Meta templates. Sub-50ms latency.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW5_Yes</bpmn:incoming>
+      <bpmn:outgoing>Flow_S5_GW6</bpmn:outgoing>
+    </bpmn:businessRuleTask>
+    <bpmn:exclusiveGateway id="GW6_TemplateValid" name="Template Valid?">
+      <bpmn:documentation>Routes based on template validation result.
+
+DECISION LOGIC:
+- VALID branch: templateValid == true → proceed to rate limit merge
+- INVALID branch: templateValid == false → terminate at EndEvent_TemplateInvalid (E9); caller receives error with validationError details</bpmn:documentation>
+      <bpmn:incoming>Flow_S5_GW6</bpmn:incoming>
+      <bpmn:outgoing>Flow_GW6_No</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW6_Yes</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_TemplateInvalid" name="E9: Template Invalid">
+      <bpmn:documentation>E9: TemplateInvalid. Template messageType but template not in catalog, deprecated, or parameter mismatch. Caller receives error with validation details. Indicates either caller bug or template catalog drift — review.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW6_No</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="GW_MergeToRateLimit" name="Merge to Rate Limit">
+      <bpmn:documentation>Convergence point for three flows: (a) FreeForm direct path skipping template validation, (b) Template-validated path, (c) Queue Loop Back from Step 6 timer (re-enters rate limit check after backoff), (d) 429 retry from API dispatch outer boundary.
+
+DECISION LOGIC: Pass-through merge — no branching. All incoming flows route to Step 6 (Rate Limit Check).</bpmn:documentation>
+      <bpmn:incoming>Flow_GW5_No</bpmn:incoming>
+      <bpmn:incoming>Flow_GW6_Yes</bpmn:incoming>
+      <bpmn:incoming>Flow_QueueLoopBack</bpmn:incoming>
+      <bpmn:incoming>Flow_Outer_429</bpmn:incoming>
+      <bpmn:outgoing>Flow_Merge_S6</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Task_Step6_RateLimitCheck" name="Step 6: Rate Limit Check">
+      <bpmn:documentation>Step 6 — Rate Limit Check.
+
+PURPOSE: Enforce three rate limits before dispatching:
+- PER_SECOND: tier-based send rate (e.g., 80 msg/sec for Tier 1)
+- PER_DAY: daily volume cap (e.g., 1000/day for Tier 1)
+- PER_USER: anti-spam, max N messages per user per hour to prevent runaway loops
+
+LOGIC: Check current rate counters. Determine action based on which limit is hit and message priority:
+- All limits OK: PROCEED
+- PER_SECOND or PER_USER hit, Normal/High priority: QUEUE (10s timer, then retry)
+- PER_USER hit, Critical priority: PROCEED (Critical bypasses per-user limit)
+- PER_DAY hit, Normal/High: REJECT (terminate at E10)
+- PER_DAY hit, Critical: REJECT with escalation (Critical hitting day limit is an emergency — escalate via Event_EscalateCriticalLimit before terminating)
+
+OUTPUT: rateAction (PROCEED | QUEUE | REJECT), limitType (PER_SECOND | PER_DAY | PER_USER | none).
+
+IMPLEMENTATION HINT: Service task with rate limiter (Redis-based or in-process token bucket). Atomic operations. Sub-10ms latency.</bpmn:documentation>
+      <bpmn:incoming>Flow_Merge_S6</bpmn:incoming>
+      <bpmn:outgoing>Flow_S6_GW7</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="GW7_RateDecision" name="Rate Action?">
+      <bpmn:documentation>Routes based on rate limit decision. 4-way exclusive gateway.
+
+DECISION LOGIC (plain English):
+- PROCEED branch: rateAction == 'PROCEED' OR (rateAction == 'QUEUE' AND priority == 'Critical' AND limitType == 'USER') → proceed to Step 7 (Idempotency Create)
+- QUEUE branch: rateAction == 'QUEUE' AND not Critical-bypass → route to Queue Timer (10s wait), then loop back to GW_MergeToRateLimit
+- REJECT branch: rateAction == 'REJECT' AND priority != 'Critical' → terminate at EndEvent_RateLimitExceeded (E10)
+- ESCALATE branch: rateAction == 'REJECT' AND priority == 'Critical' → throw escalation event (notifies monitoring/incident system) then terminate at E10</bpmn:documentation>
+      <bpmn:incoming>Flow_S6_GW7</bpmn:incoming>
+      <bpmn:outgoing>Flow_GW7_Proceed</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW7_Queue</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW7_Reject</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW7_RejectEscalate</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:intermediateCatchEvent id="Event_QueueTimer" name="Wait 10s (Queue)">
+      <bpmn:documentation>Intermediate timer catch event. Pauses the process for 10 seconds, then loops back to GW_MergeToRateLimit for retry.
+
+PURPOSE: Backoff for transient rate limit hits. After 10s the rate limit window has typically refreshed and the message can proceed.
+
+IMPLEMENTATION HINT: Timer event with PT10S duration. Engine re-evaluates rate limit on resume. No exit conditions — message will continue retrying until either rate clears or daily limit hits (which routes to REJECT).</bpmn:documentation>
+      <bpmn:incoming>Flow_GW7_Queue</bpmn:incoming>
+      <bpmn:outgoing>Flow_QueueLoopBack</bpmn:outgoing>
+      <bpmn:timerEventDefinition id="TimerDef_Queue">
+        <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT10S</bpmn:timeDuration>
+      </bpmn:timerEventDefinition>
+    </bpmn:intermediateCatchEvent>
+    <bpmn:intermediateThrowEvent id="Event_EscalateCriticalLimit" name="Escalate Critical Day Limit">
+      <bpmn:documentation>Intermediate throw event for Critical priority hitting the daily rate limit.
+
+PURPOSE: Critical priority messages hitting the per-day cap is an emergency situation — typically means the system has been over-sending or the limit is misconfigured. Throws a notification (message event) to monitoring/incident system, then routes to terminal end event.
+
+IMPLEMENTATION HINT: Throw event with messageEventDefinition. The receiving system is monitoring/Process #18 Incident Handling. After throw, flow continues to E10.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW7_RejectEscalate</bpmn:incoming>
+      <bpmn:outgoing>Flow_Critical_E10</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MsgDef_EscalateCritical" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:endEvent id="EndEvent_RateLimitExceeded" name="E10: Rate Limit Exceeded">
+      <bpmn:documentation>E10: RateLimitExceeded. Daily rate limit reached for Normal/High priority OR Critical priority hit day limit (which also triggered escalation event). Dispatch rejected. Caller informed.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW7_Reject</bpmn:incoming>
+      <bpmn:incoming>Flow_Critical_E10</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_Step7_IdempotencyCreate" name="Step 7: Create Idempotency Record">
+      <bpmn:documentation>Step 7 — Idempotency Record Creation (CRITICAL).
+
+PURPOSE: Before dispatching, write the correlationId + state='dispatching' to the idempotency store with 24h TTL. This protects against double-sends if the process crashes between Step 6 and Step 8.
+
+LOGIC: Atomic write to Redis. If write fails, abort — better to fail than risk double-send.
+
+OUTPUT: idempotencyRecord with correlationId, state='dispatching', createdAt.
+
+IMPLEMENTATION HINT: Service task with Redis SETEX (24h TTL). Use SETNX semantics or Lua script to ensure idempotent write under concurrent requests with same correlationId.
+
+ERROR BOUNDARY: Idempotency store unavailable routes via Boundary_S7_Error to EndEvent_IdempotencyStoreFailure (E15). High-severity incident — dispatch must NOT proceed without idempotency protection.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW7_Proceed</bpmn:incoming>
+      <bpmn:outgoing>Flow_S7_S8</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:boundaryEvent id="Boundary_S7_Error" name="Idempotency Store Error" attachedToRef="Task_Step7_IdempotencyCreate">
+      <bpmn:documentation>Error boundary on Step 7. Catches IdempotencyStoreFailure error (Redis unavailable, write timeout, capacity exhausted). Routes to E15. CRITICAL: dispatch must abort here rather than proceed without idempotency — failure to do so risks double-sending the same message to the user.</bpmn:documentation>
+      <bpmn:outgoing>Flow_S7_Error</bpmn:outgoing>
+      <bpmn:errorEventDefinition id="ErrDef_S7" errorRef="Error_Idempotency" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="EndEvent_IdempotencyStoreFailure" name="E15: Idempotency Store Failure">
+      <bpmn:documentation>E15: IdempotencyStoreFailure. Could not write idempotency record at Step 7. Dispatch ABORTED to prevent double-send risk. HIGH-severity incident — Redis or equivalent infrastructure must be restored before dispatching can resume.</bpmn:documentation>
+      <bpmn:incoming>Flow_S7_Error</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:subProcess id="SubProcess_Step8_APIDispatch" name="Step 8: API Dispatch with Retries">
+      <bpmn:documentation>Step 8 — API Dispatch with Retry Logic.
+
+PURPOSE: Embedded subprocess containing the actual WhatsApp Business API call with exponential backoff retry on transient errors.
+
+INTERNAL FLOW: Start → Retry Merge → Call API → on error route by error type → for transient errors: increment retry counter → check retry limit → if under 3, backoff timer (3s), loop back to API call → if at 3, escalate Transient → for permanent errors (401, 4xx, 429): escalate immediately to outer boundary.
+
+INTERNAL OUTCOMES (escalated to outer boundaries):
+- 401 (auth/permission failure): account suspension or token issue → Escalation_401
+- 4xx (permanent client error - invalid number, blocked, etc.): permanent failure → Escalation_4xx
+- 429 (rate limit from API itself): retry via outer boundary loop back → Escalation_429
+- Transient exhausted (3 retries on 5xx/timeout/network): cached for later reconciliation → Escalation_Transient
+
+NORMAL EXIT: API returned 200 with WhatsApp message ID → SubEnd_Success → flow continues to Step 9.
+
+IMPLEMENTATION HINT: Embedded subprocess in BPMN; in implementation, can be a single function with retry logic OR a sub-state-machine. The 5-second timeout on each call is critical — total budget across 3 retries with backoff is ~30s worst case.</bpmn:documentation>
+      <bpmn:incoming>Flow_S7_S8</bpmn:incoming>
+      <bpmn:outgoing>Flow_S8_S9</bpmn:outgoing>
+      <bpmn:startEvent id="SubStart_API" name="Begin Dispatch">
+        <bpmn:documentation>Internal start of API dispatch subprocess. No payload — uses parent process state.</bpmn:documentation>
+        <bpmn:outgoing>Flow_Sub_S1</bpmn:outgoing>
+      </bpmn:startEvent>
+      <bpmn:exclusiveGateway id="SubGW_RetryMerge" name="Retry Merge">
+        <bpmn:documentation>Convergence point for two flows inside the API dispatch subprocess: (a) initial entry from SubStart_API, (b) re-entry from backoff timer on retry. Routes to SubTask_CallWhatsApp.</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_S1</bpmn:incoming>
+        <bpmn:incoming>Flow_Sub_TimerToAPI</bpmn:incoming>
+        <bpmn:outgoing>Flow_Sub_ToAPI</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:serviceTask id="SubTask_CallWhatsApp" name="Call WhatsApp Business API">
+        <bpmn:documentation>Internal task of API dispatch subprocess. Makes the actual HTTP call to WhatsApp Business API (Twilio's WhatsApp API endpoint or Meta Cloud API directly).
+
+LOGIC: Construct request payload (text or template+params), POST to WhatsApp API, parse response, extract WhatsApp message ID on success. 5-second timeout enforced.
+
+OUTPUT: waMessageId (on success), error (on failure with type categorization).
+
+IMPLEMENTATION HINT: Service task with HTTP client (Axios/fetch). The provider-specific URL and headers are configured per environment. Provider-agnostic interface so Twilio vs Meta Cloud API can swap.</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_ToAPI</bpmn:incoming>
+        <bpmn:outgoing>Flow_Sub_Success</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:endEvent id="SubEnd_Success" name="API Success">
+        <bpmn:documentation>Successful API dispatch. WhatsApp message ID captured. Subprocess exits normally; parent process resumes at Step 9.</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_Success</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:boundaryEvent id="SubBound_401" name="401/403 Auth Error" attachedToRef="SubTask_CallWhatsApp">
+        <bpmn:documentation>Boundary error event on API call. Catches 401/403 responses (auth failure, account suspension, token revoked). Routes to Escalation_401 which propagates to outer boundary OuterBound_401.</bpmn:documentation>
+        <bpmn:outgoing>Flow_Sub_B401</bpmn:outgoing>
+        <bpmn:errorEventDefinition errorRef="Error_401" />
+      </bpmn:boundaryEvent>
+      <bpmn:boundaryEvent id="SubBound_429" name="429 Rate Limit" attachedToRef="SubTask_CallWhatsApp">
+        <bpmn:documentation>Boundary error event on API call. Catches 429 responses (rate limit from API itself, distinct from internal rate limiter). Routes to Escalation_429 which propagates to outer boundary OuterBound_429 → re-enters internal rate limiter via GW_MergeToRateLimit.</bpmn:documentation>
+        <bpmn:outgoing>Flow_Sub_B429</bpmn:outgoing>
+        <bpmn:errorEventDefinition errorRef="Error_429" />
+      </bpmn:boundaryEvent>
+      <bpmn:boundaryEvent id="SubBound_4xx" name="Other 4xx Error" attachedToRef="SubTask_CallWhatsApp">
+        <bpmn:documentation>Boundary error event on API call. Catches non-401/429 4xx responses (invalid phone, user blocked Hogaan, malformed payload). These are permanent failures. Routes to Escalation_4xx → OuterBound_4xx → E12.</bpmn:documentation>
+        <bpmn:outgoing>Flow_Sub_B4xx</bpmn:outgoing>
+        <bpmn:errorEventDefinition errorRef="Error_4xx" />
+      </bpmn:boundaryEvent>
+      <bpmn:boundaryEvent id="SubBound_5xx" name="5xx Server Error" attachedToRef="SubTask_CallWhatsApp">
+        <bpmn:documentation>Boundary error event on API call. Catches 5xx responses (server-side errors). These are retryable. Routes to SubGW_TransientMerge for retry decision.</bpmn:documentation>
+        <bpmn:outgoing>Flow_Sub_B5xx</bpmn:outgoing>
+        <bpmn:errorEventDefinition errorRef="Error_5xx" />
+      </bpmn:boundaryEvent>
+      <bpmn:boundaryEvent id="SubBound_Timeout" name="Timeout (5s)" attachedToRef="SubTask_CallWhatsApp">
+        <bpmn:documentation>Boundary timer event on API call. Fires if call takes longer than 5 seconds. Treated as transient — routes to SubGW_TransientMerge for retry decision.</bpmn:documentation>
+        <bpmn:outgoing>Flow_Sub_BTime</bpmn:outgoing>
+        <bpmn:timerEventDefinition>
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT5S</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:boundaryEvent>
+      <bpmn:endEvent id="SubEscalate_401" name="Escalate Auth">
+        <bpmn:documentation>Escalation end event throwing Escalation_401. Caught by parent process via OuterBound_401 → routes to E11 (AccountSuspended).</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_B401</bpmn:incoming>
+        <bpmn:escalationEventDefinition escalationRef="Escalation_401" />
+      </bpmn:endEvent>
+      <bpmn:endEvent id="SubEscalate_429" name="Escalate 429">
+        <bpmn:documentation>Escalation end event throwing Escalation_429. Caught by parent process via OuterBound_429 → loops back to GW_MergeToRateLimit (re-enters internal rate limit decision; may then queue or proceed depending on internal counters).</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_B429</bpmn:incoming>
+        <bpmn:escalationEventDefinition escalationRef="Escalation_429" />
+      </bpmn:endEvent>
+      <bpmn:endEvent id="SubEscalate_4xx" name="Escalate Permanent">
+        <bpmn:documentation>Escalation end event throwing Escalation_4xx. Caught by parent process via OuterBound_4xx → routes to E12 (PermanentDeliveryFailure). Phone number flagged for suppression list review.</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_B4xx</bpmn:incoming>
+        <bpmn:escalationEventDefinition escalationRef="Escalation_4xx" />
+      </bpmn:endEvent>
+      <bpmn:exclusiveGateway id="SubGW_TransientMerge" name="Transient Merge">
+        <bpmn:documentation>Convergence point for transient errors (5xx, timeout). Routes to retry counter.</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_B5xx</bpmn:incoming>
+        <bpmn:incoming>Flow_Sub_BTime</bpmn:incoming>
+        <bpmn:outgoing>Flow_Sub_ToRetryCheck</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:scriptTask id="SubTask_IncRetry" name="Increment Retry Counter">
+        <bpmn:documentation>Increments retryCount by 1 inside subprocess. Pure script logic.</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_ToRetryCheck</bpmn:incoming>
+        <bpmn:outgoing>Flow_Sub_ToGWRetry</bpmn:outgoing>
+      </bpmn:scriptTask>
+      <bpmn:exclusiveGateway id="SubGW_RetryCheck" name="Retry Under Limit?">
+        <bpmn:documentation>Decision point: retry or escalate?
+
+DECISION LOGIC:
+- RETRY branch: retryCount &lt; 3 → route to backoff timer (3s, 6s, 12s exponential — though Gemini's spec uses fixed 3s)
+- EXHAUSTED branch: retryCount &gt;= 3 → escalate Transient → routes to E13 via outer boundary</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_ToGWRetry</bpmn:incoming>
+        <bpmn:outgoing>Flow_Sub_DoRetry</bpmn:outgoing>
+        <bpmn:outgoing>Flow_Sub_Exhausted</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:intermediateCatchEvent id="SubTimer_Backoff" name="Backoff (3s)">
+        <bpmn:documentation>Backoff timer (PT3S in Gemini's design; could be made exponential PT3S/PT6S/PT12S in implementation). Loops back to SubGW_RetryMerge for next API call attempt.</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_DoRetry</bpmn:incoming>
+        <bpmn:outgoing>Flow_Sub_TimerToAPI</bpmn:outgoing>
+        <bpmn:timerEventDefinition>
+          <bpmn:timeDuration xsi:type="bpmn:tFormalExpression">PT3S</bpmn:timeDuration>
+        </bpmn:timerEventDefinition>
+      </bpmn:intermediateCatchEvent>
+      <bpmn:endEvent id="SubEscalate_Transient" name="Escalate Transient">
+        <bpmn:documentation>Escalation end event throwing Escalation_Transient. Caught by OuterBound_Transient → routes to E13 (TransientFailureExhausted). Failure cached for later reconciliation.</bpmn:documentation>
+        <bpmn:incoming>Flow_Sub_Exhausted</bpmn:incoming>
+        <bpmn:escalationEventDefinition escalationRef="Escalation_Transient" />
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_Sub_S1" sourceRef="SubStart_API" targetRef="SubGW_RetryMerge">
+        <bpmn:documentation>Initial entry into the API call retry loop.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_TimerToAPI" sourceRef="SubTimer_Backoff" targetRef="SubGW_RetryMerge">
+        <bpmn:documentation>Backoff complete; re-attempt API call.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_ToAPI" sourceRef="SubGW_RetryMerge" targetRef="SubTask_CallWhatsApp">
+        <bpmn:documentation>Make the WhatsApp Business API call (5s timeout).</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_Success" sourceRef="SubTask_CallWhatsApp" targetRef="SubEnd_Success">
+        <bpmn:documentation>API returned 200 with WhatsApp message ID; subprocess exits normally.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_B401" sourceRef="SubBound_401" targetRef="SubEscalate_401">
+        <bpmn:documentation>401/403 caught; throw escalation to outer boundary.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_B429" sourceRef="SubBound_429" targetRef="SubEscalate_429">
+        <bpmn:documentation>429 caught; throw escalation to outer boundary (which loops back to internal rate limiter).</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_B4xx" sourceRef="SubBound_4xx" targetRef="SubEscalate_4xx">
+        <bpmn:documentation>Permanent 4xx caught; throw escalation.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_B5xx" sourceRef="SubBound_5xx" targetRef="SubGW_TransientMerge">
+        <bpmn:documentation>5xx caught; route to retry decision.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_BTime" sourceRef="SubBound_Timeout" targetRef="SubGW_TransientMerge">
+        <bpmn:documentation>Timeout caught; route to retry decision (treated as transient).</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_ToRetryCheck" sourceRef="SubGW_TransientMerge" targetRef="SubTask_IncRetry">
+        <bpmn:documentation>Transient error converged; increment retry counter.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_ToGWRetry" sourceRef="SubTask_IncRetry" targetRef="SubGW_RetryCheck">
+        <bpmn:documentation>Retry counter incremented; check if under limit.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_DoRetry" sourceRef="SubGW_RetryCheck" targetRef="SubTimer_Backoff">
+        <bpmn:documentation>Under retry limit (retryCount &lt; 3); wait for backoff and retry.</bpmn:documentation>
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">retryCount &lt; 3</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Sub_Exhausted" sourceRef="SubGW_RetryCheck" targetRef="SubEscalate_Transient">
+        <bpmn:documentation>Retry budget exhausted (retryCount &gt;= 3); throw escalation.</bpmn:documentation>
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">retryCount &gt;= 3</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+    </bpmn:subProcess>
+    <bpmn:boundaryEvent id="OuterBound_401" name="Auth Escalation" attachedToRef="SubProcess_Step8_APIDispatch">
+      <bpmn:documentation>Outer boundary event on the API Dispatch subprocess. Catches Escalation_401 from the subprocess. Routes to E11 (AccountSuspended) — this is a HIGH severity incident requiring immediate engineering attention.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Outer_401</bpmn:outgoing>
+      <bpmn:escalationEventDefinition escalationRef="Escalation_401" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="OuterBound_4xx" name="Permanent Failure Escalation" attachedToRef="SubProcess_Step8_APIDispatch">
+      <bpmn:documentation>Outer boundary event on subprocess. Catches Escalation_4xx. Routes to E12 (PermanentDeliveryFailure).</bpmn:documentation>
+      <bpmn:outgoing>Flow_Outer_4xx</bpmn:outgoing>
+      <bpmn:escalationEventDefinition escalationRef="Escalation_4xx" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="OuterBound_429" name="Rate Limit Escalation" attachedToRef="SubProcess_Step8_APIDispatch">
+      <bpmn:documentation>Outer boundary event on subprocess. Catches Escalation_429. Routes back to GW_MergeToRateLimit so internal rate limiter can decide queue vs reject vs proceed based on current counters.</bpmn:documentation>
+      <bpmn:outgoing>Flow_Outer_429</bpmn:outgoing>
+      <bpmn:escalationEventDefinition escalationRef="Escalation_429" />
+    </bpmn:boundaryEvent>
+    <bpmn:boundaryEvent id="OuterBound_Transient" name="Transient Exhausted Escalation" attachedToRef="SubProcess_Step8_APIDispatch">
+      <bpmn:documentation>Outer boundary event on subprocess. Catches Escalation_Transient. Routes to E13 (TransientFailureExhausted).</bpmn:documentation>
+      <bpmn:outgoing>Flow_Outer_Trans</bpmn:outgoing>
+      <bpmn:escalationEventDefinition escalationRef="Escalation_Transient" />
+    </bpmn:boundaryEvent>
+    <bpmn:endEvent id="EndEvent_AccountSuspended" name="E11: Account Suspended">
+      <bpmn:documentation>E11: AccountSuspended. WhatsApp API returned 401/403 — account or token issue. HIGH SEVERITY incident — engineering alerted immediately. Operations team must investigate before more messages can be sent.</bpmn:documentation>
+      <bpmn:incoming>Flow_Outer_401</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndEvent_PermanentFailure" name="E12: Permanent Delivery Failure">
+      <bpmn:documentation>E12: PermanentDeliveryFailure. Non-retryable 4xx error from WhatsApp API (invalid phone, user blocked Hogaan, etc.). Recorded; caller informed; phone number flagged for suppression list review.</bpmn:documentation>
+      <bpmn:incoming>Flow_Outer_4xx</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndEvent_TransientExhausted" name="E13: Transient Failure Exhausted">
+      <bpmn:documentation>E13: TransientFailureExhausted. Retry budget (3 attempts) exhausted on retryable 5xx/timeout errors. Failure cached for later reconciliation. Incident emitted. Caller informed of dispatch failure.</bpmn:documentation>
+      <bpmn:incoming>Flow_Outer_Trans</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Task_Step9_RecordReceipt" name="Step 9: Record Initial Receipt">
+      <bpmn:documentation>Step 9 — Initial Receipt Recording.
+
+PURPOSE: After successful API dispatch, update state with the WhatsApp message ID and persist the delivery record for compliance and debugging.
+
+LOGIC (two parallel writes):
+1. Update idempotency store entry: state = 'sent', waMessageId, sentAt timestamp
+2. Write delivery record to message log store with full payload, metadata, and status='sent'
+
+OUTPUT: deliveryRecord persisted, idempotencyRecord updated.
+
+IMPLEMENTATION HINT: Service task with two database writes. Either failure is logged but does NOT unwind the dispatch (the message was already sent). Both writes have their own retry logic.</bpmn:documentation>
+      <bpmn:incoming>Flow_S8_S9</bpmn:incoming>
+      <bpmn:outgoing>Flow_S9_S10</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Task_Step10_WebhookSub" name="Step 10: Subscribe to Status Webhooks">
+      <bpmn:documentation>Step 10 — Status Webhook Subscription.
+
+PURPOSE: Register interest in WhatsApp delivery status updates for this message ID. Status updates arrive asynchronously via the webhook receiver (modeled as the event subprocess in Step 12).
+
+LOGIC: Store correlation mapping (waMessageId → correlationId, callerProcessId, deliveryRecordId) in the correlation store with TTL of 7 days. Used by Step 12 to look up the delivery record when a webhook arrives.
+
+IMPLEMENTATION HINT: Service task with database write. Sub-10ms latency.</bpmn:documentation>
+      <bpmn:incoming>Flow_S9_S10</bpmn:incoming>
+      <bpmn:outgoing>Flow_S10_S11</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:intermediateThrowEvent id="Event_NotifyCaller" name="Step 11: Notify Caller (Dispatch Confirmed)">
+      <bpmn:documentation>Step 11 — Caller Notification.
+
+PURPOSE: Emit MessageDispatchConfirmed event with WhatsApp message ID and correlationId. Calling process (upstream Hogaan process) receives this as confirmation that delivery to the API succeeded.
+
+NOTE: This is NOT confirmation that the user received the message — that arrives later via Step 12 webhook reconciliation. It is confirmation that the API accepted the message.
+
+IMPLEMENTATION HINT: Intermediate throw message event. In implementation, this is a publish to an internal event bus correlated by correlationId.</bpmn:documentation>
+      <bpmn:incoming>Flow_S10_S11</bpmn:incoming>
+      <bpmn:outgoing>Flow_S11_GW9</bpmn:outgoing>
+      <bpmn:messageEventDefinition id="MsgDef_NotifyCaller" />
+    </bpmn:intermediateThrowEvent>
+    <bpmn:exclusiveGateway id="GW9_DispatchState" name="Dispatch Path Taken?">
+      <bpmn:documentation>Final routing for the dispatch flow. Distinguishes three terminal happy-path states based on whether the API call succeeded first time, after retries, or via the queueing path.
+
+DECISION LOGIC (plain English):
+- NORMAL branch: dispatch succeeded on first attempt AND no rate-limit queueing happened → terminate at EndEvent_MessageDispatched (E1)
+- RETRY branch: dispatch succeeded after one or more API retries → terminate at EndEvent_MessageDispatchedAfterRetry (E2); flagged for monitoring
+- QUEUED branch: dispatch succeeded but only after rate-limit queue loop back → terminate at EndEvent_MessageDispatchedQueued (E3); caller informed of expected delay</bpmn:documentation>
+      <bpmn:incoming>Flow_S11_GW9</bpmn:incoming>
+      <bpmn:outgoing>Flow_GW9_Normal</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW9_Retry</bpmn:outgoing>
+      <bpmn:outgoing>Flow_GW9_Queued</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_MessageDispatched" name="E1: Message Dispatched">
+      <bpmn:documentation>E1: MessageDispatched. Successful first-attempt delivery to WhatsApp API. Awaits webhook reconciliation for delivered/read status. Target state: ~95% of requests.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW9_Normal</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndEvent_MessageDispatchedAfterRetry" name="E2: Dispatched After Retry">
+      <bpmn:documentation>E2: MessageDispatchedAfterRetry. Delivery succeeded after one or more API retries (5xx or timeout); flagged in metadata for monitoring API reliability. If this rate exceeds 5%, investigate WhatsApp API or network health.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW9_Retry</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:endEvent id="EndEvent_MessageDispatchedQueued" name="E3: Dispatched After Queueing">
+      <bpmn:documentation>E3: MessageDispatchedQueued. Delivery succeeded after rate-limit queue loop back. Caller informed of the queueing delay. Used for analytics on internal rate limiter pressure.</bpmn:documentation>
+      <bpmn:incoming>Flow_GW9_Queued</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:subProcess id="SubProcess_Step12_Reconciliation" name="Step 12: Status Webhook Reconciliation" triggeredByEvent="true">
+      <bpmn:documentation>Step 12 — Status Webhook Reconciliation (Event Subprocess).
+
+PURPOSE: Asynchronously process delivery status updates posted by WhatsApp via webhooks. Reconciles status (sent → delivered → read OR sent → failed) to the message log. Supports out-of-order webhook arrival.
+
+INVOCATION: triggeredByEvent='true' — fires whenever a Message_Webhook arrives, INDEPENDENT of any specific outbound flow instance. The subprocess correlates incoming webhooks to outbound dispatch records by waMessageId.
+
+INTERNAL FLOW: Webhook arrives → look up message log by waMessageId → update record with new status (preserving precedence: read &gt; delivered &gt; sent; once 'read' is recorded, ignore later 'delivered' webhooks) → branch by status: success (delivered/read) → E4; failed → E14.
+
+IMPLEMENTATION HINT: Event subprocess at process scope. Triggered asynchronously — runs independently of the main dispatch flow. The webhook receiver itself is a separate HTTP endpoint that publishes Message_Webhook to the event bus.</bpmn:documentation>
+      <bpmn:startEvent id="Start_WebhookInbound" name="WhatsApp Status Webhook Received" isInterrupting="false">
+        <bpmn:documentation>Webhook arrival start event for the reconciliation event subprocess.
+
+EVENT TYPE: Non-interrupting message start event (isInterrupting='false' — multiple webhooks for the same waMessageId can be processed independently).
+
+PAYLOAD: waMessageId (correlation key), status (sent | delivered | read | failed), statusTimestamp, errorCode (if status==failed).</bpmn:documentation>
+        <bpmn:outgoing>Flow_Ev_S1</bpmn:outgoing>
+        <bpmn:messageEventDefinition messageRef="Message_Webhook" />
+      </bpmn:startEvent>
+      <bpmn:serviceTask id="EvTask_LookupLog" name="Lookup Message Log by waMessageId">
+        <bpmn:documentation>Look up the message log entry by waMessageId. Implementation: indexed read on message_log table.</bpmn:documentation>
+        <bpmn:incoming>Flow_Ev_S1</bpmn:incoming>
+        <bpmn:outgoing>Flow_Ev_S2</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:serviceTask id="EvTask_UpdateLog" name="Update Status &#38; Emit Metrics">
+        <bpmn:documentation>Update the delivery record with new status, then emit metrics events for delivery latency (sent → delivered) and read rate (delivered → read).
+
+OUT-OF-ORDER HANDLING: status downgrade is not allowed — once 'read' is recorded, ignore later 'delivered' webhooks for the same message. Implemented via status precedence check before update.
+
+IMPLEMENTATION HINT: Service task with database update + metrics emission. Both operations atomic where possible.</bpmn:documentation>
+        <bpmn:incoming>Flow_Ev_S2</bpmn:incoming>
+        <bpmn:outgoing>Flow_Ev_GW</bpmn:outgoing>
+      </bpmn:serviceTask>
+      <bpmn:exclusiveGateway id="EvGW_Status" name="Status Type?">
+        <bpmn:documentation>Routes based on incoming webhook status.
+
+DECISION LOGIC:
+- DELIVERED branch: status in ['sent', 'delivered', 'read'] → terminate at E4 (MessageDeliveredReconciled). Note: 'sent' webhook just updates state and ends here too; the user-visible 'delivered' is the meaningful state.
+- FAILED branch: status == 'failed' → terminate at E14 (FailedDeliveryReconciled); caller notified asynchronously of delivery failure</bpmn:documentation>
+        <bpmn:incoming>Flow_Ev_GW</bpmn:incoming>
+        <bpmn:outgoing>Flow_Ev_Success</bpmn:outgoing>
+        <bpmn:outgoing>Flow_Ev_Fail</bpmn:outgoing>
+      </bpmn:exclusiveGateway>
+      <bpmn:endEvent id="EndEvent_ReconciledDelivered" name="E4: Message Delivered Reconciled">
+        <bpmn:documentation>E4: MessageDeliveredReconciled. Webhook confirmed user received the message (delivered or read status). Reconciliation complete. Metrics emitted.</bpmn:documentation>
+        <bpmn:incoming>Flow_Ev_Success</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:endEvent id="EndEvent_ReconciledFailed" name="E14: Failed Delivery Reconciled">
+        <bpmn:documentation>E14: FailedDeliveryReconciled. Webhook returned 'failed' status. Reconciled to log. Caller notified asynchronously via the correlationId-correlated event bus. Phone number flagged for review (possible blocked, invalid, etc.).</bpmn:documentation>
+        <bpmn:incoming>Flow_Ev_Fail</bpmn:incoming>
+      </bpmn:endEvent>
+      <bpmn:sequenceFlow id="Flow_Ev_S1" sourceRef="Start_WebhookInbound" targetRef="EvTask_LookupLog">
+        <bpmn:documentation>Webhook arrived; look up corresponding delivery record.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Ev_S2" sourceRef="EvTask_LookupLog" targetRef="EvTask_UpdateLog">
+        <bpmn:documentation>Record found; update status and emit metrics.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Ev_GW" sourceRef="EvTask_UpdateLog" targetRef="EvGW_Status">
+        <bpmn:documentation>Status updated; route by status type.</bpmn:documentation>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Ev_Success" sourceRef="EvGW_Status" targetRef="EndEvent_ReconciledDelivered">
+        <bpmn:documentation>Status is sent/delivered/read; reconciliation complete.</bpmn:documentation>
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">status in ["sent", "delivered", "read"]</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+      <bpmn:sequenceFlow id="Flow_Ev_Fail" sourceRef="EvGW_Status" targetRef="EndEvent_ReconciledFailed">
+        <bpmn:documentation>Status is failed; reconciliation complete with failure.</bpmn:documentation>
+        <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">status == "failed"</bpmn:conditionExpression>
+      </bpmn:sequenceFlow>
+    </bpmn:subProcess>
+    <bpmn:sequenceFlow id="Flow_Start_S1" sourceRef="StartEvent_OutboundRequested" targetRef="Task_Step1_Validate">
+      <bpmn:documentation>Outbound message request received from caller; route to validation.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S1_GW1" sourceRef="Task_Step1_Validate" targetRef="GW1_Valid">
+      <bpmn:documentation>Validation result; route based on isValid.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW1_No" sourceRef="GW1_Valid" targetRef="EndEvent_MalformedRequest">
+      <bpmn:documentation>Malformed payload; terminate at E6 with validationErrors. Caller receives error response.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Payload invalid (isValid == false)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW1_Yes" sourceRef="GW1_Valid" targetRef="Task_Step2_IdempotencyCheck">
+      <bpmn:documentation>Payload OK; check for duplicate correlationId.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Payload valid (isValid == true)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S2_GW2" sourceRef="Task_Step2_IdempotencyCheck" targetRef="GW2_Duplicate">
+      <bpmn:documentation>Idempotency lookup result.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW2_Yes" sourceRef="GW2_Duplicate" targetRef="EndEvent_DuplicateRequest">
+      <bpmn:documentation>Duplicate detected; return original receipt at E5; no new dispatch.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">correlationId already processed (isDuplicate == true)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW2_No" sourceRef="GW2_Duplicate" targetRef="Task_Step3_SuppressionCheck">
+      <bpmn:documentation>New request; check suppression list.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Unique correlationId (isDuplicate == false)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S3_GW3" sourceRef="Task_Step3_SuppressionCheck" targetRef="GW3_Suppressed">
+      <bpmn:documentation>Suppression and block list lookup result.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW3_Yes" sourceRef="GW3_Suppressed" targetRef="EndEvent_SuppressedRecipient">
+      <bpmn:documentation>Suppressed recipient; terminate at E7. NON-BYPASSABLE — even Critical priority stops here. Compliance audit log written.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Phone number on suppression or block list (isSuppressed == true)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW3_No" sourceRef="GW3_Suppressed" targetRef="Task_Step4_WindowCheck">
+      <bpmn:documentation>Clear; proceed to window check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Phone number clear (isSuppressed == false)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S4_GW4" sourceRef="Task_Step4_WindowCheck" targetRef="GW4_WindowValid">
+      <bpmn:documentation>Window state and message type evaluation.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW4_Yes" sourceRef="GW4_WindowValid" targetRef="EndEvent_WindowClosedFreeFormBlocked">
+      <bpmn:documentation>FreeForm blocked outside 24-hour window per WhatsApp policy; terminate at E8. Caller advised to use Template.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Window CLOSED AND messageType == FreeForm</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW4_No" sourceRef="GW4_WindowValid" targetRef="GW5_IsTemplate">
+      <bpmn:documentation>Allowed; check if Template message.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Window OPEN OR messageType == Template</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW5_Yes" sourceRef="GW5_IsTemplate" targetRef="Task_Step5_TemplateValidation">
+      <bpmn:documentation>Template message; validate against catalog.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">messageType == Template</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW5_No" sourceRef="GW5_IsTemplate" targetRef="GW_MergeToRateLimit">
+      <bpmn:documentation>FreeForm message; skip template validation; merge into rate limit check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">messageType == FreeForm</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S5_GW6" sourceRef="Task_Step5_TemplateValidation" targetRef="GW6_TemplateValid">
+      <bpmn:documentation>Template validation result.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW6_No" sourceRef="GW6_TemplateValid" targetRef="EndEvent_TemplateInvalid">
+      <bpmn:documentation>Template invalid; terminate at E9. Caller receives validationError details.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Template not in catalog, deprecated, or param mismatch (templateValid == false)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW6_Yes" sourceRef="GW6_TemplateValid" targetRef="GW_MergeToRateLimit">
+      <bpmn:documentation>Template approved; merge into rate limit check.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Template valid (templateValid == true)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Merge_S6" sourceRef="GW_MergeToRateLimit" targetRef="Task_Step6_RateLimitCheck">
+      <bpmn:documentation>Converged from FreeForm-direct, Template-validated, queue-loop-back, or 429-retry-from-API; check rate limits.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S6_GW7" sourceRef="Task_Step6_RateLimitCheck" targetRef="GW7_RateDecision">
+      <bpmn:documentation>Rate limit decision; 4-way branch.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW7_Proceed" sourceRef="GW7_RateDecision" targetRef="Task_Step7_IdempotencyCreate">
+      <bpmn:documentation>Under limits OR Critical bypass; proceed to idempotency record creation.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">rateAction == 'PROCEED' OR (Critical priority bypass on per-user limit)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW7_Queue" sourceRef="GW7_RateDecision" targetRef="Event_QueueTimer">
+      <bpmn:documentation>Hit per-second or per-user limit; wait 10 seconds and retry.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">rateAction == 'QUEUE' AND not Critical-bypass</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW7_Reject" sourceRef="GW7_RateDecision" targetRef="EndEvent_RateLimitExceeded">
+      <bpmn:documentation>Daily rate limit hit for Normal/High priority; terminate at E10.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">rateAction == 'REJECT' AND priority != 'Critical'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW7_RejectEscalate" sourceRef="GW7_RateDecision" targetRef="Event_EscalateCriticalLimit">
+      <bpmn:documentation>Critical priority hit daily limit — emergency situation; throw escalation event then terminate.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">rateAction == 'REJECT' AND priority == 'Critical'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_QueueLoopBack" sourceRef="Event_QueueTimer" targetRef="GW_MergeToRateLimit">
+      <bpmn:documentation>10s backoff complete; re-enter rate limit check.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Critical_E10" sourceRef="Event_EscalateCriticalLimit" targetRef="EndEvent_RateLimitExceeded">
+      <bpmn:documentation>Escalation thrown to monitoring; terminate at E10.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S7_S8" sourceRef="Task_Step7_IdempotencyCreate" targetRef="SubProcess_Step8_APIDispatch">
+      <bpmn:documentation>Idempotency record created with state='dispatching'; enter API dispatch subprocess.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S7_Error" sourceRef="Boundary_S7_Error" targetRef="EndEvent_IdempotencyStoreFailure">
+      <bpmn:documentation>Idempotency store unavailable; ABORT dispatch (do NOT proceed without idempotency protection); terminate at E15. HIGH-severity incident.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S8_S9" sourceRef="SubProcess_Step8_APIDispatch" targetRef="Task_Step9_RecordReceipt">
+      <bpmn:documentation>API dispatch succeeded; record initial receipt.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Outer_401" sourceRef="OuterBound_401" targetRef="EndEvent_AccountSuspended">
+      <bpmn:documentation>Auth failure escalated from API dispatch; terminate at E11. HIGH-severity incident.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Outer_4xx" sourceRef="OuterBound_4xx" targetRef="EndEvent_PermanentFailure">
+      <bpmn:documentation>Permanent 4xx from API dispatch; terminate at E12.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Outer_429" sourceRef="OuterBound_429" targetRef="GW_MergeToRateLimit">
+      <bpmn:documentation>429 from API itself; loop back to internal rate limit check (which will likely queue).</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_Outer_Trans" sourceRef="OuterBound_Transient" targetRef="EndEvent_TransientExhausted">
+      <bpmn:documentation>Retry budget exhausted on transient errors; terminate at E13.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S9_S10" sourceRef="Task_Step9_RecordReceipt" targetRef="Task_Step10_WebhookSub">
+      <bpmn:documentation>Initial receipt recorded; subscribe to delivery status webhooks.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S10_S11" sourceRef="Task_Step10_WebhookSub" targetRef="Event_NotifyCaller">
+      <bpmn:documentation>Webhook subscription registered; notify caller of API success.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_S11_GW9" sourceRef="Event_NotifyCaller" targetRef="GW9_DispatchState">
+      <bpmn:documentation>Caller notified; route to terminal end event based on dispatch path taken.</bpmn:documentation>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW9_Normal" sourceRef="GW9_DispatchState" targetRef="EndEvent_MessageDispatched">
+      <bpmn:documentation>Happy path; terminate at E1.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">First-attempt success, no queueing (retryCount == 0 AND queueLoops == 0)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW9_Retry" sourceRef="GW9_DispatchState" targetRef="EndEvent_MessageDispatchedAfterRetry">
+      <bpmn:documentation>Succeeded after API retries; terminate at E2; flagged for monitoring.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Success after retries (retryCount &gt; 0)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_GW9_Queued" sourceRef="GW9_DispatchState" targetRef="EndEvent_MessageDispatchedQueued">
+      <bpmn:documentation>Succeeded after rate-limit queue loop; terminate at E3.</bpmn:documentation>
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">Success after queueing (queueLoops &gt; 0)</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_WADelivery">
+    <bpmndi:BPMNPlane id="BPMNPlane_WADelivery" bpmnElement="Collaboration_Hogaan_WADelivery">
+      <bpmndi:BPMNShape id="Pool_di" bpmnElement="Participant_Hogaan" isHorizontal="true">
+        <dc:Bounds x="50" y="50" width="4400" height="1500" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_OrchestrationEngine_di" bpmnElement="Lane_OrchestrationEngine" isHorizontal="true">
+        <dc:Bounds x="80" y="50" width="4370" height="550" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_WhatsAppGateway_di" bpmnElement="Lane_WhatsAppGateway" isHorizontal="true">
+        <dc:Bounds x="80" y="600" width="4370" height="350" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_DataLayer_di" bpmnElement="Lane_DataLayer" isHorizontal="true">
+        <dc:Bounds x="80" y="950" width="4370" height="550" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_OutboundRequested_di" bpmnElement="StartEvent_OutboundRequested">
+        <dc:Bounds x="130" y="342" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="100" y="383" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step1_Validate_di" bpmnElement="Task_Step1_Validate">
+        <dc:Bounds x="210" y="320" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW1_Valid_di" bpmnElement="GW1_Valid" isMarkerVisible="true">
+        <dc:Bounds x="370" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="345" y="310" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW2_Duplicate_di" bpmnElement="GW2_Duplicate" isMarkerVisible="true">
+        <dc:Bounds x="530" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="505" y="310" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW3_Suppressed_di" bpmnElement="GW3_Suppressed" isMarkerVisible="true">
+        <dc:Bounds x="690" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="665" y="310" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW4_WindowValid_di" bpmnElement="GW4_WindowValid" isMarkerVisible="true">
+        <dc:Bounds x="850" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="825" y="310" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW5_IsTemplate_di" bpmnElement="GW5_IsTemplate" isMarkerVisible="true">
+        <dc:Bounds x="1010" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="985" y="310" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW6_TemplateValid_di" bpmnElement="GW6_TemplateValid" isMarkerVisible="true">
+        <dc:Bounds x="1170" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1145" y="310" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW_MergeToRateLimit_di" bpmnElement="GW_MergeToRateLimit" isMarkerVisible="true">
+        <dc:Bounds x="1330" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1305" y="310" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step6_RateLimitCheck_di" bpmnElement="Task_Step6_RateLimitCheck">
+        <dc:Bounds x="1410" y="320" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW7_RateDecision_di" bpmnElement="GW7_RateDecision" isMarkerVisible="true">
+        <dc:Bounds x="1570" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1545" y="310" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="GW9_DispatchState_di" bpmnElement="GW9_DispatchState" isMarkerVisible="true">
+        <dc:Bounds x="3680" y="335" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3655" y="310" width="100" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_NotifyCaller_di" bpmnElement="Event_NotifyCaller">
+        <dc:Bounds x="3590" y="342" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3560" y="383" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_QueueTimer_di" bpmnElement="Event_QueueTimer">
+        <dc:Bounds x="1670" y="150" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1640" y="191" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Event_EscalateCriticalLimit_di" bpmnElement="Event_EscalateCriticalLimit">
+        <dc:Bounds x="1670" y="230" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1640" y="271" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_MalformedRequest_di" bpmnElement="EndEvent_MalformedRequest">
+        <dc:Bounds x="377" y="430" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="347" y="471" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_DuplicateRequest_di" bpmnElement="EndEvent_DuplicateRequest">
+        <dc:Bounds x="537" y="430" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="507" y="471" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_SuppressedRecipient_di" bpmnElement="EndEvent_SuppressedRecipient">
+        <dc:Bounds x="697" y="430" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="667" y="471" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_WindowClosedFreeFormBlocked_di" bpmnElement="EndEvent_WindowClosedFreeFormBlocked">
+        <dc:Bounds x="857" y="430" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="827" y="471" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_TemplateInvalid_di" bpmnElement="EndEvent_TemplateInvalid">
+        <dc:Bounds x="1177" y="430" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1147" y="471" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_RateLimitExceeded_di" bpmnElement="EndEvent_RateLimitExceeded">
+        <dc:Bounds x="1730" y="190" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1700" y="231" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_MessageDispatched_di" bpmnElement="EndEvent_MessageDispatched">
+        <dc:Bounds x="3770" y="342" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3740" y="383" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_MessageDispatchedAfterRetry_di" bpmnElement="EndEvent_MessageDispatchedAfterRetry">
+        <dc:Bounds x="3770" y="420" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3740" y="461" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_MessageDispatchedQueued_di" bpmnElement="EndEvent_MessageDispatchedQueued">
+        <dc:Bounds x="3770" y="265" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="3740" y="306" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step2_IdempotencyCheck_di" bpmnElement="Task_Step2_IdempotencyCheck">
+        <dc:Bounds x="470" y="1040" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step3_SuppressionCheck_di" bpmnElement="Task_Step3_SuppressionCheck">
+        <dc:Bounds x="630" y="1040" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step4_WindowCheck_di" bpmnElement="Task_Step4_WindowCheck">
+        <dc:Bounds x="790" y="1040" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step5_TemplateValidation_di" bpmnElement="Task_Step5_TemplateValidation">
+        <dc:Bounds x="1100" y="1040" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step7_IdempotencyCreate_di" bpmnElement="Task_Step7_IdempotencyCreate">
+        <dc:Bounds x="1810" y="1040" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Boundary_S7_Error_di" bpmnElement="Boundary_S7_Error">
+        <dc:Bounds x="1870" y="1102" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1840" y="1143" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_IdempotencyStoreFailure_di" bpmnElement="EndEvent_IdempotencyStoreFailure">
+        <dc:Bounds x="1870" y="1160" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1840" y="1201" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step9_RecordReceipt_di" bpmnElement="Task_Step9_RecordReceipt">
+        <dc:Bounds x="3270" y="1040" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Step10_WebhookSub_di" bpmnElement="Task_Step10_WebhookSub">
+        <dc:Bounds x="3430" y="1040" width="110" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubProcess_Step8_APIDispatch_di" bpmnElement="SubProcess_Step8_APIDispatch" isExpanded="true">
+        <dc:Bounds x="2010" y="670" width="1140" height="240" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="OuterBound_401_di" bpmnElement="OuterBound_401">
+        <dc:Bounds x="2050" y="892" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2020" y="933" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="OuterBound_4xx_di" bpmnElement="OuterBound_4xx">
+        <dc:Bounds x="2150" y="892" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2120" y="933" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="OuterBound_429_di" bpmnElement="OuterBound_429">
+        <dc:Bounds x="2250" y="892" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2220" y="933" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="OuterBound_Transient_di" bpmnElement="OuterBound_Transient">
+        <dc:Bounds x="2350" y="892" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2320" y="933" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_AccountSuspended_di" bpmnElement="EndEvent_AccountSuspended">
+        <dc:Bounds x="2050" y="820" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2020" y="861" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_PermanentFailure_di" bpmnElement="EndEvent_PermanentFailure">
+        <dc:Bounds x="2150" y="820" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2120" y="861" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_TransientExhausted_di" bpmnElement="EndEvent_TransientExhausted">
+        <dc:Bounds x="2350" y="820" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="2320" y="861" width="100" height="30" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubProcess_Step12_Reconciliation_di" bpmnElement="SubProcess_Step12_Reconciliation" isExpanded="true">
+        <dc:Bounds x="2900" y="430" width="900" height="130" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubStart_API_di" bpmnElement="SubStart_API">
+        <dc:Bounds x="2030" y="782" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubGW_RetryMerge_di" bpmnElement="SubGW_RetryMerge" isMarkerVisible="true">
+        <dc:Bounds x="2090" y="775" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubTask_CallWhatsApp_di" bpmnElement="SubTask_CallWhatsApp">
+        <dc:Bounds x="2170" y="760" width="120" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubEnd_Success_di" bpmnElement="SubEnd_Success">
+        <dc:Bounds x="2330" y="782" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubBound_401_di" bpmnElement="SubBound_401">
+        <dc:Bounds x="2188" y="822" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubBound_429_di" bpmnElement="SubBound_429">
+        <dc:Bounds x="2208" y="822" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubBound_4xx_di" bpmnElement="SubBound_4xx">
+        <dc:Bounds x="2228" y="822" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubBound_5xx_di" bpmnElement="SubBound_5xx">
+        <dc:Bounds x="2248" y="822" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubBound_Timeout_di" bpmnElement="SubBound_Timeout">
+        <dc:Bounds x="2268" y="822" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubEscalate_401_di" bpmnElement="SubEscalate_401">
+        <dc:Bounds x="2188" y="890" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubEscalate_429_di" bpmnElement="SubEscalate_429">
+        <dc:Bounds x="2208" y="890" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubEscalate_4xx_di" bpmnElement="SubEscalate_4xx">
+        <dc:Bounds x="2228" y="890" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubGW_TransientMerge_di" bpmnElement="SubGW_TransientMerge" isMarkerVisible="true">
+        <dc:Bounds x="2420" y="775" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubTask_IncRetry_di" bpmnElement="SubTask_IncRetry">
+        <dc:Bounds x="2500" y="760" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubGW_RetryCheck_di" bpmnElement="SubGW_RetryCheck" isMarkerVisible="true">
+        <dc:Bounds x="2630" y="775" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubTimer_Backoff_di" bpmnElement="SubTimer_Backoff">
+        <dc:Bounds x="2730" y="782" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="SubEscalate_Transient_di" bpmnElement="SubEscalate_Transient">
+        <dc:Bounds x="2810" y="782" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_WebhookInbound_di" bpmnElement="Start_WebhookInbound">
+        <dc:Bounds x="2920" y="492" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EvTask_LookupLog_di" bpmnElement="EvTask_LookupLog">
+        <dc:Bounds x="2990" y="480" width="120" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EvTask_UpdateLog_di" bpmnElement="EvTask_UpdateLog">
+        <dc:Bounds x="3140" y="480" width="140" height="60" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EvGW_Status_di" bpmnElement="EvGW_Status" isMarkerVisible="true">
+        <dc:Bounds x="3310" y="485" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_ReconciledDelivered_di" bpmnElement="EndEvent_ReconciledDelivered">
+        <dc:Bounds x="3400" y="468" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_ReconciledFailed_di" bpmnElement="EndEvent_ReconciledFailed">
+        <dc:Bounds x="3400" y="510" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_Start_S1_di" bpmnElement="Flow_Start_S1">
+        <di:waypoint x="166" y="360" />
+        <di:waypoint x="210" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S1_GW1_di" bpmnElement="Flow_S1_GW1">
+        <di:waypoint x="320" y="360" />
+        <di:waypoint x="370" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW1_No_di" bpmnElement="Flow_GW1_No">
+        <di:waypoint x="395" y="385" />
+        <di:waypoint x="395" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW1_Yes_di" bpmnElement="Flow_GW1_Yes">
+        <di:waypoint x="420" y="360" />
+        <di:waypoint x="440" y="285" />
+        <di:waypoint x="440" y="1030" />
+        <di:waypoint x="470" y="1080" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S2_GW2_di" bpmnElement="Flow_S2_GW2">
+        <di:waypoint x="580" y="1080" />
+        <di:waypoint x="600" y="1030" />
+        <di:waypoint x="600" y="285" />
+        <di:waypoint x="530" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW2_Yes_di" bpmnElement="Flow_GW2_Yes">
+        <di:waypoint x="555" y="385" />
+        <di:waypoint x="555" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW2_No_di" bpmnElement="Flow_GW2_No">
+        <di:waypoint x="580" y="360" />
+        <di:waypoint x="600" y="285" />
+        <di:waypoint x="600" y="1030" />
+        <di:waypoint x="630" y="1080" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S3_GW3_di" bpmnElement="Flow_S3_GW3">
+        <di:waypoint x="740" y="1080" />
+        <di:waypoint x="760" y="1030" />
+        <di:waypoint x="760" y="285" />
+        <di:waypoint x="690" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW3_Yes_di" bpmnElement="Flow_GW3_Yes">
+        <di:waypoint x="715" y="385" />
+        <di:waypoint x="715" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW3_No_di" bpmnElement="Flow_GW3_No">
+        <di:waypoint x="740" y="360" />
+        <di:waypoint x="760" y="285" />
+        <di:waypoint x="760" y="1030" />
+        <di:waypoint x="790" y="1080" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S4_GW4_di" bpmnElement="Flow_S4_GW4">
+        <di:waypoint x="900" y="1080" />
+        <di:waypoint x="920" y="1030" />
+        <di:waypoint x="920" y="285" />
+        <di:waypoint x="850" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW4_Yes_di" bpmnElement="Flow_GW4_Yes">
+        <di:waypoint x="875" y="385" />
+        <di:waypoint x="875" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW4_No_di" bpmnElement="Flow_GW4_No">
+        <di:waypoint x="900" y="360" />
+        <di:waypoint x="1010" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW5_Yes_di" bpmnElement="Flow_GW5_Yes">
+        <di:waypoint x="1035" y="385" />
+        <di:waypoint x="1035" y="1030" />
+        <di:waypoint x="1100" y="1080" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW5_No_di" bpmnElement="Flow_GW5_No">
+        <di:waypoint x="1060" y="360" />
+        <di:waypoint x="1100" y="285" />
+        <di:waypoint x="1100" y="295" />
+        <di:waypoint x="1330" y="295" />
+        <di:waypoint x="1330" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S5_GW6_di" bpmnElement="Flow_S5_GW6">
+        <di:waypoint x="1210" y="1080" />
+        <di:waypoint x="1240" y="1030" />
+        <di:waypoint x="1240" y="285" />
+        <di:waypoint x="1170" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW6_No_di" bpmnElement="Flow_GW6_No">
+        <di:waypoint x="1195" y="385" />
+        <di:waypoint x="1195" y="430" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW6_Yes_di" bpmnElement="Flow_GW6_Yes">
+        <di:waypoint x="1220" y="360" />
+        <di:waypoint x="1330" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Merge_S6_di" bpmnElement="Flow_Merge_S6">
+        <di:waypoint x="1380" y="360" />
+        <di:waypoint x="1410" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S6_GW7_di" bpmnElement="Flow_S6_GW7">
+        <di:waypoint x="1520" y="360" />
+        <di:waypoint x="1570" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW7_Proceed_di" bpmnElement="Flow_GW7_Proceed">
+        <di:waypoint x="1620" y="360" />
+        <di:waypoint x="1850" y="285" />
+        <di:waypoint x="1850" y="990" />
+        <di:waypoint x="1865" y="1040" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW7_Queue_di" bpmnElement="Flow_GW7_Queue">
+        <di:waypoint x="1595" y="335" />
+        <di:waypoint x="1595" y="200" />
+        <di:waypoint x="1670" y="200" />
+        <di:waypoint x="1670" y="168" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW7_Reject_di" bpmnElement="Flow_GW7_Reject">
+        <di:waypoint x="1595" y="385" />
+        <di:waypoint x="1595" y="380" />
+        <di:waypoint x="1730" y="380" />
+        <di:waypoint x="1730" y="208" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW7_RejectEscalate_di" bpmnElement="Flow_GW7_RejectEscalate">
+        <di:waypoint x="1620" y="360" />
+        <di:waypoint x="1620" y="295" />
+        <di:waypoint x="1620" y="248" />
+        <di:waypoint x="1670" y="248" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_QueueLoopBack_di" bpmnElement="Flow_QueueLoopBack">
+        <di:waypoint x="1706" y="168" />
+        <di:waypoint x="1740" y="118" />
+        <di:waypoint x="1300" y="118" />
+        <di:waypoint x="1300" y="200" />
+        <di:waypoint x="1355" y="200" />
+        <di:waypoint x="1355" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Critical_E10_di" bpmnElement="Flow_Critical_E10">
+        <di:waypoint x="1706" y="248" />
+        <di:waypoint x="1730" y="208" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S7_S8_di" bpmnElement="Flow_S7_S8">
+        <di:waypoint x="1865" y="1040" />
+        <di:waypoint x="1865" y="990" />
+        <di:waypoint x="1865" y="760" />
+        <di:waypoint x="2010" y="760" />
+        <di:waypoint x="2010" y="790" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S7_Error_di" bpmnElement="Flow_S7_Error">
+        <di:waypoint x="1888" y="1138" />
+        <di:waypoint x="1888" y="1160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S8_S9_di" bpmnElement="Flow_S8_S9">
+        <di:waypoint x="3150" y="790" />
+        <di:waypoint x="3210" y="760" />
+        <di:waypoint x="3210" y="990" />
+        <di:waypoint x="3325" y="1040" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Outer_401_di" bpmnElement="Flow_Outer_401">
+        <di:waypoint x="2068" y="928" />
+        <di:waypoint x="2068" y="820" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Outer_4xx_di" bpmnElement="Flow_Outer_4xx">
+        <di:waypoint x="2168" y="928" />
+        <di:waypoint x="2168" y="820" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Outer_429_di" bpmnElement="Flow_Outer_429">
+        <di:waypoint x="2268" y="928" />
+        <di:waypoint x="2268" y="880" />
+        <di:waypoint x="2268" y="920" />
+        <di:waypoint x="1355" y="920" />
+        <di:waypoint x="1355" y="385" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Outer_Trans_di" bpmnElement="Flow_Outer_Trans">
+        <di:waypoint x="2368" y="928" />
+        <di:waypoint x="2368" y="820" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S9_S10_di" bpmnElement="Flow_S9_S10">
+        <di:waypoint x="3380" y="1080" />
+        <di:waypoint x="3430" y="1080" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S10_S11_di" bpmnElement="Flow_S10_S11">
+        <di:waypoint x="3485" y="1040" />
+        <di:waypoint x="3485" y="990" />
+        <di:waypoint x="3485" y="580" />
+        <di:waypoint x="3608" y="580" />
+        <di:waypoint x="3608" y="292" />
+        <di:waypoint x="3590" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_S11_GW9_di" bpmnElement="Flow_S11_GW9">
+        <di:waypoint x="3626" y="360" />
+        <di:waypoint x="3680" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW9_Normal_di" bpmnElement="Flow_GW9_Normal">
+        <di:waypoint x="3730" y="360" />
+        <di:waypoint x="3770" y="360" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW9_Retry_di" bpmnElement="Flow_GW9_Retry">
+        <di:waypoint x="3705" y="385" />
+        <di:waypoint x="3705" y="380" />
+        <di:waypoint x="3770" y="380" />
+        <di:waypoint x="3770" y="438" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_GW9_Queued_di" bpmnElement="Flow_GW9_Queued">
+        <di:waypoint x="3705" y="335" />
+        <di:waypoint x="3705" y="235" />
+        <di:waypoint x="3770" y="235" />
+        <di:waypoint x="3770" y="283" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_S1_di" bpmnElement="Flow_Sub_S1">
+        <di:waypoint x="2066" y="800" />
+        <di:waypoint x="2090" y="800" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_ToAPI_di" bpmnElement="Flow_Sub_ToAPI">
+        <di:waypoint x="2140" y="800" />
+        <di:waypoint x="2170" y="800" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_Success_di" bpmnElement="Flow_Sub_Success">
+        <di:waypoint x="2290" y="800" />
+        <di:waypoint x="2330" y="800" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_B401_di" bpmnElement="Flow_Sub_B401">
+        <di:waypoint x="2206" y="858" />
+        <di:waypoint x="2206" y="890" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_B429_di" bpmnElement="Flow_Sub_B429">
+        <di:waypoint x="2226" y="858" />
+        <di:waypoint x="2226" y="890" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_B4xx_di" bpmnElement="Flow_Sub_B4xx">
+        <di:waypoint x="2246" y="858" />
+        <di:waypoint x="2246" y="890" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_B5xx_di" bpmnElement="Flow_Sub_B5xx">
+        <di:waypoint x="2266" y="858" />
+        <di:waypoint x="2266" y="960" />
+        <di:waypoint x="2445" y="960" />
+        <di:waypoint x="2445" y="825" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_BTime_di" bpmnElement="Flow_Sub_BTime">
+        <di:waypoint x="2286" y="858" />
+        <di:waypoint x="2286" y="955" />
+        <di:waypoint x="2445" y="955" />
+        <di:waypoint x="2445" y="825" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_ToRetryCheck_di" bpmnElement="Flow_Sub_ToRetryCheck">
+        <di:waypoint x="2470" y="800" />
+        <di:waypoint x="2500" y="800" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_ToGWRetry_di" bpmnElement="Flow_Sub_ToGWRetry">
+        <di:waypoint x="2600" y="800" />
+        <di:waypoint x="2630" y="800" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_DoRetry_di" bpmnElement="Flow_Sub_DoRetry">
+        <di:waypoint x="2680" y="800" />
+        <di:waypoint x="2730" y="800" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_TimerToAPI_di" bpmnElement="Flow_Sub_TimerToAPI">
+        <di:waypoint x="2748" y="782" />
+        <di:waypoint x="2748" y="750" />
+        <di:waypoint x="2115" y="750" />
+        <di:waypoint x="2115" y="775" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Sub_Exhausted_di" bpmnElement="Flow_Sub_Exhausted">
+        <di:waypoint x="2680" y="800" />
+        <di:waypoint x="2810" y="800" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Ev_S1_di" bpmnElement="Flow_Ev_S1">
+        <di:waypoint x="2956" y="510" />
+        <di:waypoint x="2990" y="510" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Ev_S2_di" bpmnElement="Flow_Ev_S2">
+        <di:waypoint x="3110" y="510" />
+        <di:waypoint x="3140" y="510" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Ev_GW_di" bpmnElement="Flow_Ev_GW">
+        <di:waypoint x="3280" y="510" />
+        <di:waypoint x="3310" y="510" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Ev_Success_di" bpmnElement="Flow_Ev_Success">
+        <di:waypoint x="3335" y="485" />
+        <di:waypoint x="3335" y="486" />
+        <di:waypoint x="3400" y="486" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_Ev_Fail_di" bpmnElement="Flow_Ev_Fail">
+        <di:waypoint x="3335" y="535" />
+        <di:waypoint x="3335" y="528" />
+        <di:waypoint x="3400" y="528" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
