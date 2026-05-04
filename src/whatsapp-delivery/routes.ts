@@ -1,6 +1,10 @@
 import formbody from '@fastify/formbody';
 import type { FastifyInstance } from 'fastify';
-import type { Database } from '../shared/db/client.js';
+import { routeInboundMessage } from '../coaching/webhook-router.js';
+import type { Database, SqlClient } from '../shared/db/client.js';
+import type { RedisBundle } from '../shared/redis/client.js';
+import type { RateLimiters } from '../shared/redis/rate-limit.js';
+import type { TraceEmitter } from '../shared/trace/index.js';
 import {
   parseInboundMessage,
   parseStatusCallback,
@@ -11,6 +15,10 @@ import {
 
 export interface RoutesOptions {
   db: Database;
+  sql: SqlClient;
+  redis: RedisBundle;
+  rateLimiters: RateLimiters;
+  traceEmitter: TraceEmitter;
   /**
    * Public-facing base URL the webhook is reachable at (e.g.
    * https://hogaan.onrender.com). Required because Twilio's signature is
@@ -54,16 +62,46 @@ export async function registerWhatsAppRoutes(
     }
 
     const event = parseInboundMessage(params);
-    if (event.kind === 'inbound') {
-      req.log.info(
-        { waMessageId: event.waMessageId, hasMedia: event.mediaUrls.length > 0 },
-        'twilio inbound received',
+    if (event.kind !== 'inbound') {
+      return reply.code(204).send();
+    }
+    req.log.info(
+      { waMessageId: event.waMessageId, hasMedia: event.mediaUrls.length > 0 },
+      'twilio inbound received',
+    );
+
+    // Phase 7: dispatch through identity → onboarding/coaching. The webhook
+    // returns 204 immediately after the routing call so Twilio doesn't retry;
+    // any internal errors are reported as P1 incidents but never bubble to
+    // Twilio. Outbound replies are dispatched separately by the
+    // orchestrator via Process #11.
+    try {
+      const outcome = await routeInboundMessage(
+        {
+          config: app.config,
+          db: opts.db,
+          sql: opts.sql,
+          redis: opts.redis,
+          rateLimiters: opts.rateLimiters,
+          traceEmitter: opts.traceEmitter,
+        },
+        {
+          fromE164: event.fromE164,
+          body: event.body,
+          mediaUrls: event.mediaUrls,
+          inboundMessageSid: event.waMessageId,
+          receivedAt: event.receivedAt,
+          traceId: req.id,
+        },
       );
+      req.log.info(
+        { outcome: outcome.kind, reason: 'reason' in outcome ? outcome.reason : undefined },
+        'inbound webhook routed',
+      );
+    } catch (err) {
+      req.log.error({ err }, 'inbound webhook routing failed');
     }
 
-    // Phase 6/7 will wire this to identity → coaching. For Phase 3 we ack
-    // the webhook so Twilio doesn't retry, and store nothing — the inbound
-    // message_log row gets written when Process #12 resolves identity.
     return reply.code(204).send();
   });
 

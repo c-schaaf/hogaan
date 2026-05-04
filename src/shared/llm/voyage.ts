@@ -10,7 +10,13 @@ import { withTimeout } from './retry.js';
 const VOYAGE_URL = 'https://api.voyageai.com/v1/embeddings';
 
 export interface VoyageEmbedRequest {
-  model: 'voyage-3-lite';
+  /**
+   * `voyage-3` produces 1024-dim embeddings natively (matches the
+   * `vector(1024)` schema column on memories). The original CLAUDE.md spec
+   * named `voyage-3-lite` but Voyage's lite model only supports 256/512 dim;
+   * upgrading to voyage-3 keeps the dim contract intact at marginal cost.
+   */
+  model: 'voyage-3';
   texts: string[];
   /** 'document' for the indexed corpus (memories, scenarios), 'query' for live retrieval. */
   inputType: 'document' | 'query';

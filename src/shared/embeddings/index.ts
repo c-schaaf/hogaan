@@ -3,7 +3,9 @@ import { voyageEmbed } from '../llm/voyage.js';
 
 /**
  * Embedding helper: thin facade over the Voyage client. All embeddings in the
- * Hogaan corpus are 1024-dim from voyage-3-lite (CLAUDE.md / PRD §6).
+ * Hogaan corpus are 1024-dim. Originally specced as voyage-3-lite per
+ * CLAUDE.md / PRD §6, but Voyage's lite model only supports 256/512 dim,
+ * so we upgraded to voyage-3 (1024 native) at marginal cost.
  *
  * `inputType` discipline: documents (memories, scenarios, library content) use
  * 'document' so Voyage's domain prompt biases for retrieval-corpus shape.
@@ -23,7 +25,7 @@ export async function embedQuery(
   timeoutMs: number = DEFAULT_TIMEOUT_MS,
 ): Promise<number[]> {
   const res = await voyageEmbed(config, {
-    model: 'voyage-3-lite',
+    model: 'voyage-3',
     texts: [text],
     inputType: 'query',
     timeoutMs,
@@ -63,7 +65,7 @@ export async function embedDocuments(
   for (let offset = 0; offset < texts.length; offset += VOYAGE_BATCH_LIMIT) {
     const slice = texts.slice(offset, offset + VOYAGE_BATCH_LIMIT);
     const res = await voyageEmbed(config, {
-      model: 'voyage-3-lite',
+      model: 'voyage-3',
       texts: slice,
       inputType: 'document',
       timeoutMs,
