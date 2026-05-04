@@ -6,6 +6,9 @@ type OptionalKey =
   | 'UPSTASH_REDIS_REST_URL'
   | 'UPSTASH_REDIS_REST_TOKEN'
   | 'ENCRYPTION_KEY_BASE64'
+  | 'JWT_SECRET_BASE64'
+  | 'JWT_ISSUER'
+  | 'JWT_AUDIENCE'
   | 'ANTHROPIC_API_KEY'
   | 'GROQ_API_KEY'
   | 'VOYAGE_API_KEY'
@@ -27,6 +30,9 @@ export interface AppConfig {
   upstashRedisRestUrl: string | undefined;
   upstashRedisRestToken: string | undefined;
   encryptionKeyBase64: string | undefined;
+  jwtSecretBase64: string | undefined;
+  jwtIssuer: string | undefined;
+  jwtAudience: string | undefined;
   anthropicApiKey: string | undefined;
   groqApiKey: string | undefined;
   voyageApiKey: string | undefined;
@@ -94,6 +100,9 @@ export function loadConfig(): AppConfig {
     upstashRedisRestUrl: readOptional('UPSTASH_REDIS_REST_URL'),
     upstashRedisRestToken: readOptional('UPSTASH_REDIS_REST_TOKEN'),
     encryptionKeyBase64: readOptional('ENCRYPTION_KEY_BASE64'),
+    jwtSecretBase64: readOptional('JWT_SECRET_BASE64'),
+    jwtIssuer: readOptional('JWT_ISSUER'),
+    jwtAudience: readOptional('JWT_AUDIENCE'),
     anthropicApiKey: readOptional('ANTHROPIC_API_KEY'),
     groqApiKey: readOptional('GROQ_API_KEY'),
     voyageApiKey: readOptional('VOYAGE_API_KEY'),
