@@ -1,5 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import type { Database } from '../shared/db/client.js';
+import { asDate } from '../shared/db/dates.js';
 import { whatsappMessages } from '../shared/db/schema/whatsapp-messages.js';
 
 const WINDOW_HOURS = 24;
@@ -56,7 +57,8 @@ export async function checkWindowByUserId(
     if (last === undefined || last === null) {
       return 'closed';
     }
-    const ageMs = now.getTime() - last.getTime();
+    // postgres-js returns timestamp columns as ISO strings — coerce to Date.
+    const ageMs = now.getTime() - asDate(last).getTime();
     return ageMs <= WINDOW_MS ? 'open' : 'closed';
   } catch {
     return 'open'; // fail-open per Process #11 §4

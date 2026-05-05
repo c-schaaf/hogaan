@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { and, desc, eq, gte } from 'drizzle-orm';
 import type { Database } from '../shared/db/client.js';
+import { asDate } from '../shared/db/dates.js';
 import { whatsappMessages } from '../shared/db/schema/whatsapp-messages.js';
 import { PRACTICE_TAGS, type PracticeTag, type UserId } from '../shared/types/index.js';
 import type { DailyPrompt, DailyPromptsPayload } from '../libraries/types.js';
@@ -198,7 +199,8 @@ export async function loadRecentHistory(
     out.push({
       practice: practice as PracticeTag,
       promptId,
-      sentAt: r.createdAt,
+      // postgres-js returns timestamp columns as ISO strings — coerce to Date.
+      sentAt: asDate(r.createdAt),
     });
   }
   return out;

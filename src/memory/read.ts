@@ -1,4 +1,5 @@
 import { sql } from 'drizzle-orm';
+import { asDate } from '../shared/db/dates.js';
 import type { Database } from '../shared/db/client.js';
 import { embedQuery } from '../shared/embeddings/index.js';
 import type { AppConfig } from '../shared/secrets/config.js';
@@ -54,6 +55,8 @@ export async function retrieveMemories(
     content: r.content,
     similarity: Number.parseFloat(r.similarity),
     metadata: r.metadata,
-    createdAt: r.created_at,
+    // postgres-js returns timestamp columns as ISO strings; coerce at the
+    // boundary so callers get a real Date (matches MemorySearchResult typing).
+    createdAt: asDate(r.created_at),
   }));
 }

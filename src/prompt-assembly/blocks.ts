@@ -1,9 +1,15 @@
+import { asDate } from '../shared/db/dates.js';
 import type { InputPayload } from './types.js';
 
 /**
  * Process #9 §8 — memory block. Most-recent-first list capped by N entries.
  * Each entry is summarized to one line; the LLM has the raw context, no need
  * for verbatim memory dumps.
+ *
+ * Defensive: createdAt is typed as `Date` but postgres-js may hand us an
+ * ISO string at runtime. We coerce here as a safety net even though the
+ * boundary readers (memory/read.ts etc.) should normalize too. See
+ * src/shared/db/dates.ts for context.
  */
 const MEMORY_DEFAULT_CAP = 10;
 
@@ -16,12 +22,12 @@ export function buildMemoryBlock(
   }
   // Sort by createdAt desc (most recent first), then take up to `cap`.
   const sorted = [...retrievedMemories].sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    (a, b) => asDate(b.createdAt).getTime() - asDate(a.createdAt).getTime(),
   );
   const limited = sorted.slice(0, cap);
   const lines: string[] = ['## Memory'];
   for (const m of limited) {
-    const date = m.createdAt.toISOString().slice(0, 10);
+    const date = asDate(m.createdAt).toISOString().slice(0, 10);
     lines.push(`- (${date}) ${oneLine(m.content)}`);
   }
   return lines.join('\n');

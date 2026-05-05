@@ -1,5 +1,6 @@
 import { desc, eq } from 'drizzle-orm';
 import type { Database } from '../shared/db/client.js';
+import { asDate } from '../shared/db/dates.js';
 import { turns } from '../shared/db/schema/turns.js';
 import type { SessionId } from '../shared/types/index.js';
 import type { RecentTurn } from './types.js';
@@ -38,6 +39,7 @@ export async function fetchRecentTurns(
     turnId: r.turnId,
     userMessage: r.userMessage,
     responseText: r.responseText,
-    createdAt: r.createdAt,
+    // postgres-js returns timestamp columns as ISO strings — coerce to Date.
+    createdAt: asDate(r.createdAt),
   }));
 }
