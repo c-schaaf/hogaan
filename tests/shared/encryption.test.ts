@@ -34,6 +34,9 @@ function configWithKey(key: string | undefined): AppConfig {
     axiomToken: undefined,
     axiomDataset: undefined,
     betterstackHeartbeatUrl: undefined,
+    resendApiKey: undefined,
+    resendFromEmail: undefined,
+    sponsorPortalBaseUrl: undefined,
   };
 }
 

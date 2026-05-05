@@ -12,3 +12,4 @@ export * from './suppression-list.js';
 export * from './library-versions.js';
 export * from './prompt-logs.js';
 export * from './crisis-events.js';
+export * from './sponsor-users.js';

@@ -38,6 +38,9 @@ function configWith(
     axiomToken: undefined,
     axiomDataset: undefined,
     betterstackHeartbeatUrl: undefined,
+    resendApiKey: undefined,
+    resendFromEmail: undefined,
+    sponsorPortalBaseUrl: undefined,
   };
 }
 

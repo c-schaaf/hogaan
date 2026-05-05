@@ -20,7 +20,10 @@ type OptionalKey =
   | 'SENTRY_DSN'
   | 'AXIOM_TOKEN'
   | 'AXIOM_DATASET'
-  | 'BETTERSTACK_HEARTBEAT_URL';
+  | 'BETTERSTACK_HEARTBEAT_URL'
+  | 'RESEND_API_KEY'
+  | 'RESEND_FROM_EMAIL'
+  | 'SPONSOR_PORTAL_BASE_URL';
 
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'staging' | 'production';
@@ -46,6 +49,9 @@ export interface AppConfig {
   axiomToken: string | undefined;
   axiomDataset: string | undefined;
   betterstackHeartbeatUrl: string | undefined;
+  resendApiKey: string | undefined;
+  resendFromEmail: string | undefined;
+  sponsorPortalBaseUrl: string | undefined;
 }
 
 export class ConfigError extends Error {
@@ -117,6 +123,9 @@ export function loadConfig(): AppConfig {
     axiomToken: readOptional('AXIOM_TOKEN'),
     axiomDataset: readOptional('AXIOM_DATASET'),
     betterstackHeartbeatUrl: readOptional('BETTERSTACK_HEARTBEAT_URL'),
+    resendApiKey: readOptional('RESEND_API_KEY'),
+    resendFromEmail: readOptional('RESEND_FROM_EMAIL'),
+    sponsorPortalBaseUrl: readOptional('SPONSOR_PORTAL_BASE_URL'),
   };
 }
 

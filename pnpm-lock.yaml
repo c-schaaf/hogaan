@@ -20,6 +20,9 @@ importers:
       '@fastify/sensible':
         specifier: ^6.0.1
         version: 6.0.4
+      '@fastify/view':
+        specifier: ^11.1.1
+        version: 11.1.1
       '@sentry/node':
         specifier: ^10.51.0
         version: 10.51.0
@@ -35,6 +38,9 @@ importers:
       drizzle-orm:
         specifier: ^0.36.0
         version: 0.36.4(@opentelemetry/api@1.9.1)(@types/pg@8.15.6)(postgres@3.4.9)
+      eta:
+        specifier: ^4.6.0
+        version: 4.6.0
       fastify:
         specifier: ^5.1.0
         version: 5.8.5
@@ -784,6 +790,9 @@ packages:
 
   '@fastify/sensible@6.0.4':
     resolution: {integrity: sha512-1vxcCUlPMew6WroK8fq+LVOwbsLtX+lmuRuqpcp6eYqu6vmkLwbKTdBWAZwbeaSgCfW4tzUpTIHLLvTiQQ1BwQ==}
+
+  '@fastify/view@11.1.1':
+    resolution: {integrity: sha512-GiHqT3R2eKJgWmy0s45eELTC447a4+lTM2o+8fSWeKwBe9VToeePuHJcKtOEXPrKGSddGO0RsNayULiS3aeHeQ==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -1735,6 +1744,10 @@ packages:
   esutils@2.0.3:
     resolution: {integrity: sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==}
     engines: {node: '>=0.10.0'}
+
+  eta@4.6.0:
+    resolution: {integrity: sha512-lW6is4T1NFOYnmqGZIfvixqj7A7sSvScF+DN8EK6K58xI5MZ5UvYe0GjopxOXQtZvUn4eDdVuZ8XSoYWTMEKwA==}
+    engines: {node: '>=20'}
 
   event-target-shim@5.0.1:
     resolution: {integrity: sha512-i/2XbnSz/uxRCU6+NdVJgKWDTM427+MqYbkQzD321DuCQJUqOuJKIA0IM2+W2xtYHdKOmZ4dR6fExsd4SXL+WQ==}
@@ -3082,6 +3095,11 @@ snapshots:
       type-is: 2.0.1
       vary: 1.1.2
 
+  '@fastify/view@11.1.1':
+    dependencies:
+      fastify-plugin: 5.1.0
+      toad-cache: 3.7.0
+
   '@humanfs/core@0.19.2':
     dependencies:
       '@humanfs/types': 0.15.0
@@ -4092,6 +4110,8 @@ snapshots:
       '@types/estree': 1.0.8
 
   esutils@2.0.3: {}
+
+  eta@4.6.0: {}
 
   event-target-shim@5.0.1: {}
 

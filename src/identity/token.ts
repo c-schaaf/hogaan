@@ -102,7 +102,7 @@ export async function validateSessionToken(
 
   let isRevoked: number | null;
   try {
-    isRevoked = await redis.withTimeout('token:revoked', 250, () =>
+    isRevoked = await redis.withTimeout('token:revoked', 1500, () =>
       redis.client.sismember(REVOCATION_SET_KEY, payload.jti as string),
     );
   } catch (err) {

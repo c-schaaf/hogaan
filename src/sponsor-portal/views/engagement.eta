@@ -1,0 +1,54 @@
+<h2>Engagement (last 14 days)</h2>
+
+<% if (it.summary.suppressed) { %>
+  <div class="suppressed"><%= it.summary.copy %></div>
+<% } else { %>
+  <dl class="kv">
+    <dt>Redeemed seats</dt><dd class="num"><%= it.summary.value.redeemedSeats %></dd>
+    <dt>Active distinct users</dt><dd class="num"><%= it.summary.value.activeDistinctUsers %></dd>
+    <dt>Active %</dt><dd class="pct"><%= (it.summary.value.activePct * 100).toFixed(1) %>%</dd>
+    <dt>Total sessions</dt><dd class="num"><%= it.summary.value.totalSessions %></dd>
+    <dt>Total turns</dt><dd class="num"><%= it.summary.value.totalTurns %></dd>
+    <dt>Median session length (turns)</dt><dd class="num"><%= it.summary.value.medianSessionLengthTurns %></dd>
+  </dl>
+<% } %>
+
+<h2>Retention curve</h2>
+<% if (it.retention.suppressed) { %>
+  <div class="suppressed"><%= it.retention.copy %></div>
+<% } else { %>
+  <table>
+    <thead><tr><th>Week</th><th class="num">Active users</th><th class="num">% of baseline</th></tr></thead>
+    <tbody>
+      <% it.retention.value.forEach(function(p) { %>
+        <tr>
+          <td>Week <%= p.weekIndex %></td>
+          <td class="num"><%= p.activeUsers %></td>
+          <td class="pct"><%= (p.pct * 100).toFixed(1) %>%</td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>
+
+<h2>Practice distribution (last 30 days)</h2>
+<% if (it.practices.suppressed) { %>
+  <div class="suppressed"><%= it.practices.copy %></div>
+<% } else if (it.practices.value.length === 0) { %>
+  <p style="color:#666;">No practice tags meet the privacy floor in this window.</p>
+<% } else { %>
+  <table>
+    <thead>
+      <tr><th>Practice</th><th class="num">Turns</th><th class="num">Distinct users</th></tr>
+    </thead>
+    <tbody>
+      <% it.practices.value.forEach(function(p) { %>
+        <tr>
+          <td><%= p.practice %></td>
+          <td class="num"><%= p.turnCount %></td>
+          <td class="num"><%= p.distinctUsers %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>

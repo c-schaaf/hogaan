@@ -26,6 +26,9 @@ const testConfig: AppConfig = {
   axiomToken: undefined,
   axiomDataset: undefined,
   betterstackHeartbeatUrl: undefined,
+  resendApiKey: undefined,
+  resendFromEmail: undefined,
+  sponsorPortalBaseUrl: undefined,
 };
 
 describe('app', () => {

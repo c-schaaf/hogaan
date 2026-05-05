@@ -63,3 +63,10 @@ export const libraryName = pgEnum('library_name', [
 ]);
 
 export const triggerSource = pgEnum('trigger_source', ['whatsapp', 'web_session', 'web_signup']);
+
+/**
+ * Sponsor portal RBAC. Two roles for Phase 9A:
+ *   - sponsor_admin: scoped read access to their own sponsor's cohorts
+ *   - hogaan_ops: read all sponsors / cohorts (internal staff)
+ */
+export const sponsorUserRole = pgEnum('sponsor_user_role', ['sponsor_admin', 'hogaan_ops']);

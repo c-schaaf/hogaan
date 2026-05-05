@@ -1,6 +1,7 @@
 import { buildApp } from './app.js';
 import { loadConfig } from './shared/secrets/config.js';
 import { initSentry, shutdownSentry, startHeartbeat } from './shared/observability/index.js';
+import { wireSponsorPortalRoutes } from './sponsor-portal/setup.js';
 import { wireWhatsAppDeliveryRoutes } from './whatsapp-delivery/setup.js';
 
 async function main(): Promise<void> {
@@ -12,6 +13,11 @@ async function main(): Promise<void> {
   app.log.info(
     { whatsappRoutes: wired.registered, reason: wired.reason ?? 'ok' },
     'whatsapp delivery routes',
+  );
+  const portalWired = await wireSponsorPortalRoutes(app, config);
+  app.log.info(
+    { sponsorPortalRoutes: portalWired.registered, reason: portalWired.reason ?? 'ok' },
+    'sponsor portal routes',
   );
   const heartbeat = startHeartbeat(config);
 
