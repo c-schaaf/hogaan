@@ -38,12 +38,7 @@ async function main(): Promise<void> {
       metadata: whatsappMessages.metadata,
     })
     .from(whatsappMessages)
-    .where(
-      and(
-        eq(whatsappMessages.userId, u[0].id),
-        eq(whatsappMessages.direction, 'outbound'),
-      ),
-    )
+    .where(and(eq(whatsappMessages.userId, u[0].id), eq(whatsappMessages.direction, 'outbound')))
     .orderBy(desc(whatsappMessages.createdAt))
     .limit(limit);
   for (const r of rows) {

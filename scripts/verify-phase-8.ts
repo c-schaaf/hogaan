@@ -62,7 +62,9 @@ async function provisionUser(
   let userId: UserId;
   if (prior[0] !== undefined) {
     userId = asUserId(prior[0].id);
-    await db.delete(whatsappMessages).where(eq(whatsappMessages.userId, userId as unknown as string));
+    await db
+      .delete(whatsappMessages)
+      .where(eq(whatsappMessages.userId, userId as unknown as string));
     await db
       .update(users)
       .set({
