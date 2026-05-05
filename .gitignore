@@ -8,8 +8,6 @@ coverage/
 .env.local
 .env.*.local
 
-.husky/_
-
 .vscode/
 .idea/
 *.swp
