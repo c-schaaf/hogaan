@@ -9,7 +9,8 @@ export type LibraryName =
   | 'voice_rules'
   | 'cultural_framing'
   | 'crisis_resources'
-  | 'scenarios';
+  | 'scenarios'
+  | 'daily_prompts';
 
 export interface PublishOptions {
   libraryName: LibraryName;

@@ -156,6 +156,25 @@ export interface ScenariosPayload {
 }
 
 // ===========================================================================
+// 6. daily_prompts
+// ===========================================================================
+
+export interface DailyPrompt {
+  id: string;
+  /** Single practice this prompt anchors on. Drives rotation across the 12. */
+  practice: PracticeTag;
+  /** WhatsApp body text (max ~300 chars; some can be quotes, some questions). */
+  body: string;
+  /** Tags for trace + future analytics ('reflection' | 'question' | 'quote' | ...). */
+  kind: 'reflection' | 'question' | 'quote';
+}
+
+export interface DailyPromptsPayload {
+  prompts: DailyPrompt[];
+  notes: string;
+}
+
+// ===========================================================================
 // Discriminated union over all library payloads (for the resolver).
 // ===========================================================================
 
@@ -164,4 +183,5 @@ export type LibraryPayload =
   | { libraryName: 'voice_rules'; payload: VoiceRulesPayload }
   | { libraryName: 'cultural_framing'; payload: CulturalFramingPayload }
   | { libraryName: 'crisis_resources'; payload: CrisisResourcesPayload }
-  | { libraryName: 'scenarios'; payload: ScenariosPayload };
+  | { libraryName: 'scenarios'; payload: ScenariosPayload }
+  | { libraryName: 'daily_prompts'; payload: DailyPromptsPayload };

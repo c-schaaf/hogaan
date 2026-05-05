@@ -1,0 +1,1 @@
+ALTER TYPE "public"."library_name" ADD VALUE 'daily_prompts';

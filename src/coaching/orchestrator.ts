@@ -4,6 +4,7 @@ import { reportP1 } from '../incident-handling/index.js';
 import { getActiveLibraryVersions } from '../libraries/index.js';
 import { assemblePrompt } from '../prompt-assembly/index.js';
 import { runQualityCheck } from '../quality-check/index.js';
+import { runScenarioTurn } from '../scenario-learning/index.js';
 import { resolveSession } from '../session-lifecycle/index.js';
 import type { Database } from '../shared/db/client.js';
 import {
@@ -38,7 +39,6 @@ interface CoachingDeps {
 const SAFE_TEMPLATE = `That topic isn't something I can help with from a coaching seat. If it's a leadership challenge underneath, tell me what's at stake for your team and I'll meet you there.`;
 const REJECT_TEMPLATE = `That message lands outside what I can help with. If you have a leadership challenge — a hard conversation, a stuck team, a decision under pressure — that's where I'm built to be useful.`;
 const META_TEMPLATE = `I'm Hogaan — a coaching presence anchored in Hamse Warfa's twelve-practice framework. I'm an AI built around his voice, sponsor-funded for users in the Horn of Africa. I work text-only for now: send me a leadership challenge and I'll respond.`;
-const SCENARIO_DEFER_TEMPLATE = `Scenario practice is coming soon. For now, send me the actual situation you're walking into and I'll coach you through it.`;
 const PROFILE_ACK_TEMPLATE = `Heard. I've noted that update — I'll show up with it in mind next time. Send a leadership question whenever you're ready.`;
 const MEDIA_REJECT_TEMPLATE = `I work with text only for now. Type out what's on your mind and I'll respond.`;
 
@@ -111,6 +111,39 @@ export async function runCoachingTurn(
     now: inbound.receivedAt,
   });
 
+  // ---- Step 4 (pre): scenario routing --------------------------------
+  // An active scenario takes precedence over intent: if the user is mid-
+  // scenario, their reply belongs to the scenario flow regardless of how
+  // the intent classifier labeled it. ScenarioRequest with no active
+  // scenario kicks off a new one.
+  const scenarioOutcome = await runScenarioTurn(
+    {
+      config: deps.config,
+      db: deps.db,
+      redis: deps.redis,
+      rateLimiters: deps.rateLimiters,
+    },
+    {
+      userId: inbound.userId,
+      phoneE164: inbound.phoneE164,
+      body: inbound.body,
+      sessionId: session.sessionId,
+    },
+    intent === 'ScenarioRequest',
+  );
+  if (scenarioOutcome.kind !== 'no_active_scenario_no_kickoff') {
+    return finalize(deps, inbound, {
+      endEvent: 'E4_ScenarioHandoff',
+      responseText: 'responseText' in scenarioOutcome ? scenarioOutcome.responseText : '',
+      practiceTag: null,
+      levelTag: null,
+      latencyMs: Date.now() - t0,
+      reason: `scenario_${scenarioOutcome.kind}`,
+      sessionId: session.sessionId,
+      turnId: null,
+    });
+  }
+
   // ---- Step 4: intent router (sub-flows for non-coaching intents) ----
   if (intent === 'MetaQuestion') {
     return await runTemplatedResponse(
@@ -120,17 +153,6 @@ export async function runCoachingTurn(
       META_TEMPLATE,
       'meta',
       'E6_MetaResponse',
-      t0,
-    );
-  }
-  if (intent === 'ScenarioRequest') {
-    return await runTemplatedResponse(
-      deps,
-      inbound,
-      session.sessionId,
-      SCENARIO_DEFER_TEMPLATE,
-      'scenario-defer',
-      'E4_ScenarioHandoff',
       t0,
     );
   }

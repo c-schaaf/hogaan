@@ -1,5 +1,6 @@
 export {
   getActiveLibraryVersions,
+  getActiveDailyPrompts,
   toVersionSet,
   verifyIntegrity,
   invalidateLibraryCache,
@@ -22,6 +23,8 @@ export type {
   CulturalFramingPayload,
   CrisisResourcesPayload,
   ScenariosPayload,
+  DailyPromptsPayload,
+  DailyPrompt,
   PromptTemplate,
   PracticeFramingBlock,
   LevelFramingBlock,
@@ -39,3 +42,4 @@ export { promptTemplatesV1 } from './seed/prompt-templates.js';
 export { crisisResourcesV1 } from './seed/crisis-resources.js';
 export { crisisResourcesV2 } from './seed/crisis-resources-v2.js';
 export { scenariosV1 } from './seed/scenarios.js';
+export { dailyPromptsV1 } from './seed/daily-prompts.js';

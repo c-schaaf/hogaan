@@ -59,6 +59,7 @@ export const libraryName = pgEnum('library_name', [
   'cultural_framing',
   'crisis_resources',
   'scenarios',
+  'daily_prompts',
 ]);
 
 export const triggerSource = pgEnum('trigger_source', ['whatsapp', 'web_session', 'web_signup']);

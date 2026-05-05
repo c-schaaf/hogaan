@@ -6,6 +6,7 @@ import { canonicalHash } from './hash.js';
 import type {
   CrisisResourcesPayload,
   CulturalFramingPayload,
+  DailyPromptsPayload,
   PromptTemplatesPayload,
   ScenariosPayload,
   VoiceRulesPayload,
@@ -159,3 +160,32 @@ export function resetResolverForTests(): void {
 
 /** Re-export for callers that want to filter by name+version explicitly. */
 export { libraryVersions, and };
+
+/**
+ * Standalone fetcher for the `daily_prompts` library — not part of the
+ * Process #9 pinned bundle (daily prompts run on the cron scheduler, not
+ * inside a coaching turn) so we don't include them in
+ * `getActiveLibraryVersions`. Caller-managed cache; recommended TTL is the
+ * same 60s the resolver uses, but daily prompts are tolerant of staler
+ * reads — the cron tick is far less frequent than a coaching turn.
+ */
+export async function getActiveDailyPrompts(
+  db: Database,
+): Promise<{ version: string; hash: string; payload: DailyPromptsPayload }> {
+  const rows = await db
+    .select({
+      version: libraryVersions.version,
+      hash: libraryVersions.hash,
+      payload: libraryVersions.payload,
+    })
+    .from(libraryVersions)
+    .where(and(eq(libraryVersions.libraryName, 'daily_prompts'), eq(libraryVersions.active, true)))
+    .limit(1);
+  const row = rows[0];
+  if (row === undefined) {
+    throw new LibraryResolverError(
+      'no active version for library daily_prompts — run seed-libraries',
+    );
+  }
+  return { version: row.version, hash: row.hash, payload: row.payload as DailyPromptsPayload };
+}
