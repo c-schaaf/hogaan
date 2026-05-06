@@ -7,6 +7,7 @@ import type { RedisBundle } from '../../src/shared/redis/client.js';
 import type { RateLimiters } from '../../src/shared/redis/rate-limit.js';
 import type { TraceEmitter } from '../../src/shared/trace/index.js';
 import type { AppConfig } from '../../src/shared/secrets/config.js';
+import type * as OptOutModule from '../../src/onboarding/opt-out.js';
 
 /**
  * Phase 12 R17 — STOP keyword fires at webhook-router scope, regardless
@@ -23,9 +24,7 @@ vi.mock('../../src/identity/index.js', () => ({
 }));
 
 vi.mock('../../src/onboarding/opt-out.js', async () => {
-  const actual = await vi.importActual<typeof import('../../src/onboarding/opt-out.js')>(
-    '../../src/onboarding/opt-out.js',
-  );
+  const actual = await vi.importActual<typeof OptOutModule>('../../src/onboarding/opt-out.js');
   return {
     ...actual,
     recordOptOut: vi.fn(() => Promise.resolve()),
@@ -75,9 +74,9 @@ function fakeDb(): Database {
 
 function fakeRedis(): RedisBundle {
   return {
-    client: {} as never,
+    client: {},
     withTimeout: <T>(_op: string, _ms: number, fn: () => Promise<T>) => fn(),
-  } as RedisBundle;
+  } as unknown as RedisBundle;
 }
 
 function makeDeps(): {
@@ -94,7 +93,7 @@ function makeDeps(): {
     sql: {} as unknown as SqlClient,
     redis: fakeRedis(),
     rateLimiters: {} as unknown as RateLimiters,
-    traceEmitter: { emit: () => undefined, flush: () => Promise.resolve() } as TraceEmitter,
+    traceEmitter: { emit: () => undefined, flush: () => Promise.resolve() },
   };
 }
 

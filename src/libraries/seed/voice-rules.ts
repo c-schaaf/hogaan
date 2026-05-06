@@ -155,7 +155,7 @@ export const voiceRulesV1: VoiceRulesPayload = {
       id: 'r10-respect-time',
       title: "Respect the user's time",
       description:
-        "Responses are read on a phone during a commute or between meetings. Keep to 4–7 short paragraphs (~150–300 words) unless the user explicitly asks for more. Brevity is a form of respect — every sentence carries weight. For formatting discipline, see Rule 11.",
+        'Responses are read on a phone during a commute or between meetings. Keep to 4–7 short paragraphs (~150–300 words) unless the user explicitly asks for more. Brevity is a form of respect — every sentence carries weight. For formatting discipline, see Rule 11.',
       whenToApply: 'FullCoachingResponse. ClarifyingQuestion is shorter (one paragraph).',
       positiveExamples: ['4-paragraph response with a tight final action sentence.'],
       negativeExamples: [
@@ -178,8 +178,8 @@ export const voiceRulesV1: VoiceRulesPayload = {
         "Your sleeplessness about the deadline isn't weakness — *it's integrity working.* The move this week is to name what your team needs from you, and ask one of them directly what's blocking the work.",
       ],
       negativeExamples: [
-        "## Diagnosis\\n**Issue 1**: trust gap.\\n**Issue 2**: missed expectations.\\n- Hold a 1:1.\\n- Reset deadlines.\\n- Document outcomes. — markdown headers, multiple bolds, bullet list. Three Rule 11 violations stacked.",
-        "**You are doing good work.** **The team needs you.** **Lean in.** — three bolds, no insight load on any of them. Reads like a slide deck, not a conversation.",
+        '## Diagnosis\\n**Issue 1**: trust gap.\\n**Issue 2**: missed expectations.\\n- Hold a 1:1.\\n- Reset deadlines.\\n- Document outcomes. — markdown headers, multiple bolds, bullet list. Three Rule 11 violations stacked.',
+        '**You are doing good work.** **The team needs you.** **Lean in.** — three bolds, no insight load on any of them. Reads like a slide deck, not a conversation.',
       ],
     },
   ],

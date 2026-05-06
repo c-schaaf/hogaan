@@ -58,12 +58,15 @@ describe('Phase 12 R13 — §7.3 sample-prompt tagging', () => {
       if (s.expected.includes(r.practiceTag)) {
         hits += 1;
       } else {
-        misses.push(`"${s.prompt}" → got ${r.practiceTag}, expected one of ${s.expected.join('|')}`);
+        misses.push(
+          `"${s.prompt}" → got ${r.practiceTag}, expected one of ${s.expected.join('|')}`,
+        );
       }
     }
     const matchRate = hits / SAMPLES.length;
-    expect(matchRate, `match rate ${(matchRate * 100).toFixed(0)}%; misses:\n${misses.join('\n')}`).toBeGreaterThanOrEqual(
-      0.7,
-    );
+    expect(
+      matchRate,
+      `match rate ${(matchRate * 100).toFixed(0)}%; misses:\n${misses.join('\n')}`,
+    ).toBeGreaterThanOrEqual(0.7);
   });
 });

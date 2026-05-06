@@ -19,7 +19,12 @@ import type { AppConfig } from '../shared/secrets/config.js';
 import { BRAND_FRAMEWORK_ATTRIBUTION } from '../shared/brand/constants.js';
 import { hashPhone } from '../shared/db/encryption.js';
 import { emitTurnTrace, type TraceEmitter } from '../shared/trace/index.js';
-import { asCorrelationId, type LevelTag, type PracticeTag } from '../shared/types/index.js';
+import {
+  asCorrelationId,
+  type LevelTag,
+  type PracticeTag,
+  type TurnId,
+} from '../shared/types/index.js';
 import { sendOutbound } from '../whatsapp-delivery/orchestrator.js';
 import { fetchCoachingContext } from './context-fetch.js';
 import { decideContinuation } from './continuation.js';
@@ -448,7 +453,7 @@ interface MinimalFinalize {
   reason: string;
   sessionId: string;
   /** Phase 12 R20 — short-circuit paths now persist a turn row, so this can be a TurnId. */
-  turnId: import('../shared/types/index.js').TurnId | null;
+  turnId: TurnId | null;
   waMessageId?: string;
 }
 

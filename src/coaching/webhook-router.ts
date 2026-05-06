@@ -11,12 +11,7 @@ import type { Database, SqlClient } from '../shared/db/client.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
-import {
-  asCorrelationId,
-  asPhoneE164,
-  asUserId,
-  type UserId,
-} from '../shared/types/index.js';
+import { asCorrelationId, asPhoneE164, asUserId, type UserId } from '../shared/types/index.js';
 import type { TraceEmitter } from '../shared/trace/index.js';
 import { sendOutbound } from '../whatsapp-delivery/orchestrator.js';
 import { runCoachingTurn } from './orchestrator.js';
@@ -160,7 +155,9 @@ export async function routeInboundMessage(
           ownerId: 'opt-out',
         },
         {
-          correlationId: asCorrelationId(`optout-${event.inboundMessageSid}-${randomUUID().slice(0, 6)}`),
+          correlationId: asCorrelationId(
+            `optout-${event.inboundMessageSid}-${randomUUID().slice(0, 6)}`,
+          ),
           callerProcessId: 'webhook-router:opt-out',
           phoneE164: asPhoneE164(event.fromE164),
           userId,

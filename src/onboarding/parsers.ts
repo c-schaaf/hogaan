@@ -149,11 +149,7 @@ function levenshtein(a: string, b: string): number {
   for (let i = 1; i <= m; i += 1) {
     for (let j = 1; j <= n; j += 1) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i]![j] = Math.min(
-        dp[i - 1]![j]! + 1,
-        dp[i]![j - 1]! + 1,
-        dp[i - 1]![j - 1]! + cost,
-      );
+      dp[i]![j] = Math.min(dp[i - 1]![j]! + 1, dp[i]![j - 1]! + 1, dp[i - 1]![j - 1]! + cost);
     }
   }
   return dp[m]![n]!;
@@ -273,7 +269,15 @@ const ROLE_KEYWORDS: Record<RoleOption, string[]> = {
     'civic leader',
     'civic',
   ],
-  Advocate: ['advocate', 'advocacy', 'activist', 'campaign', 'campaigner', 'human rights', 'rights'],
+  Advocate: [
+    'advocate',
+    'advocacy',
+    'activist',
+    'campaign',
+    'campaigner',
+    'human rights',
+    'rights',
+  ],
 };
 
 export function parseRole(text: string): RoleOption | 'invalid' {

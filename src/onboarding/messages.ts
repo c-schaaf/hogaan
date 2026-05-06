@@ -76,7 +76,10 @@ const ALL_TWELVE = Object.keys(PRACTICE_GLOSSES);
  * and only the first 3 get inline gloss. ALL → meta acknowledgment.
  */
 export function formatPracticeAcknowledgment(practices: string[]): string {
-  if (practices.length === 0 || (practices.length === ALL_TWELVE.length && practices.every((p) => ALL_TWELVE.includes(p)))) {
+  if (
+    practices.length === 0 ||
+    (practices.length === ALL_TWELVE.length && practices.every((p) => ALL_TWELVE.includes(p)))
+  ) {
     return `Good — we'll let your messages tell us where to focus. Tell me what's on your mind this week, and the framework will reveal itself in how we talk about it.`;
   }
   if (practices.length === 1) {

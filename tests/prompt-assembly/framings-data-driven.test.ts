@@ -104,12 +104,8 @@ describe('Phase 12 R6 — selectCulturalFraming uses data-driven affinity', () =
   });
 
   it('returns null on excluded modes regardless of practice', () => {
-    expect(
-      selectCulturalFraming(culturalFramingV1, 'ClarifyingQuestion', 'integrity'),
-    ).toBeNull();
-    expect(
-      selectCulturalFraming(culturalFramingV1, 'MetaResponse', 'integrity'),
-    ).toBeNull();
+    expect(selectCulturalFraming(culturalFramingV1, 'ClarifyingQuestion', 'integrity')).toBeNull();
+    expect(selectCulturalFraming(culturalFramingV1, 'MetaResponse', 'integrity')).toBeNull();
     expect(
       selectCulturalFraming(culturalFramingV1, 'ProfileUpdateAcknowledgment', 'integrity'),
     ).toBeNull();
