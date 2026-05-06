@@ -3,7 +3,7 @@
 **Date:** 2026-05-06
 **Branch source:** `phase-12-application-logic` @ 59a37c1
 **Reporter:** engineering (read-only diagnostic — no thresholds or wiring changed)
-**Status:** triage decision pending
+**Status:** Finding 1 (library promotion mismatch) actioned 2026-05-06 17:07 UTC; Render restart pending — see Postscript at the bottom of this report. Threshold tuning deferred per separate decision.
 
 ## TL;DR
 
@@ -273,3 +273,33 @@ NODE_ENV=development PORT=3000 LOG_LEVEL=info \
 ```
 
 The output JSON contains user content. Inspect locally; do not commit.
+
+---
+
+## Postscript — actions taken (2026-05-06 17:07 UTC)
+
+Finding 1 (library promotion mismatch) was actioned the same day:
+
+1. Added [scripts/publish-voice-rules-v2.ts](../../scripts/publish-voice-rules-v2.ts)
+   and [scripts/publish-cultural-framing-v2.ts](../../scripts/publish-cultural-framing-v2.ts),
+   modeled on [scripts/publish-crisis-resources-v2.ts](../../scripts/publish-crisis-resources-v2.ts).
+   Both call `publishLibraryVersion(...)` with `version='v2'` and
+   `makeActive=true`, attributed to `muhsin:phase-12-promotion-2026-05-06`.
+2. Ran each against the production `DATABASE_URL`. Recorded transitions:
+   - `voice_rules`: v1 (`8bcd22a03b9c…`) → v2 (`f1077420458e…`)
+   - `cultural_framing`: v1 (`d9695618742c…`) → v2 (`93f35de917fb…`)
+3. Re-ran [scripts/inspect-fallback-turns.ts](../../scripts/inspect-fallback-turns.ts);
+   confirmed both v2 rows are `active=true` in `library_versions` and
+   `verifyIntegrity()` reports stored hash matches canonical recomputation
+   of the active payload.
+
+**Render restart is still required** for the change to take effect in
+the running web server. The resolver cache is process-local and the
+voice-consistency module's `voiceRulesV1` import is statically bound at
+module load (Finding 4); only a fresh process picks up the new active
+DB rows AND rebuilds the centroid against current seed `positiveExamples`.
+Until restart, the prompt-vs-checks content split persists.
+
+Threshold (0.65) and QC wiring intentionally untouched in this batch
+per separate decision; revisit after content parity is verified
+post-restart and ≥30 real production turns have accumulated.

@@ -105,21 +105,67 @@ without requiring a process restart.
 
 A read-only diagnostic against the production `turns` table and
 `library_versions` table found that the v2 promotions documented in
-"Library promotion notes" above **never landed in the DB**. Active rows
-for both `voice_rules` and `cultural_framing` are pre-Phase-12 hashes
-published 2026-05-04; the Phase-12-ratified content lives only in the
-seed files. This drives a content split between prompt assembly (DB
-content) and the voice-consistency centroid (seed content), and is the
-likely root cause of the elevated regen / fallback rate observed
-post-merge.
+"Library promotion notes" above **had not landed in the DB** at the
+time of the diagnostic. Active rows for both `voice_rules` and
+`cultural_framing` were the pre-Phase-12 hashes published 2026-05-04;
+the Phase-12-ratified content lived only in the seed files. This drove
+a content split between prompt assembly (DB content) and the
+voice-consistency centroid (seed content), and is the likely root
+cause of the elevated regen / fallback rate observed post-merge.
 
 Full report: [2026-05-06-phase-12-fallback-diagnostic.md](2026-05-06-phase-12-fallback-diagnostic.md).
 
-Triage actions are recorded in the report; they include adding
-`publish-voice-rules-v2.ts` and `publish-cultural-framing-v2.ts`
-scripts modeled on the existing `publish-crisis-resources-v2.ts`, plus
-adding per-check persistence so future incidents are diagnosable from
-data rather than from local replay.
+### Promotion executed (2026-05-06 17:07 UTC)
+
+After the diagnostic, `voice_rules v2` and `cultural_framing v2` were
+promoted to `active=true` in the production `library_versions` table
+via [scripts/publish-voice-rules-v2.ts](../../scripts/publish-voice-rules-v2.ts)
+and [scripts/publish-cultural-framing-v2.ts](../../scripts/publish-cultural-framing-v2.ts)
+(modeled on the existing `publish-crisis-resources-v2.ts`). Both
+scripts are idempotent and run the demote-v1 + insert-v2 transaction
+inside `publishLibraryVersion`.
+
+Recorded transitions:
+
+| Library          | Before (v1) hash | After (v2) hash | Published by                         |
+| ---------------- | ---------------- | ---------------- | ------------------------------------ |
+| voice_rules      | `8bcd22a03b9c…`  | `f1077420458e…`  | muhsin:phase-12-promotion-2026-05-06 |
+| cultural_framing | `d9695618742c…`  | `93f35de917fb…`  | muhsin:phase-12-promotion-2026-05-06 |
+
+Verified post-promotion: `verifyIntegrity()` confirmed each stored hash
+matches a fresh canonical recomputation of the active payload. Old v1
+rows remain in DB with `active=false` for audit traceability and easy
+rollback.
+
+### Render restart still required
+
+Process-local in-memory caches in the running web server are not
+cleared by the DB write:
+
+- `getActiveLibraryVersions()` resolver cache holds v1 payloads in
+  the prod process until a restart or in-process `invalidateLibraryCache()`.
+- The R10 fix wires `invalidateVoiceCentroidCache()` to library-cache
+  flush, but voice-consistency imports `voiceRulesV1` statically from
+  the seed file ([src/quality-check/voice-consistency.ts:1](../../src/quality-check/voice-consistency.ts#L1));
+  the static binding is fixed at module load, so a process restart is
+  the cleanest way to bring both caches into agreement with the new DB
+  state.
+
+**Action item:** restart the Render web service for the Hogaan API.
+After restart, the resolver re-reads v2 active rows from DB, and
+voice-consistency rebuilds its centroid against the (already-current)
+seed `positiveExamples`. Both will then describe the same content.
+
+Until restart: prompt assembly continues to use cached v1 content while
+QC checks score against v2 — the same mismatch the diagnostic
+documented. Promotion alone is necessary but not sufficient.
+
+### Threshold tuning deferred
+
+The voice-consistency 0.65 threshold and any QC wiring changes are
+deferred to a separate batch. Re-evaluate after content parity is
+verified post-restart and a fresh sample of ≥30 real production turns
+has accumulated.
 
 ---
 
