@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-05-06T09:04:23.882Z",
+  "recordedAt": "2026-05-06T09:59:54.893Z",
   "testId": "phase-10/runbook-tabletop/twilio-reregistration",
   "controlId": "T1.BackupAndDR.TwilioSenderReregistration",
   "tier": "T1",
