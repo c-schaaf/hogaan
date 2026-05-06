@@ -34,7 +34,12 @@ describe('Phase 11 R15 — voice-consistency math', () => {
   });
 
   it('averageVectors element-wise mean', () => {
-    expect(_internal.averageVectors([[1, 2], [3, 4]])).toEqual([2, 3]);
+    expect(
+      _internal.averageVectors([
+        [1, 2],
+        [3, 4],
+      ]),
+    ).toEqual([2, 3]);
   });
 
   it('threshold is 0.65 (audit-prescribed)', () => {

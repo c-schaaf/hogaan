@@ -7,7 +7,12 @@ import {
   asUserId,
   type SessionId,
 } from '../../src/shared/types/index.js';
-import { fakeConfig, fakeRateLimiters, fakeRedis, fakeTraceEmitter } from '../phase-10/helpers/fakes.js';
+import {
+  fakeConfig,
+  fakeRateLimiters,
+  fakeRedis,
+  fakeTraceEmitter,
+} from '../phase-10/helpers/fakes.js';
 
 /**
  * Phase 11 R16 — Greeting + Affirmation must never enter prompt assembly.
@@ -36,9 +41,7 @@ vi.mock('../../src/session-lifecycle/index.js', () => ({
 }));
 
 vi.mock('../../src/scenario-learning/index.js', () => ({
-  runScenarioTurn: vi.fn(() =>
-    Promise.resolve({ kind: 'no_active_scenario_no_kickoff' as const }),
-  ),
+  runScenarioTurn: vi.fn(() => Promise.resolve({ kind: 'no_active_scenario_no_kickoff' as const })),
 }));
 
 vi.mock('../../src/shared/llm/chat.js', () => ({
