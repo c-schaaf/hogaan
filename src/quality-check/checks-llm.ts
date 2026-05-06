@@ -191,6 +191,63 @@ Return strict JSON {"status": "pass"|"soft_fail"|"crisis"|"hard_fail", "reason":
   }
 }
 
+/**
+ * Phase 11 R33 — Voice Rule 6 enforcement (lived authority sparingly).
+ *
+ * The audit found responses citing Hamse's biography ("as a refugee", "from
+ * my time at...") as a *credential* without the *insight* the experience is
+ * meant to load — i.e. the lived-experience marker does the rhetorical work
+ * alone. Voice Rule 6 says: lived authority must always be in service of an
+ * insight, never standing in for one.
+ *
+ * Score: 0 = no lived-experience invoked (pass), 1 = invoked AND paired with
+ * an insight (pass), 2 = invoked as a credential without insight (soft_fail).
+ *
+ * Soft-fail: the QC retry loop gets one chance to repair. Like the other
+ * voice checks, this is quality-shaping, not safety-critical.
+ */
+export async function checkLivedExperienceDiscipline(
+  config: AppConfig,
+  candidate: string,
+): Promise<CheckResult> {
+  const system = `You are a voice classifier for Hogaan, a leadership coaching presence anchored in Hamse Warfa's voice. Hamse's lived experience (Somali refugee origin, US private-sector + public-service career, philanthropic work in the Horn of Africa) is part of the voice — but Voice Rule 6 says: invoke it ONLY in service of a specific insight. Never as a credential standing on its own.
+
+Score the candidate response on a 0/1/2 scale:
+  - 0 = lived experience not invoked (default, pass)
+  - 1 = lived experience invoked AND paired with a concrete insight (pass)
+  - 2 = lived experience invoked as a credential WITHOUT an accompanying insight (FAIL)
+
+Return strict JSON {"score": 0|1|2, "reason": "..."} (reason ≤80 chars).`;
+  try {
+    const res = await groqChat(config, {
+      model: 'llama-3.3-70b-versatile',
+      systemPrompt: system,
+      messages: [{ role: 'user', content: `Candidate response:\n"""\n${candidate}\n"""` }],
+      maxTokens: CLASSIFIER_MAX_TOKENS,
+      temperature: 0,
+      jsonMode: true,
+      timeoutMs: CLASSIFIER_TIMEOUT_MS,
+    });
+    const parsed = JSON.parse(res.text) as { score?: unknown; reason?: unknown };
+    const score = typeof parsed.score === 'number' ? parsed.score : -1;
+    const reason = typeof parsed.reason === 'string' ? parsed.reason : '';
+    let outcome: CheckOutcome;
+    if (score === 0 || score === 1) {
+      outcome = { status: 'pass' };
+    } else if (score === 2) {
+      outcome = {
+        status: 'soft_fail',
+        reason: reason || 'lived authority cited as credential without insight',
+      };
+    } else {
+      throw new Error(`classifier returned invalid score: ${String(parsed.score)}`);
+    }
+    return { checkId: 'check_10_lived_experience', outcome };
+  } catch (err) {
+    return makeServiceUnavailable('check_10_lived_experience', err);
+  }
+}
+
 function makeServiceUnavailable(checkId: CheckResult['checkId'], err: unknown): CheckResult {
   const reason =
     err instanceof LlmError
