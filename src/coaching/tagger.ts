@@ -49,6 +49,9 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'why am i doing',
     'what am i for',
     'point of this work',
+    // T2 — natural-language variants
+    'pointless',
+    'why am i even',
     // R12 — Somali (ujeedo/meaning)
     'ujeedo',
     'macno',
@@ -86,6 +89,9 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'lose face',
     'save face',
     'face in front of the team',
+    // T4 — natural-language variants
+    'lost face',
+    'losing face',
     // R12 — Somali (sharaf/respect)
     'sharaf',
     'ixtiraam',
@@ -121,6 +127,9 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     "doesn't speak up",
     'never says anything',
     'gets talked over',
+    // T6 — natural-language variants
+    'never speaks up',
+    'never speak up',
     'silent in meetings',
     // R12 — Somali (ka mid ah/included)
     'ka mid ah',
@@ -134,6 +143,10 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'resource',
     'what we have',
     'what i have',
+    // T7 — asset-based reframe targets (cost-cutting / scarcity contexts)
+    "what we don't have",
+    'morale is low',
+    'scarcity',
     // R12 — Somali (waxa aan haysano)
     'waxa aan haysano',
     'awood',
@@ -149,6 +162,8 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'try a different approach',
     'new way of working',
     'doing things differently',
+    // T8 — natural-language variant
+    'different way of working',
     // R12 — Somali (hal-abuur)
     'hal-abuur',
     'wax cusub',
@@ -161,6 +176,10 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'positive sum',
     'value creation',
     'shared',
+    // T9 — long-view compounding wins
+    'compound',
+    'compounds',
+    'compounding',
     // R12 — Somali (barwaaqo/thriving)
     'barwaaqo',
     'horumar',
@@ -174,6 +193,9 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     "i don't know",
     'pushback',
     'truth-teller',
+    // T19 — self-questioning candidacy framing
+    "i'm not sure",
+    'not sure i should',
     // R12 — Somali (is-hoosaysiin)
     'is-hoosaysiin',
     'ma garanayo',
@@ -189,6 +211,10 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'whose voice',
     'voice in the decision',
     'voice at the table',
+    // T11 — unequal-participation framing
+    'voices dominate',
+    'dominate every decision',
+    'never weigh in',
     // R12 — Somali (dimoqraadiyad/voice)
     'dimoqraadiyad',
     'cod',
@@ -243,6 +269,16 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'we as a team',
     'our team',
     'one of my',
+    // T15 — recurring team-meeting framing
+    'standup',
+    'stand-up',
+    'team meeting',
+    'one-on-ones',
+    // T16 — deputy / second-in-command relationship
+    'number two',
+    'my deputy',
+    'my second',
+    'my right hand',
     // R12 — Somali
     'kooxda',
     'kooxdayda',
@@ -271,6 +307,15 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'country',
     'society',
     'profession',
+    // T19 — diaspora-council framing
+    'diaspora',
+    'diaspora council',
+    'community council',
+    'civic council',
+    // T20 — philanthropic-foundation framing
+    'foundation',
+    'nonprofit',
+    'philanthropy',
     // R12 — Somali
     'bulshada',
     'dadweynaha',

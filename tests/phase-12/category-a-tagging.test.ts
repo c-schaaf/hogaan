@@ -165,6 +165,205 @@ describe('Phase 12 — Category A: Tagging accuracy (green subset)', () => {
     );
   });
 
+  it('T2: "Why am I even doing this work?... feel pointless" → purpose', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T2-feel-pointless',
+        controlId: 'T5.VoiceFidelity.T2_FeelPointless',
+        tier: 'T5',
+        description:
+          'Existential meaning question with "pointless" / "why am i even" → purpose practice. Approved keywords (verbatim): "pointless", "why am i even".',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          'Why am I even doing this work? Some days the meetings just feel pointless.',
+        );
+        expect(r.practiceTag).toBe('purpose');
+      },
+    );
+  });
+
+  it('T4: "...He went quiet. I think he lost face." → dignity (practice axis)', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T4-lost-face',
+        controlId: 'T5.VoiceFidelity.T4_LostFace',
+        tier: 'T5',
+        description:
+          'Past-tense "lost face" → dignity practice. Approved keywords: "lost face", "losing face". Level axis not asserted: §3 keyword approval covers practice only; the spec sentence has no team-level keyword, so level falls back to self.',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          'I gave hard feedback to a senior person in a meeting. He went quiet. I think he lost face.',
+        );
+        expect(r.practiceTag).toBe('dignity');
+      },
+    );
+  });
+
+  it('T6: "quiet team member who never speaks up" → inclusion / team', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T6-never-speaks-up',
+        controlId: 'T5.VoiceFidelity.T6_NeverSpeaksUp',
+        tier: 'T5',
+        description:
+          '"never speaks up" variant catches the inclusion practice. Approved keywords: "never speaks up", "never speak up".',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          'There is a quiet team member who never speaks up but I think she has the best ideas. How do I bring her in?',
+        );
+        expect(r.practiceTag).toBe('inclusion');
+      },
+    );
+  });
+
+  it('T7: "cost-cutting mode... morale is low" → assets / organization', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T7-cost-cutting-assets',
+        controlId: 'T5.VoiceFidelity.T7_CostCutting',
+        tier: 'T5',
+        description:
+          'Asset-based reframe target — "morale is low" + "what we don\'t have" / "scarcity" → assets practice. Approved keywords: "what we don\'t have", "morale is low", "scarcity". Level=organization driven by existing "the org" keyword in spec sentence.',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          "The org is in cost-cutting mode. Morale is low. I keep hearing what we don't have.",
+        );
+        expect(r.practiceTag).toBe('assets');
+        expect(r.levelTag).toBe('organization');
+      },
+    );
+  });
+
+  it('T8: "different way of working" → innovation', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T8-different-way',
+        controlId: 'T5.VoiceFidelity.T8_DifferentWay',
+        tier: 'T5',
+        description:
+          '"different way of working" variant catches innovation practice. Approved keyword: "different way of working".',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          'We need a different way of working. The current one is broken but everyone is scared to change.',
+        );
+        expect(r.practiceTag).toBe('innovation');
+      },
+    );
+  });
+
+  it('T9: "closed a big deal... compounds" → prosperity', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T9-closed-deal-compounds',
+        controlId: 'T5.VoiceFidelity.T9_ClosedDeal',
+        tier: 'T5',
+        description:
+          'Long-view prosperity framing — compounding wins. Approved keywords: "compound", "compounds", "compounding".',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          "We just closed a big deal. Now I'm thinking about how to make sure the win actually compounds.",
+        );
+        expect(r.practiceTag).toBe('prosperity');
+      },
+    );
+  });
+
+  it('T11: "same three voices dominate every decision" → democracy', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T11-voices-dominate',
+        controlId: 'T5.VoiceFidelity.T11_VoicesDominate',
+        tier: 'T5',
+        description:
+          'Unequal-participation framing → democracy practice. Approved keywords: "voices dominate", "dominate every decision", "never weigh in".',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          "I'm on a board where the same three voices dominate every decision. The other six never weigh in.",
+        );
+        expect(r.practiceTag).toBe('democracy');
+      },
+    );
+  });
+
+  it('T19: "running for the diaspora council... not sure I should" → humility / community', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T19-diaspora-council',
+        controlId: 'T5.VoiceFidelity.T19_DiasporaCouncil',
+        tier: 'T5',
+        description:
+          'Self-questioning candidacy framing → humility practice; diaspora council → community level. Approved keywords (practice): "i\'m not sure", "not sure i should". Approved keywords (level): "diaspora", "diaspora council", "community council", "civic council".',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          "I'm thinking about running for the diaspora council. I'm not sure I should.",
+        );
+        expect(r.practiceTag).toBe('humility');
+        expect(r.levelTag).toBe('community');
+      },
+    );
+  });
+
+  it('T15: "Monday standup so it does not feel like a status update" → team', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T15-monday-standup',
+        controlId: 'T5.VoiceFidelity.T15_MondayStandup',
+        tier: 'T5',
+        description:
+          'Recurring team-meeting framing → team level. Approved keywords: "standup", "stand-up", "team meeting", "one-on-ones".',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          'How do I run my Monday standup so it does not feel like a status update?',
+        );
+        expect(r.levelTag).toBe('team');
+      },
+    );
+  });
+
+  it('T16: "I do not trust my number two anymore" → team', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T16-number-two',
+        controlId: 'T5.VoiceFidelity.T16_NumberTwo',
+        tier: 'T5',
+        description:
+          'Deputy / second-in-command relationship → team level (relationship-as-unit). Approved keywords: "number two", "my deputy", "my second", "my right hand".',
+      },
+      () => {
+        const r = tagPracticeAndLevel('I do not trust my number two anymore.');
+        expect(r.levelTag).toBe('team');
+      },
+    );
+  });
+
+  it('T20: "want to start a foundation... vanity or service" → humility / community', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T20-foundation',
+        controlId: 'T5.VoiceFidelity.T20_Foundation',
+        tier: 'T5',
+        description:
+          'Philanthropic-foundation framing → community level; "i don\'t know" already drives humility practice (no practice add needed). Approved level keywords: "foundation", "nonprofit", "philanthropy".',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          "I want to start a foundation. I don't know if it's vanity or service.",
+        );
+        expect(r.practiceTag).toBe('humility');
+        expect(r.levelTag).toBe('community');
+      },
+    );
+  });
+
   it('T17 (regression-lock): "Our company values are written down..." → organization', async () => {
     await withVoiceFidelityEvidence(
       {
