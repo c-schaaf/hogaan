@@ -40,7 +40,8 @@ export type CheckId =
   | 'check_11_formatting_discipline'
   | 'check_12_tangible_action'
   | 'check_13_voice_consistency'
-  | 'check_14_intent_length';
+  | 'check_14_intent_length'
+  | 'check_15_useful_to_society_anchor';
 
 export type CheckOutcome =
   | { status: 'pass' }

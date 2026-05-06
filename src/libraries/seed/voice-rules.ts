@@ -186,17 +186,26 @@ export const voiceRulesV1: VoiceRulesPayload = {
   ],
 
   /**
-   * Process #10 Check 6 — anchor presence check for Self/Community-level
-   * responses. Any one of these patterns counts as the anchor having landed.
+   * Process #10 Check 6 — anchor presence check.
+   *
+   * Phase 12 R4 — tightened. The previous patterns ('community', 'others',
+   * 'voice', 'usefulness') matched almost any leadership response, making
+   * the rule-based check toothless. Replaced with phrasal anchors that
+   * specifically signal Voice Rule 1's "useful to society" framing. The
+   * R4 LLM intentionality check (checks-llm.ts:checkUsefulToSocietyAnchor)
+   * is the second-line that catches incidental matches.
    */
   usefulToSocietyPatterns: [
-    'useful to',
+    'useful to society',
+    'useful to the people you lead',
+    'useful to the people',
     'in service of',
-    'serve your',
-    'something larger',
-    'larger than',
-    'community',
-    'others',
-    'usefulness',
+    'something larger than',
+    'larger than yourself',
+    'larger than the deal',
+    'next ten years',
+    'shape the leaders',
+    'serve the work',
+    'the work in front of you',
   ],
 };

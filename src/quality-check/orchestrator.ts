@@ -8,6 +8,7 @@ import {
   check8SafetyCrisis,
   checkLivedExperienceDiscipline,
   checkTangibleAction,
+  checkUsefulToSocietyAnchor,
 } from './checks-llm.js';
 import {
   check1PracticeTag,
@@ -242,6 +243,7 @@ async function runAllChecks(
     checkLivedExperienceDiscipline(deps.config, candidate),
     checkTangibleAction(deps.config, candidate),
     checkVoiceConsistency(deps.config, candidate),
+    checkUsefulToSocietyAnchor(deps.config, candidate),
   ]);
   return [...sync, ...llm];
 }
