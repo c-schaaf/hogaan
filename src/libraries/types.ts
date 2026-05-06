@@ -87,6 +87,11 @@ export interface CulturalFraming {
   applicableWhen: string[];
   /** Example phrasings the LLM may draw inspiration from. NOT verbatim quotes. */
   examplePhrasings: string[];
+  /** Phase 12 R6 — practices this framing has affinity for. Used by
+   *  selectCulturalFraming to find the right framing for a practice tag.
+   *  Optional for backwards compatibility; v1 library populates these in
+   *  R7+R8+R9. When missing, the legacy PRACTICE_TO_FRAMING fallback applies. */
+  practicesMapped?: PracticeTag[];
 }
 
 export interface CulturalFramingPayload {
