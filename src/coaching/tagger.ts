@@ -225,6 +225,11 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'within myself',
     'my integrity',
     'my values',
+    // T14 — leader-blames-self phrases (also act as override below).
+    'because of me',
+    'failing because of me',
+    'my fault',
+    'on me',
     // R12 — Somali
     'aniga',
     'naftayda',
@@ -272,6 +277,16 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'ummadda',
   ],
 };
+
+// T14 — leader-blames-self precedence: when a leader-responsibility phrase
+// fires, level=self overrides any team-keyword hits. The leader is the unit
+// when accepting blame, even if the message mentions "my team".
+const SELF_OVERRIDE_PHRASES: readonly string[] = [
+  'because of me',
+  'failing because of me',
+  'my fault',
+  'on me',
+];
 
 export interface TagResult {
   practiceTag: PracticeTag;
@@ -400,6 +415,22 @@ export function tagPracticeAndLevel(message: string, profileMapped: PracticeTag[
       secondLevelScore = s;
     }
   }
+  // T14 — self-override precedence. If a leader-responsibility phrase fires,
+  // force level=self even when "my team" / other team-keywords also hit.
+  // The previously-winning level becomes the runner-up if it wasn't already self.
+  let selfOverrideFired = false;
+  for (const phrase of SELF_OVERRIDE_PHRASES) {
+    if (lower.includes(phrase)) {
+      selfOverrideFired = true;
+      break;
+    }
+  }
+  if (selfOverrideFired && level !== 'self') {
+    secondLevel = level;
+    secondLevelScore = bestLevelScore;
+    level = 'self';
+  }
+
   // secondLevel must be non-zero score AND distinct from primary.
   const secondaryLevel: LevelTag | null = secondLevelScore > 0 ? secondLevel : null;
 
@@ -428,4 +459,4 @@ export function tagPracticeAndLevel(message: string, profileMapped: PracticeTag[
 }
 
 /** Test seam — exposes the keyword tables for audit. */
-export const _internal = { PRACTICE_KEYWORDS, LEVEL_KEYWORDS };
+export const _internal = { PRACTICE_KEYWORDS, LEVEL_KEYWORDS, SELF_OVERRIDE_PHRASES };

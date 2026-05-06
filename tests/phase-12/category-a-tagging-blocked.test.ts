@@ -21,7 +21,6 @@ describe('Phase 12 — Category A: Tagging accuracy (BLOCKED on keyword signoff)
   it.todo('T8: "We need a DIFFERENT way of working... scared to change" → innovation');
   it.todo('T9: "We just closed a big deal... compounds" → prosperity / organization');
   it.todo('T11: "same three voices DOMINATE every decision" → democracy / community');
-  it.todo('T14: "My team is failing because of me" → self vs team (Hamse spec clarification)');
   it.todo('T15: "Monday standup so it does not feel like a status update" → team');
   it.todo('T16: "I do not trust my number two anymore" → team (verify substring match)');
   it.todo('T17: "Our company values are written down but no one acts on them" → organization');

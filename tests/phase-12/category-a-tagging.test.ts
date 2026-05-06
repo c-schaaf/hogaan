@@ -130,4 +130,38 @@ describe('Phase 12 — Category A: Tagging accuracy (green subset)', () => {
       },
     );
   });
+
+  it('T14: "My team is failing because of me." → level=self override', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T14-leader-blames-self',
+        controlId: 'T5.VoiceFidelity.T14_LeaderBlamesSelf',
+        tier: 'T5',
+        description:
+          'Phase 12 T14 — leader-responsibility phrase ("because of me") forces level=self even when "my team" team-keyword is also present. The leader is the unit when accepting blame.',
+      },
+      () => {
+        const r = tagPracticeAndLevel('My team is failing because of me.');
+        expect(r.levelTag).toBe('self');
+      },
+    );
+  });
+
+  it('T14 precedence: multiple team-keyword hits + "because of me"/"my fault" → level=self', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T14-self-override-precedence',
+        controlId: 'T5.VoiceFidelity.T14_SelfOverridePrecedence',
+        tier: 'T5',
+        description:
+          'T14 deterministic precedence proof — a message with multiple team-level signals AND a self-override phrase still lands at level=self. Drives the SELF_OVERRIDE_PHRASES rule in tagPracticeAndLevel.',
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          "my team has been struggling and it's because of me, my fault really",
+        );
+        expect(r.levelTag).toBe('self');
+      },
+    );
+  });
 });
