@@ -12,9 +12,23 @@ import type { LevelTag, PracticeTag } from '../shared/types/index.js';
  * memory recurrence, etc. — Phase 7 ships the deterministic v1.
  */
 
+// Phase 12 R11 — common-word keywords replaced with phrasal anchors.
+// The previous list had 'why', 'voice', 'face', 'change', 'monday morning'
+// as bare keywords; they fired on far too many leadership-context messages.
+// Phrasal anchors are more specific to the practice the user is wrestling
+// with.
 const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
   integrity: ['integrity', 'principle', 'standard', 'compromise my', 'cut corners', 'doing right'],
-  purpose: ['purpose', 'why', 'meaning', 'mission', 'what for', "what's the point"],
+  purpose: [
+    'purpose',
+    'meaning',
+    'mission',
+    'what for',
+    "what's the point",
+    'why am i doing',
+    'what am i for',
+    'point of this work',
+  ],
   accountability: [
     'accountable',
     'accountability',
@@ -24,7 +38,16 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'my fault',
     'on me',
   ],
-  dignity: ['dignity', 'respect', 'humiliate', 'humiliation', 'embarrass', 'face'],
+  dignity: [
+    'dignity',
+    'respect',
+    'humiliate',
+    'humiliation',
+    'embarrass',
+    'lose face',
+    'save face',
+    'face in front of the team',
+  ],
   empathy: [
     'empathy',
     'understand',
@@ -32,7 +55,6 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'their side',
     'where they',
     'walk in',
-    'monday morning',
   ],
   inclusion: [
     'inclusion',
@@ -51,18 +73,23 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'new approach',
     'experiment',
     'try something new',
-    'change',
+    'change the way',
+    'try a different approach',
+    'new way of working',
+    'doing things differently',
   ],
   prosperity: ['prosperity', 'thrive', 'win-win', 'positive sum', 'value creation', 'shared'],
   humility: ['humility', 'humble', 'wrong', 'admit', "i don't know", 'pushback', 'truth-teller'],
   democracy: [
     'democracy',
     'fair process',
-    'voice',
     'transparent',
     'opaque',
     'governance',
     'how we decide',
+    'whose voice',
+    'voice in the decision',
+    'voice at the table',
   ],
   peace: ['peace', 'feud', 'conflict', 'tension', 'rivalry', 'cycle', 'escalation', 'de-escalate'],
 };
