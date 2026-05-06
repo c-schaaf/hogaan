@@ -282,7 +282,7 @@ describe('Phase 10.1 — Process #2 (Coaching) end-event coverage', () => {
         );
 
         expect(result.endEvent).toBe('E6_MetaResponse');
-        expect(result.responseText).toMatch(/anchored in Hamse Warfa's twelve-practice/i);
+        expect(result.responseText).toMatch(/anchored in Hamse Warfa's 12 Practices/i);
         expect(sendSpy).toHaveBeenCalledTimes(1);
         const sendArgs = sendSpy.mock.calls[0]![1] as { callerProcessId: string };
         expect(sendArgs.callerProcessId).toBe('coaching:meta');

@@ -16,6 +16,7 @@ import { chat } from '../shared/llm/chat.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
+import { BRAND_FRAMEWORK_ATTRIBUTION } from '../shared/brand/constants.js';
 import { hashPhone } from '../shared/db/encryption.js';
 import { emitTurnTrace, type TraceEmitter } from '../shared/trace/index.js';
 import { asCorrelationId, type LevelTag, type PracticeTag } from '../shared/types/index.js';
@@ -38,7 +39,7 @@ interface CoachingDeps {
 
 const SAFE_TEMPLATE = `That topic isn't something I can help with from a coaching seat. If it's a leadership challenge underneath, tell me what's at stake for your team and I'll meet you there.`;
 const REJECT_TEMPLATE = `That message lands outside what I can help with. If you have a leadership challenge — a hard conversation, a stuck team, a decision under pressure — that's where I'm built to be useful.`;
-const META_TEMPLATE = `I'm Hogaan — a coaching presence anchored in Hamse Warfa's twelve-practice framework. I'm an AI built around his voice, sponsor-funded for users in the Horn of Africa. I work text-only for now: send me a leadership challenge and I'll respond.`;
+const META_TEMPLATE = `I'm Hogaan — a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION}. I'm an AI built around his voice, sponsor-funded for users in the Horn of Africa. I work text-only for now: send me a leadership challenge and I'll respond.`;
 const PROFILE_ACK_TEMPLATE = `Heard. I've noted that update — I'll show up with it in mind next time. Send a leadership question whenever you're ready.`;
 const MEDIA_REJECT_TEMPLATE = `I work with text only for now. Type out what's on your mind and I'll respond.`;
 // R16 — short-circuit templates for low-content intents. Each ≤80 words,
