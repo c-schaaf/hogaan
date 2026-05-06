@@ -28,42 +28,58 @@ describe('parseConsent', () => {
   });
 });
 
-describe('parseGoals', () => {
-  it('accepts a single number', () => {
-    const r = parseGoals('1');
+describe('parseGoals (Phase 12 R14 — direct practice picker)', () => {
+  it('accepts a single practice name', () => {
+    const r = parseGoals('integrity');
     expect(r).not.toBe('invalid');
     if (r !== 'invalid') {
-      expect(r.goals).toEqual(['Leadership confidence']);
+      expect(r.goals).toEqual(['integrity']);
     }
   });
-  it('accepts multiple numbers comma-separated', () => {
-    const r = parseGoals('1, 3');
+  it('accepts multiple practices comma-separated', () => {
+    const r = parseGoals('integrity, peace');
     if (r === 'invalid') {
       throw new Error('expected parse');
     }
-    expect(r.goals).toContain('Leadership confidence');
-    expect(r.goals).toContain('Conflict resolution');
+    expect(r.goals).toContain('integrity');
+    expect(r.goals).toContain('peace');
   });
-  it('accepts keyword phrasing ("conflict resolution", "career growth")', () => {
-    const r1 = parseGoals('conflict resolution');
-    expect(r1 !== 'invalid' && r1.goals.includes('Conflict resolution')).toBe(true);
-    const r2 = parseGoals("career growth, that's what I'm focused on");
-    expect(r2 !== 'invalid' && r2.goals.includes('Career growth')).toBe(true);
+  it('accepts keyword phrasing ("empathy and peace")', () => {
+    const r1 = parseGoals('empathy and peace');
+    expect(r1 !== 'invalid' && r1.goals.includes('empathy')).toBe(true);
+    expect(r1 !== 'invalid' && r1.goals.includes('peace')).toBe(true);
+  });
+  it('accepts ALL → all 12 practices', () => {
+    const r = parseGoals('ALL');
+    if (r === 'invalid') throw new Error('expected parse');
+    expect(r.goals).toHaveLength(12);
+    expect(r.matchedAll).toBe(true);
+  });
+  it('accepts level shorthand "Self" → integrity/purpose/accountability', () => {
+    const r = parseGoals('Self');
+    if (r === 'invalid') throw new Error('expected parse');
+    expect(r.goals).toContain('integrity');
+    expect(r.goals).toContain('purpose');
+    expect(r.goals).toContain('accountability');
+  });
+  it('fuzzy-matches typos within edit distance 2', () => {
+    const r1 = parseGoals('humilty'); // missing 'i'
+    expect(r1 !== 'invalid' && r1.goals.includes('humility')).toBe(true);
+    const r2 = parseGoals('empthy'); // missing 'a'
+    expect(r2 !== 'invalid' && r2.goals.includes('empathy')).toBe(true);
   });
   it('rejects nonsense', () => {
     expect(parseGoals('asdfghjkl')).toBe('invalid');
   });
 });
 
-describe('goalsToPractices', () => {
-  it('maps Leadership confidence → integrity + purpose', () => {
-    const p = goalsToPractices(['Leadership confidence']);
-    expect(p).toContain('integrity');
-    expect(p).toContain('purpose');
+describe('goalsToPractices (Phase 12 R14 — identity transform)', () => {
+  it('passes practices through unchanged (deduplicated)', () => {
+    const p = goalsToPractices(['integrity']);
+    expect(p).toEqual(['integrity']);
   });
-  it('deduplicates across multiple goals', () => {
-    const p = goalsToPractices(['Communication', 'Conflict resolution']);
-    // Both share 'empathy' — should appear only once.
+  it('deduplicates', () => {
+    const p = goalsToPractices(['empathy', 'empathy', 'peace']);
     expect(p.filter((x) => x === 'empathy')).toHaveLength(1);
   });
 });

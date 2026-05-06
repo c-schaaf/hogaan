@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { checkFormattingDiscipline } from '../../src/quality-check/checks-rule-based.js';
 import { voiceRulesV1 } from '../../src/libraries/seed/voice-rules.js';
-import {
-  _R11_FORMATTING_DRAFT,
-  voiceRulesV2Draft,
-} from '../../src/libraries/seed/voice-rules-v2.js';
 
 /**
  * Phase 11 R39 — Rule 11 (formatting discipline) wiring.
@@ -72,26 +68,29 @@ describe('Phase 11 R39 — checkFormattingDiscipline (runtime)', () => {
   });
 });
 
-describe('Phase 11 R39 — voice_rules v2 DRAFT shape', () => {
-  it('contains exactly v1 rules + 1 (r11-formatting-discipline)', () => {
-    expect(voiceRulesV2Draft.rules).toHaveLength(voiceRulesV1.rules.length + 1);
+describe('Phase 12 R3 — voice_rules v2 promoted (Rule 11 in v1 active)', () => {
+  it('v1 contains 11 rules including r11-formatting-discipline', () => {
+    expect(voiceRulesV1.rules).toHaveLength(11);
+    expect(voiceRulesV1.rules.find((r) => r.id === 'r11-formatting-discipline')).toBeDefined();
   });
 
-  it('preserves every v1 rule id', () => {
-    const v1Ids = voiceRulesV1.rules.map((r) => r.id);
-    const v2Ids = voiceRulesV2Draft.rules.map((r) => r.id);
-    for (const id of v1Ids) {
-      expect(v2Ids).toContain(id);
+  it('Rule 11 has ratified positive/negative examples (no DRAFT markers)', () => {
+    const r11 = voiceRulesV1.rules.find((r) => r.id === 'r11-formatting-discipline');
+    expect(r11).toBeDefined();
+    if (r11 === undefined) return;
+    for (const ex of r11.positiveExamples) {
+      expect(ex).not.toMatch(/DRAFT/);
+    }
+    for (const ex of r11.negativeExamples) {
+      expect(ex).not.toMatch(/DRAFT/);
     }
   });
 
-  it('rule 11 has id r11-formatting-discipline and DRAFT examples', () => {
-    expect(_R11_FORMATTING_DRAFT.id).toBe('r11-formatting-discipline');
-    for (const ex of _R11_FORMATTING_DRAFT.positiveExamples) {
-      expect(ex).toMatch(/DRAFT/);
-    }
-    for (const ex of _R11_FORMATTING_DRAFT.negativeExamples) {
-      expect(ex).toMatch(/DRAFT/);
-    }
+  it('Rule 10 description no longer mentions bold; cross-references Rule 11', () => {
+    const r10 = voiceRulesV1.rules.find((r) => r.id === 'r10-respect-time');
+    expect(r10).toBeDefined();
+    if (r10 === undefined) return;
+    expect(r10.description).not.toMatch(/\bbold\b/i);
+    expect(r10.description).toMatch(/Rule 11/);
   });
 });

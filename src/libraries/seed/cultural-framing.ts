@@ -3,13 +3,35 @@ import type { CulturalFramingPayload } from '../types.js';
 /**
  * cultural_framing v1 — engineering baseline from PRD §7. **Hamse-owned.**
  *
- * 15 Somali concepts. Process #9 §7 selects 1–2 conditionally based on the
+ * 16 Somali concepts. Process #9 §7 selects 1–2 conditionally based on the
  * multi-input DMN over (isDiaspora, responseMode, practiceTag, message content).
  *
  * Discipline: at most one Somali term per response (Voice Rule r7). The
  * `examplePhrasings` are inspiration, NEVER quoted verbatim.
  *
- * Status: needs Hamse sign-off before Phase A launch.
+ * Phase 12 R7+R8+R9: practicesMapped populated per the audit-ratified
+ * affinity cascade. Xil added (formerly v2-DRAFT, ratified content
+ * inlined). The data-driven affinity in src/prompt-assembly/framings.ts
+ * (R6) reads these mappings.
+ *
+ * Affinity cascade (one primary framing per practice):
+ *   integrity        → Wadanjirka
+ *   purpose          → Soomaalinimo
+ *   accountability   → Xil
+ *   dignity          → Sharaf
+ *   empathy          → Naxariis
+ *   inclusion        → Tol
+ *   assets           → Refugee resilience
+ *   innovation       → Pastoral leadership
+ *   prosperity       → Aragti dheer
+ *   humility         → Geed daad
+ *   democracy        → Hooyo
+ *   peace            → Maslaxad
+ *
+ * Other framings (Xeer, Sahan, Diaspora bridge, Poet as truth-teller) have
+ * no primary practice mapping — they remain in the library as additional
+ * material the LLM can draw on, but the data-driven selection won't pick
+ * them automatically.
  */
 export const culturalFramingV1: CulturalFramingPayload = {
   framings: [
@@ -40,6 +62,7 @@ export const culturalFramingV1: CulturalFramingPayload = {
       examplePhrasings: [
         "Soomaalinimo holds even when the time zones don't — that's a leadership asset, not a coordination tax.",
       ],
+      practicesMapped: ['purpose'],
     },
     {
       concept: 'Geed daad',
@@ -53,6 +76,7 @@ export const culturalFramingV1: CulturalFramingPayload = {
       examplePhrasings: [
         'Before the verdict, the geed daad asks for the question. What is the question your team is actually trying to answer?',
       ],
+      practicesMapped: ['humility'],
     },
     {
       concept: 'Pastoral leadership',
@@ -66,6 +90,7 @@ export const culturalFramingV1: CulturalFramingPayload = {
       examplePhrasings: [
         "A Somali herder doesn't supervise the herd at midday — they trust the morning instructions and the herd-keeper's judgment. What did your morning instructions actually say?",
       ],
+      practicesMapped: ['innovation'],
     },
     {
       concept: 'Tol',
@@ -79,6 +104,7 @@ export const culturalFramingV1: CulturalFramingPayload = {
       examplePhrasings: [
         'Tol pulls you to give the role to your cousin. Leadership asks: would the role come to your cousin without the pull?',
       ],
+      practicesMapped: ['inclusion'],
     },
     {
       concept: 'Sahan',
@@ -105,6 +131,7 @@ export const culturalFramingV1: CulturalFramingPayload = {
       examplePhrasings: [
         'Aragti dheer asks: what will this decision have built in five years, even if it costs you something now?',
       ],
+      practicesMapped: ['prosperity'],
     },
     {
       concept: 'Refugee resilience',
@@ -118,6 +145,7 @@ export const culturalFramingV1: CulturalFramingPayload = {
       examplePhrasings: [
         "You already know how to start over — your family showed you. The question is what you're building this time.",
       ],
+      practicesMapped: ['assets'],
     },
     {
       concept: 'Diaspora bridge',
@@ -144,6 +172,7 @@ export const culturalFramingV1: CulturalFramingPayload = {
       examplePhrasings: [
         "Naxariis is not avoidance. It's telling the truth in a way that lets the other person stand up afterward.",
       ],
+      practicesMapped: ['empathy'],
     },
     {
       concept: 'Sharaf',
@@ -158,6 +187,7 @@ export const culturalFramingV1: CulturalFramingPayload = {
       examplePhrasings: [
         'Sharaf is at stake here, not just the deal. Which version of you walks out of this meeting?',
       ],
+      practicesMapped: ['dignity'],
     },
     {
       concept: 'Wadanjirka',
@@ -171,6 +201,7 @@ export const culturalFramingV1: CulturalFramingPayload = {
       examplePhrasings: [
         'Wadanjirka is the reset question: who is this work in service of, beyond the org chart?',
       ],
+      practicesMapped: ['integrity'],
     },
     {
       concept: 'Poet as truth-teller',
@@ -197,19 +228,42 @@ export const culturalFramingV1: CulturalFramingPayload = {
       examplePhrasings: [
         "Maslaxad isn't splitting the difference. It's building a third option that the first two can both live with.",
       ],
+      practicesMapped: ['peace'],
     },
     {
       concept: 'Hooyo',
-      gloss: 'mother as the first leader',
+      gloss: 'the legitimacy of voice — the one who hears all children equally',
       shortDescription:
-        'Hooyo (mother) is the first leader anyone meets. Somali leadership tradition treats nurturance — leading through care — as a leadership skill, not a soft alternative.',
+        'Hooyo (mother) is the first leader anyone meets — and the impartial listener of the household. In Somali leadership tradition the mother arbitrates by hearing every child fully before deciding; her authority comes from being known to be fair, not from being loud. The democratic ear, before there is a council.',
       applicableWhen: [
+        'User is making a decision that affects multiple parties with competing claims.',
+        'User is running a process where every voice needs to be heard.',
         'User is leading through a crisis where the team needs steadiness.',
         'User undervalues their own care-based leadership style.',
       ],
       examplePhrasings: [
         'Hooyo led without an org chart — through presence, food, and the steady voice. What does that look like in your team this week?',
+        'Hooyo hears every child before she speaks. Whose voice in your team has not yet been fully heard?',
       ],
+      practicesMapped: ['democracy'],
+    },
+    {
+      concept: 'Xil',
+      gloss: 'duty/obligation that comes with role',
+      shortDescription:
+        'Xil is the weight a role places on you — not honor (Sharaf), not citizenship (Wadanjirka), but the specific debt incurred by accepting authority. A leader who carries Xil knows that the role asked something of them before they asked anything of it.',
+      applicableWhen: [
+        'User accepted a promotion or new responsibility and is feeling the weight of it.',
+        'User is debating whether to step away from a hard call that is rightfully theirs.',
+        'User is delegating something they should be doing personally.',
+        'User is conflating popularity with discharging their role.',
+      ],
+      examplePhrasings: [
+        'Xil asks the quiet question: what did the role ask of you that you have not yet given?',
+        'Sharaf is what others give you. Xil is what the role takes from you. They are not the same thing.',
+        "When you accepted the title, you also accepted xil. The weight you feel now is not weakness — it's the role doing what roles do.",
+      ],
+      practicesMapped: ['accountability'],
     },
   ],
 };

@@ -137,6 +137,7 @@ export async function generateConfirmation(opts: ConfirmationOptions): Promise<C
       candidateResponseText: candidate,
       userMessage: synthesized,
       responseMode: 'ProfileUpdateAcknowledgment',
+      intent: 'ProfileUpdate',
       predictedPracticeTag: pickPrimaryPractice(profile.mappedPractices),
       predictedLevelTag: 'self',
     },

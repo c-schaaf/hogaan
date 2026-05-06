@@ -73,7 +73,15 @@ export type ScenarioTurnOutcome =
   | { kind: 'no_active_scenario_no_kickoff' }
   | { kind: 'failed'; reason: string };
 
-const ABANDON_KEYWORDS = [
+// Phase 12 R19 — single-word abandon keywords (exit/abort/quit) match on
+// word boundary so "exits the building" doesn't trip. The multi-word
+// keywords (exit scenario / stop scenario / etc.) match as substrings.
+//
+// Precedence: webhook-router R17 honors global STOP/UNSUBSCRIBE/etc. before
+// reaching scenario logic. So a user typing STOP during a scenario opts out
+// entirely; only single-word exit/abort/quit (and the multi-word phrases)
+// land here.
+const ABANDON_PHRASES = [
   'exit scenario',
   'stop scenario',
   'quit scenario',
@@ -82,6 +90,7 @@ const ABANDON_KEYWORDS = [
   'abandon scenario',
   'leave scenario',
 ];
+const ABANDON_SINGLE_WORDS = ['exit', 'abort', 'quit'];
 const ABANDON_TEMPLATE =
   "Exited the scenario. We're back in regular coaching mode — what's on your mind?";
 
@@ -94,7 +103,7 @@ export async function runScenarioTurn(
   const state = await loadScenarioState(deps.db, inbound.userId);
 
   // Active scenario + abandonment keyword → exit gracefully.
-  if (state.active !== null && containsAny(inbound.body.toLowerCase(), ABANDON_KEYWORDS)) {
+  if (state.active !== null && isAbandonRequest(inbound.body)) {
     await abandonScenario(deps.db, inbound.userId);
     await sendBody(deps, inbound, ABANDON_TEMPLATE, 'scenario:abandon');
     return {
@@ -269,6 +278,7 @@ async function advanceActiveScenario(
       candidateResponseText: chatResp.text,
       userMessage: inbound.body,
       responseMode: 'ScenarioRolePlay',
+      intent: 'ScenarioRequest',
       predictedPracticeTag: scenario.practice,
       predictedLevelTag: scenario.level,
       userId: inbound.userId,
@@ -404,6 +414,41 @@ async function sendBody(
 function containsAny(haystack: string, needles: readonly string[]): boolean {
   for (const n of needles) {
     if (haystack.includes(n)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Phase 12 R19 — abandon detection.
+ *
+ * Multi-word phrases ("exit scenario") match as substrings. Single-word
+ * tokens (exit/abort/quit) match only on word boundary so common phrases
+ * like "exits the building" or "the team quit on me" don't accidentally
+ * end the scenario.
+ *
+ * Note: STOP/UNSUBSCRIBE/etc. is handled at webhook-router (R17) and never
+ * reaches here — that path opts the user out entirely.
+ */
+export function isAbandonRequest(text: string): boolean {
+  const norm = text
+    .toLowerCase()
+    .trim()
+    .replace(/[!?.,]+/g, ' ')
+    .replace(/\s+/g, ' ');
+  if (norm.length === 0) {
+    return false;
+  }
+  if (containsAny(norm, ABANDON_PHRASES)) {
+    return true;
+  }
+  for (const w of ABANDON_SINGLE_WORDS) {
+    if (norm === w) {
+      return true;
+    }
+    const re = new RegExp(`(^|[^a-z])${w}([^a-z]|$)`, 'i');
+    if (re.test(norm)) {
       return true;
     }
   }

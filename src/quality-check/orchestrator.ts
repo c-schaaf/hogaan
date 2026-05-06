@@ -6,6 +6,9 @@ import {
   check4AssetBased,
   check7Tone,
   check8SafetyCrisis,
+  checkLivedExperienceDiscipline,
+  checkTangibleAction,
+  checkUsefulToSocietyAnchor,
 } from './checks-llm.js';
 import {
   check1PracticeTag,
@@ -13,7 +16,10 @@ import {
   check5HeroToGuide,
   check6UsefulToSociety,
   check9Length,
+  checkFormattingDiscipline,
 } from './checks-rule-based.js';
+import { checkIntentLengthAsCheckResult } from './intent-length-bands.js';
+import { checkVoiceConsistency } from './voice-consistency.js';
 import { regenerate } from './corrective.js';
 import { fallbackDegraded, fallbackMaxRetries } from './fallbacks.js';
 import type { CheckResult, QcInput, QcResult } from './types.js';
@@ -201,8 +207,15 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
 }
 
 /**
- * Run all 9 checks against the current candidate. Rule-based checks run
+ * Run all 13 checks against the current candidate. Rule-based checks run
  * synchronously; LLM checks fan out in parallel for latency.
+ *
+ * Latency expectation: 6 LLM checks (check_03/04/07/08/10/12) + 1 voyage
+ * embedding pair (check_13) all run in parallel. Each LLM call has a 4s
+ * budget; voyage centroid is memoized after first call so check_13 reduces
+ * to a single embed-query (~300ms) on subsequent runs. Wall-clock for the
+ * full QC pass stays in the ~1s p99 envelope, fitting within the 6s p99
+ * total turn budget per CLAUDE.md hard rule #2.
  *
  * Note: even though Check 8 is the most consequential, we still run all checks
  * concurrently so we get the full failure picture in one round-trip — Check 8
@@ -219,12 +232,18 @@ async function runAllChecks(
     check5HeroToGuide(deps.libraries.voiceRules.payload, candidate),
     check6UsefulToSociety(deps.libraries.voiceRules.payload, candidate, input.predictedLevelTag),
     check9Length(candidate, input.responseMode),
+    checkFormattingDiscipline(candidate),
+    checkIntentLengthAsCheckResult(candidate, input.intent),
   ];
   const llm = await Promise.all([
     check3SignatureStructure(deps.config, candidate),
     check4AssetBased(deps.config, candidate),
     check7Tone(deps.config, candidate),
     check8SafetyCrisis(deps.config, input.userMessage, candidate),
+    checkLivedExperienceDiscipline(deps.config, candidate),
+    checkTangibleAction(deps.config, candidate),
+    checkVoiceConsistency(deps.config, candidate),
+    checkUsefulToSocietyAnchor(deps.config, candidate),
   ]);
   return [...sync, ...llm];
 }

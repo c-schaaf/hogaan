@@ -133,6 +133,9 @@ export async function assemblePrompt(
     systemTemplateId: template.id,
     practiceTag: validated.practiceTag ?? null,
     levelTag: validated.levelTag ?? null,
+    secondaryPracticeTag: payload.secondaryPracticeTag ?? null,
+    secondaryLevelTag: payload.secondaryLevelTag ?? null,
+    taggerConfidence: payload.taggerConfidence ?? null,
     culturalFramingConcept: finalPrompt.culturalFramingConcept,
     libraryVersions: versionSet,
   });

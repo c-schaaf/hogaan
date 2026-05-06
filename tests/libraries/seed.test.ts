@@ -10,10 +10,10 @@ import {
 import { LEVEL_TAGS, PRACTICE_TAGS, RESPONSE_MODES } from '../../src/shared/types/index.js';
 
 describe('library seed content invariants', () => {
-  it('voice_rules has exactly 10 rules with stable ids', () => {
-    expect(voiceRulesV1.rules).toHaveLength(10);
+  it('voice_rules has exactly 11 rules with stable ids (Phase 12 R3: Rule 11 promoted)', () => {
+    expect(voiceRulesV1.rules).toHaveLength(11);
     const ids = voiceRulesV1.rules.map((r) => r.id);
-    expect(new Set(ids).size).toBe(10);
+    expect(new Set(ids).size).toBe(11);
   });
 
   it('voice_rules ships hero-phrase flags + useful-to-society anchor patterns', () => {
@@ -21,10 +21,10 @@ describe('library seed content invariants', () => {
     expect(voiceRulesV1.usefulToSocietyPatterns.length).toBeGreaterThan(0);
   });
 
-  it('cultural_framing has exactly 15 framings with unique concepts', () => {
-    expect(culturalFramingV1.framings).toHaveLength(15);
+  it('cultural_framing has exactly 16 framings with unique concepts (Phase 12 R7-9: Xil added)', () => {
+    expect(culturalFramingV1.framings).toHaveLength(16);
     const concepts = culturalFramingV1.framings.map((f) => f.concept);
-    expect(new Set(concepts).size).toBe(15);
+    expect(new Set(concepts).size).toBe(16);
   });
 
   it('cultural_framing every framing has at least one applicableWhen + examplePhrasings', () => {

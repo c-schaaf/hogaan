@@ -70,11 +70,11 @@ describe('selectSystemTemplate', () => {
 });
 
 describe('selectCulturalFraming', () => {
-  it('returns a framing for FullCoachingResponse with a known practice', () => {
+  it('returns a framing for FullCoachingResponse with a known practice (Phase 12 R7-9: integrity → Wadanjirka)', () => {
     const r = selectCulturalFraming(culturalFramingV1, 'FullCoachingResponse', 'integrity');
     expect(r).not.toBeNull();
-    expect(r?.concept).toBe('Sharaf');
-    expect(r?.text).toContain('Sharaf');
+    expect(r?.concept).toBe('Wadanjirka');
+    expect(r?.text).toContain('Wadanjirka');
   });
 
   it('returns null for ClarifyingQuestion', () => {

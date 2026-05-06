@@ -19,12 +19,17 @@ import type { AppConfig } from '../shared/secrets/config.js';
 import { BRAND_FRAMEWORK_ATTRIBUTION } from '../shared/brand/constants.js';
 import { hashPhone } from '../shared/db/encryption.js';
 import { emitTurnTrace, type TraceEmitter } from '../shared/trace/index.js';
-import { asCorrelationId, type LevelTag, type PracticeTag } from '../shared/types/index.js';
+import {
+  asCorrelationId,
+  type LevelTag,
+  type PracticeTag,
+  type TurnId,
+} from '../shared/types/index.js';
 import { sendOutbound } from '../whatsapp-delivery/orchestrator.js';
 import { fetchCoachingContext } from './context-fetch.js';
 import { decideContinuation } from './continuation.js';
 import type { CoachingEndEvent } from './end-events.js';
-import { persistPostTurn } from './post-turn.js';
+import { persistPostTurn, persistShortCircuitTurn } from './post-turn.js';
 import { tagPracticeAndLevel } from './tagger.js';
 import { triage } from './triage.js';
 import type { CoachingInbound, CoachingTurnResult, TriageResult } from './types.js';
@@ -166,6 +171,7 @@ export async function runCoachingTurn(
       'meta',
       'E6_MetaResponse',
       t0,
+      'MetaQuestion',
     );
   }
   if (intent === 'ProfileUpdate') {
@@ -177,6 +183,7 @@ export async function runCoachingTurn(
       'profile-ack',
       'E5_ProfileAck',
       t0,
+      'ProfileUpdate',
     );
   }
   if (intent === 'Greeting') {
@@ -188,6 +195,7 @@ export async function runCoachingTurn(
       'greeting',
       'E1_TurnCompleted',
       t0,
+      'Greeting',
     );
   }
   if (intent === 'Affirmation') {
@@ -199,6 +207,7 @@ export async function runCoachingTurn(
       'affirmation',
       'E1_TurnCompleted',
       t0,
+      'Affirmation',
     );
   }
 
@@ -226,6 +235,9 @@ export async function runCoachingTurn(
     responseMode: 'FullCoachingResponse',
     practiceTag: tags.practiceTag,
     levelTag: tags.levelTag,
+    secondaryPracticeTag: tags.secondaryPracticeTag,
+    secondaryLevelTag: tags.secondaryLevelTag,
+    taggerConfidence: tags.confidence,
     userMessage: inbound.body,
     userProfile: ctx.profile,
     retrievedMemories: ctx.memories,
@@ -292,6 +304,7 @@ export async function runCoachingTurn(
       candidateResponseText: chatResp.text,
       userMessage: inbound.body,
       responseMode: 'FullCoachingResponse',
+      intent,
       predictedPracticeTag: tags.practiceTag,
       predictedLevelTag: tags.levelTag,
       userId: inbound.userId,
@@ -439,7 +452,8 @@ interface MinimalFinalize {
   latencyMs: number;
   reason: string;
   sessionId: string;
-  turnId: null;
+  /** Phase 12 R20 — short-circuit paths now persist a turn row, so this can be a TurnId. */
+  turnId: TurnId | null;
   waMessageId?: string;
 }
 
@@ -532,17 +546,42 @@ async function runTemplatedResponse(
   callerSubId: string,
   endEvent: CoachingEndEvent,
   t0: number,
+  intent: string = 'Coaching',
 ): Promise<CoachingTurnResult> {
   const delivery = await sendBody(deps, inbound, body, callerSubId);
+  const latencyMs = Date.now() - t0;
+
+  // Phase 12 R20+R21 — persist a lightweight turn row + memory entry so the
+  // bot remembers "user said hi yesterday" and sponsor portal aggregations
+  // see all activity. Fail-open: errors are reported but don't block.
+  // Crisis (E7) and silent-drop (E12) skip this — E7 has its own
+  // crisis_events row; E12 has no response to persist.
+  const persisted = await persistShortCircuitTurn(
+    { config: deps.config, db: deps.db },
+    {
+      userId: inbound.userId,
+      sessionId: sessionId as never,
+      userMessage: inbound.body,
+      responseText: body,
+      callerSubId,
+      intent,
+      terminalEvent: endEvent,
+      latencyMs,
+      deliveryReceipt: {
+        ...(delivery.waMessageId !== undefined ? { waMessageId: delivery.waMessageId } : {}),
+      },
+    },
+  );
+
   return finalize(deps, inbound, {
     endEvent,
     responseText: body,
     practiceTag: null,
     levelTag: null,
-    latencyMs: Date.now() - t0,
+    latencyMs,
     reason: `templated ${callerSubId}`,
     sessionId,
-    turnId: null,
+    turnId: persisted.turnId,
     ...(delivery.waMessageId !== undefined ? { waMessageId: delivery.waMessageId } : {}),
   });
 }

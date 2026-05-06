@@ -12,9 +12,48 @@ import type { LevelTag, PracticeTag } from '../shared/types/index.js';
  * memory recurrence, etc. — Phase 7 ships the deterministic v1.
  */
 
+// Phase 12 R11 — common-word keywords replaced with phrasal anchors.
+// The previous list had 'why', 'voice', 'face', 'change', 'monday morning'
+// as bare keywords; they fired on far too many leadership-context messages.
+// Phrasal anchors are more specific to the practice the user is wrestling
+// with.
+// Phase 12 R11 + R13 — common-word keywords replaced with phrasal anchors;
+// situational triggers added. The R13 audit found that the canonical "I had
+// to fire someone" prompt didn't tag accountability — only abstract terms
+// like 'accountable' and 'ownership' did. Real users describe situations,
+// not principles, so the keyword set now covers both axes.
 const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
-  integrity: ['integrity', 'principle', 'standard', 'compromise my', 'cut corners', 'doing right'],
-  purpose: ['purpose', 'why', 'meaning', 'mission', 'what for', "what's the point"],
+  integrity: [
+    'integrity',
+    'principle',
+    'standard',
+    'compromise my',
+    'cut corners',
+    'doing right',
+    // R13 — situational triggers
+    'right thing to do',
+    'against my values',
+    'compromised',
+    'not who i am',
+    // R12 — Somali (sharaf/honesty/principles)
+    'sharafteyda',
+    'qiimayaal',
+    'mabaadi',
+  ],
+  purpose: [
+    'purpose',
+    'meaning',
+    'mission',
+    'what for',
+    "what's the point",
+    'why am i doing',
+    'what am i for',
+    'point of this work',
+    // R12 — Somali (ujeedo/meaning)
+    'ujeedo',
+    'macno',
+    'sababta',
+  ],
   accountability: [
     'accountable',
     'accountability',
@@ -23,8 +62,35 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'own that',
     'my fault',
     'on me',
+    // R13 — situational triggers
+    'had to fire',
+    'had to let go',
+    'decision fell to me',
+    'ended up making the call',
+    'stuck with the call',
+    'on my shoulders',
+    'i made the call',
+    'my call to make',
+    // R12 — Somali (xil/responsibility)
+    'xil',
+    "mas'uuliyad",
+    'masuuliyad',
+    'ii saaran',
   ],
-  dignity: ['dignity', 'respect', 'humiliate', 'humiliation', 'embarrass', 'face'],
+  dignity: [
+    'dignity',
+    'respect',
+    'humiliate',
+    'humiliation',
+    'embarrass',
+    'lose face',
+    'save face',
+    'face in front of the team',
+    // R12 — Somali (sharaf/respect)
+    'sharaf',
+    'ixtiraam',
+    'fool',
+  ],
   empathy: [
     'empathy',
     'understand',
@@ -32,7 +98,15 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'their side',
     'where they',
     'walk in',
-    'monday morning',
+    // R13 — situational triggers
+    'going through',
+    'struggling with',
+    'hard time at home',
+    'team member is dealing with',
+    // R12 — Somali (naxariis/understanding)
+    'naxariis',
+    'fahmis',
+    'dareen',
   ],
   inclusion: [
     'inclusion',
@@ -43,28 +117,102 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'excluded',
     'unheard',
     'quieter voice',
+    // R13 — situational triggers
+    "doesn't speak up",
+    'never says anything',
+    'gets talked over',
+    'silent in meetings',
+    // R12 — Somali (ka mid ah/included)
+    'ka mid ah',
+    'ka qayb qaad',
+    'la-jeclayn',
   ],
-  assets: ['asset', 'strength', 'capability', 'resource', 'what we have', 'what i have'],
+  assets: [
+    'asset',
+    'strength',
+    'capability',
+    'resource',
+    'what we have',
+    'what i have',
+    // R12 — Somali (waxa aan haysano)
+    'waxa aan haysano',
+    'awood',
+    'kheyraad',
+  ],
   innovation: [
     'innovate',
     'innovation',
     'new approach',
     'experiment',
     'try something new',
-    'change',
+    'change the way',
+    'try a different approach',
+    'new way of working',
+    'doing things differently',
+    // R12 — Somali (hal-abuur)
+    'hal-abuur',
+    'wax cusub',
+    'baadhitaan',
   ],
-  prosperity: ['prosperity', 'thrive', 'win-win', 'positive sum', 'value creation', 'shared'],
-  humility: ['humility', 'humble', 'wrong', 'admit', "i don't know", 'pushback', 'truth-teller'],
+  prosperity: [
+    'prosperity',
+    'thrive',
+    'win-win',
+    'positive sum',
+    'value creation',
+    'shared',
+    // R12 — Somali (barwaaqo/thriving)
+    'barwaaqo',
+    'horumar',
+    'guusha',
+  ],
+  humility: [
+    'humility',
+    'humble',
+    'wrong',
+    'admit',
+    "i don't know",
+    'pushback',
+    'truth-teller',
+    // R12 — Somali (is-hoosaysiin)
+    'is-hoosaysiin',
+    'ma garanayo',
+    'qalad',
+  ],
   democracy: [
     'democracy',
     'fair process',
-    'voice',
     'transparent',
     'opaque',
     'governance',
     'how we decide',
+    'whose voice',
+    'voice in the decision',
+    'voice at the table',
+    // R12 — Somali (dimoqraadiyad/voice)
+    'dimoqraadiyad',
+    'cod',
+    'doorasho',
   ],
-  peace: ['peace', 'feud', 'conflict', 'tension', 'rivalry', 'cycle', 'escalation', 'de-escalate'],
+  peace: [
+    'peace',
+    'feud',
+    'conflict',
+    'tension',
+    'rivalry',
+    'cycle',
+    'escalation',
+    'de-escalate',
+    // R13 — situational triggers
+    'at each other',
+    "won't talk",
+    'stalemate',
+    'deadlocked',
+    // R12 — Somali (nabad)
+    'nabad',
+    'colaad',
+    'heshiis',
+  ],
 };
 
 const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
@@ -77,6 +225,10 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'within myself',
     'my integrity',
     'my values',
+    // R12 — Somali
+    'aniga',
+    'naftayda',
+    'qof ahaan',
   ],
   team: [
     'my team',
@@ -86,6 +238,10 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'we as a team',
     'our team',
     'one of my',
+    // R12 — Somali
+    'kooxda',
+    'kooxdayda',
+    'shaqaalayaasha',
   ],
   organization: [
     'the org',
@@ -96,6 +252,10 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'board',
     'institution',
     'function',
+    // R12 — Somali
+    'shirkadda',
+    "hay'adda",
+    'ururka',
   ],
   community: [
     'community',
@@ -106,6 +266,10 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'country',
     'society',
     'profession',
+    // R12 — Somali
+    'bulshada',
+    'dadweynaha',
+    'ummadda',
   ],
 };
 

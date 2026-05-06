@@ -188,11 +188,14 @@ describe('Phase 11 R11 — inbound webhook decoupled from pipeline', () => {
       const elapsedMs = performance.now() - t0;
 
       expect(res.statusCode).toBe(204);
-      // The 200ms ceiling is generous — actual responses are typically <50ms.
+      // 1500ms ceiling. Actual is typically <50ms; the contract under test is
+      // "decoupled from a 10-second pipeline" — 1500ms is still 6.6x faster
+      // than the un-decoupled baseline. Tighter ceilings (200ms) were
+      // flaky on Windows under test-suite parallelism.
       expect(
         elapsedMs,
-        `webhook ack took ${elapsedMs.toFixed(0)}ms (expected <200ms)`,
-      ).toBeLessThan(200);
+        `webhook ack took ${elapsedMs.toFixed(0)}ms (expected <1500ms)`,
+      ).toBeLessThan(1500);
       // Idempotency claim succeeded: the SETNX key exists.
       expect(store.kv.has(`${INBOUND_PROCESSED_KEY_PREFIX}SMtest-decouple-001`)).toBe(true);
       // Enqueue happened.

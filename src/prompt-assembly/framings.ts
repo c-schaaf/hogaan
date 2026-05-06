@@ -83,10 +83,18 @@ export function buildVoiceRules(voiceRules: VoiceRulesPayload): string {
 }
 
 /**
- * Process #9 §7 — cultural framing selection. Multi-input DMN per the BPMN;
- * Phase 4 ships a deterministic affinity-map version (one Somali concept per
- * practice). Phase 9 plan §4C.3 widens this to include isDiaspora + message-
- * content signals.
+ * Process #9 §7 — cultural framing selection.
+ *
+ * Phase 12 R6 — data-driven affinity. The framing library now carries
+ * practicesMapped: PracticeTag[] on each framing entry. Selection scans
+ * the library for any framing whose practicesMapped includes the
+ * practiceTag. When multiple framings match, the first by concept name
+ * lexically wins (deterministic tie-break, audit-stable).
+ *
+ * Backwards compatibility: if NO framing in the library carries
+ * practicesMapped (legacy v1 publish before R7-9), fall back to the
+ * static PRACTICE_TO_FRAMING table below. Once R7-9 publishes the field,
+ * the data-driven path takes over.
  *
  * Modes that exclude framing: ClarifyingQuestion (focused single question;
  * one term would dilute it), MetaResponse (out-of-scope chat about the bot),
@@ -95,7 +103,7 @@ export function buildVoiceRules(voiceRules: VoiceRulesPayload): string {
  * Voice Rule r7: at most one Somali term per response. We return at most one
  * concept.
  */
-const PRACTICE_TO_FRAMING: Record<PracticeTag, string> = {
+const LEGACY_PRACTICE_TO_FRAMING: Record<PracticeTag, string> = {
   integrity: 'Sharaf',
   purpose: 'Wadanjirka',
   accountability: 'Maslaxad',
@@ -109,6 +117,22 @@ const PRACTICE_TO_FRAMING: Record<PracticeTag, string> = {
   democracy: 'Geed daad',
   peace: 'Maslaxad',
 };
+
+export function findFramingForPractice(
+  framingLib: CulturalFramingPayload,
+  practiceTag: PracticeTag,
+): string | null {
+  const matches = framingLib.framings.filter((f) =>
+    (f.practicesMapped ?? []).includes(practiceTag),
+  );
+  if (matches.length === 0) {
+    // Legacy fallback: pre-R7-9 libraries don't carry practicesMapped.
+    return LEGACY_PRACTICE_TO_FRAMING[practiceTag] ?? null;
+  }
+  // Tie-break: first by concept name lexically. Deterministic + audit-stable.
+  matches.sort((a, b) => a.concept.localeCompare(b.concept));
+  return matches[0]!.concept;
+}
 
 export function selectCulturalFraming(
   framingLib: CulturalFramingPayload,
@@ -125,7 +149,10 @@ export function selectCulturalFraming(
   if (practiceTag === undefined) {
     return null;
   }
-  const conceptName = PRACTICE_TO_FRAMING[practiceTag];
+  const conceptName = findFramingForPractice(framingLib, practiceTag);
+  if (conceptName === null) {
+    return null;
+  }
   const concept = framingLib.framings.find((f) => f.concept === conceptName);
   if (concept === undefined) {
     return null;
@@ -145,5 +172,5 @@ export function selectCulturalFraming(
   return { text: lines.join('\n'), concept: concept.concept };
 }
 
-/** Test seam — exposes the affinity map for audits without re-deriving it. */
-export const _practiceToFraming = PRACTICE_TO_FRAMING;
+/** Test seam — exposes the legacy affinity map for audits. */
+export const _practiceToFraming = LEGACY_PRACTICE_TO_FRAMING;

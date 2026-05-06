@@ -24,6 +24,16 @@ const CLOSE_TOKENS = [
   'see you',
   'see ya',
   'catch you later',
+  // Phase 12 R22 — natural acknowledgment endings.
+  'that helps',
+  'appreciate',
+  'noted',
+  "that's helpful",
+  "i'll think about it",
+  "that's all",
+  'enough for today',
+  'good to know',
+  'got it thanks',
 ];
 
 export type ContinuationDecision = 'continue' | 'close';

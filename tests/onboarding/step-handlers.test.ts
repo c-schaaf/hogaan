@@ -25,12 +25,13 @@ describe('handleConsentReply', () => {
   });
 });
 
-describe('handleGoalReply with retry budget', () => {
-  it('advances to step 4 with the parsed goals on attempt 1', () => {
-    const r = handleGoalReply('1, 3', 1);
+describe('handleGoalReply with retry budget (Phase 12 R14 — 12-practice picker)', () => {
+  it('advances to step 4 with the parsed practices on attempt 1', () => {
+    const r = handleGoalReply('integrity, peace', 1);
     expect(r.newStep).toBe(4);
     expect(r.defaultsApplied).toBe(false);
-    expect(r.dataUpdate?.goals).toEqual(['Leadership confidence', 'Conflict resolution']);
+    expect(r.dataUpdate?.goals).toContain('integrity');
+    expect(r.dataUpdate?.goals).toContain('peace');
   });
 
   it('re-asks on attempt 1 when input is invalid', () => {
@@ -39,11 +40,11 @@ describe('handleGoalReply with retry budget', () => {
     expect(r.defaultsApplied).toBe(false);
   });
 
-  it('applies defaults on attempt 3 when still invalid (E7 path)', () => {
+  it('applies integrity default on attempt 3 when still invalid (E7 path)', () => {
     const r = handleGoalReply('???', 3);
     expect(r.newStep).toBe(4);
     expect(r.defaultsApplied).toBe(true);
-    expect(r.dataUpdate?.goals).toEqual(['Leadership confidence']);
+    expect(r.dataUpdate?.goals).toEqual(['integrity']);
     expect(r.dataUpdate?.needsProfileReview).toBe(true);
   });
 });

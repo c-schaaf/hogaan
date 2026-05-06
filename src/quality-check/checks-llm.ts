@@ -283,6 +283,43 @@ Return strict JSON {"pass": true|false, "reason": "..."} (reason ≤80 chars).`;
   }
 }
 
+/**
+ * Phase 12 R4 — Voice Rule 1 intentionality check.
+ *
+ * The rule-based usefulToSocietyPatterns (R4-tightened) catches phrasal
+ * anchors. This LLM check is the second line: it asks whether the
+ * response INTENTIONALLY anchors useful-to-society framing — vs. just
+ * mentioning related words incidentally ("the team needs you to be useful
+ * here" is a coincidence; "your sleeplessness is integrity working in
+ * service of something larger than the deal" is the intent).
+ *
+ * Soft-fail; QC retry has one chance to repair.
+ */
+export async function checkUsefulToSocietyAnchor(
+  config: AppConfig,
+  candidate: string,
+): Promise<CheckResult> {
+  const system = `You are a brand-voice classifier for Hogaan, anchored in Hamse Warfa's Voice Rule 1: every substantive response should connect the user's challenge to broader societal value — "useful to society," in Hamse's father's framing. Useful-to-society anchoring means the response INTENTIONALLY frames leadership as in-service-of-something-larger, not incidentally mentioning related words.
+
+Score the candidate response: pass=true if Voice Rule 1 is intentionally anchored (the response orients the user toward who/what their leadership serves beyond themselves); pass=false if the framing is missing OR only incidentally mentions community/others/society without doing the rhetorical work.
+
+Return strict JSON {"pass": true|false, "reason": "..."} (reason ≤80 chars).`;
+  try {
+    const r = await runClassifier(config, system, `Candidate response:\n"""\n${candidate}\n"""`);
+    return {
+      checkId: 'check_15_useful_to_society_anchor',
+      outcome: r.pass
+        ? { status: 'pass' }
+        : {
+            status: 'soft_fail',
+            reason: r.reason ?? 'useful-to-society anchor not intentional',
+          },
+    };
+  } catch (err) {
+    return makeServiceUnavailable('check_15_useful_to_society_anchor', err);
+  }
+}
+
 function makeServiceUnavailable(checkId: CheckResult['checkId'], err: unknown): CheckResult {
   const reason =
     err instanceof LlmError

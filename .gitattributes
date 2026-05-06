@@ -1,0 +1,34 @@
+# Phase 12 — enforce LF line endings on source files.
+#
+# Without this, Windows checkouts get CRLF (autocrlf=true global config
+# normalizes to CRLF on read), which makes `prettier --check` fail
+# locally because .prettierrc has `endOfLine: 'lf'`. CI on Linux always
+# sees LF and passes, but local lint diverges. This file pins the
+# behavior so pnpm lint is green on every platform.
+
+# Default: let git auto-detect text vs binary; CRLF→LF on commit.
+*           text=auto eol=lf
+
+# Source files: always LF.
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.mjs       text eol=lf
+*.cjs       text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.sql       text eol=lf
+*.eta       text eol=lf
+
+# Binary files: never touch.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary
+*.docx      binary
+*.bpmn      binary
