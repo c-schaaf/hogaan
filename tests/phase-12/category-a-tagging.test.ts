@@ -364,6 +364,23 @@ describe('Phase 12 — Category A: Tagging accuracy (green subset)', () => {
     );
   });
 
+  it('T18: "Engineering and Product hate each other." → peace / organization', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T18-org-functions-peace',
+        controlId: 'T5.VoiceFidelity.T18_OrgFunctions',
+        tier: 'T5',
+        description:
+          'Inter-functional org friction → peace practice + organization level. Approved practice keywords: "hate each other", "don\'t get along", "always fighting". Approved level keywords: "engineering and product", "product and engineering", "and sales", "and marketing", "cross-functional".',
+      },
+      () => {
+        const r = tagPracticeAndLevel('Engineering and Product hate each other.');
+        expect(r.practiceTag).toBe('peace');
+        expect(r.levelTag).toBe('organization');
+      },
+    );
+  });
+
   it('T17 (regression-lock): "Our company values are written down..." → organization', async () => {
     await withVoiceFidelityEvidence(
       {

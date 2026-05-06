@@ -234,6 +234,10 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     "won't talk",
     'stalemate',
     'deadlocked',
+    // T18 — inter-functional friction phrasings
+    'hate each other',
+    "don't get along",
+    'always fighting',
     // R12 — Somali (nabad)
     'nabad',
     'colaad',
@@ -293,6 +297,12 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'board',
     'institution',
     'function',
+    // T18 — cross-functional pairings
+    'engineering and product',
+    'product and engineering',
+    'and sales',
+    'and marketing',
+    'cross-functional',
     // R12 — Somali
     'shirkadda',
     "hay'adda",
