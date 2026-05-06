@@ -49,6 +49,9 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'why am i doing',
     'what am i for',
     'point of this work',
+    // T2 — natural-language variants
+    'pointless',
+    'why am i even',
     // R12 — Somali (ujeedo/meaning)
     'ujeedo',
     'macno',
@@ -86,6 +89,9 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'lose face',
     'save face',
     'face in front of the team',
+    // T4 — natural-language variants
+    'lost face',
+    'losing face',
     // R12 — Somali (sharaf/respect)
     'sharaf',
     'ixtiraam',
@@ -121,6 +127,9 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     "doesn't speak up",
     'never says anything',
     'gets talked over',
+    // T6 — natural-language variants
+    'never speaks up',
+    'never speak up',
     'silent in meetings',
     // R12 — Somali (ka mid ah/included)
     'ka mid ah',
@@ -134,6 +143,10 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'resource',
     'what we have',
     'what i have',
+    // T7 — asset-based reframe targets (cost-cutting / scarcity contexts)
+    "what we don't have",
+    'morale is low',
+    'scarcity',
     // R12 — Somali (waxa aan haysano)
     'waxa aan haysano',
     'awood',
@@ -149,6 +162,8 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'try a different approach',
     'new way of working',
     'doing things differently',
+    // T8 — natural-language variant
+    'different way of working',
     // R12 — Somali (hal-abuur)
     'hal-abuur',
     'wax cusub',
@@ -161,6 +176,10 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'positive sum',
     'value creation',
     'shared',
+    // T9 — long-view compounding wins
+    'compound',
+    'compounds',
+    'compounding',
     // R12 — Somali (barwaaqo/thriving)
     'barwaaqo',
     'horumar',
@@ -174,6 +193,9 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     "i don't know",
     'pushback',
     'truth-teller',
+    // T19 — self-questioning candidacy framing
+    "i'm not sure",
+    'not sure i should',
     // R12 — Somali (is-hoosaysiin)
     'is-hoosaysiin',
     'ma garanayo',
@@ -189,6 +211,10 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'whose voice',
     'voice in the decision',
     'voice at the table',
+    // T11 — unequal-participation framing
+    'voices dominate',
+    'dominate every decision',
+    'never weigh in',
     // R12 — Somali (dimoqraadiyad/voice)
     'dimoqraadiyad',
     'cod',
@@ -208,6 +234,10 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     "won't talk",
     'stalemate',
     'deadlocked',
+    // T18 — inter-functional friction phrasings
+    'hate each other',
+    "don't get along",
+    'always fighting',
     // R12 — Somali (nabad)
     'nabad',
     'colaad',
@@ -225,6 +255,11 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'within myself',
     'my integrity',
     'my values',
+    // T14 — leader-blames-self phrases (also act as override below).
+    'because of me',
+    'failing because of me',
+    'my fault',
+    'on me',
     // R12 — Somali
     'aniga',
     'naftayda',
@@ -238,6 +273,16 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'we as a team',
     'our team',
     'one of my',
+    // T15 — recurring team-meeting framing
+    'standup',
+    'stand-up',
+    'team meeting',
+    'one-on-ones',
+    // T16 — deputy / second-in-command relationship
+    'number two',
+    'my deputy',
+    'my second',
+    'my right hand',
     // R12 — Somali
     'kooxda',
     'kooxdayda',
@@ -252,6 +297,12 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'board',
     'institution',
     'function',
+    // T18 — cross-functional pairings
+    'engineering and product',
+    'product and engineering',
+    'and sales',
+    'and marketing',
+    'cross-functional',
     // R12 — Somali
     'shirkadda',
     "hay'adda",
@@ -266,12 +317,31 @@ const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
     'country',
     'society',
     'profession',
+    // T19 — diaspora-council framing
+    'diaspora',
+    'diaspora council',
+    'community council',
+    'civic council',
+    // T20 — philanthropic-foundation framing
+    'foundation',
+    'nonprofit',
+    'philanthropy',
     // R12 — Somali
     'bulshada',
     'dadweynaha',
     'ummadda',
   ],
 };
+
+// T14 — leader-blames-self precedence: when a leader-responsibility phrase
+// fires, level=self overrides any team-keyword hits. The leader is the unit
+// when accepting blame, even if the message mentions "my team".
+const SELF_OVERRIDE_PHRASES: readonly string[] = [
+  'because of me',
+  'failing because of me',
+  'my fault',
+  'on me',
+];
 
 export interface TagResult {
   practiceTag: PracticeTag;
@@ -400,6 +470,22 @@ export function tagPracticeAndLevel(message: string, profileMapped: PracticeTag[
       secondLevelScore = s;
     }
   }
+  // T14 — self-override precedence. If a leader-responsibility phrase fires,
+  // force level=self even when "my team" / other team-keywords also hit.
+  // The previously-winning level becomes the runner-up if it wasn't already self.
+  let selfOverrideFired = false;
+  for (const phrase of SELF_OVERRIDE_PHRASES) {
+    if (lower.includes(phrase)) {
+      selfOverrideFired = true;
+      break;
+    }
+  }
+  if (selfOverrideFired && level !== 'self') {
+    secondLevel = level;
+    secondLevelScore = bestLevelScore;
+    level = 'self';
+  }
+
   // secondLevel must be non-zero score AND distinct from primary.
   const secondaryLevel: LevelTag | null = secondLevelScore > 0 ? secondLevel : null;
 
@@ -428,4 +514,4 @@ export function tagPracticeAndLevel(message: string, profileMapped: PracticeTag[
 }
 
 /** Test seam — exposes the keyword tables for audit. */
-export const _internal = { PRACTICE_KEYWORDS, LEVEL_KEYWORDS };
+export const _internal = { PRACTICE_KEYWORDS, LEVEL_KEYWORDS, SELF_OVERRIDE_PHRASES };

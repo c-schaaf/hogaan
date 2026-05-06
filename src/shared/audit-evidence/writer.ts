@@ -19,6 +19,7 @@ import type { ControlId, EvidenceOutcome, EvidenceRow, Tier } from './types.js';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const EVIDENCE_DIR = path.join(REPO_ROOT, 'audit-evidence', 'phase-10');
+const EVIDENCE_DIR_PHASE_12 = path.join(REPO_ROOT, 'audit-evidence', 'phase-12');
 
 function isoDate(d: Date = new Date()): string {
   return d.toISOString().slice(0, 10); // YYYY-MM-DD
@@ -40,6 +41,7 @@ export interface RecordEvidenceInput {
   description: string;
   details?: Record<string, unknown>;
   artifactHash?: string;
+  phase?: 'phase-10' | 'phase-12';
 }
 
 /**
@@ -48,6 +50,7 @@ export interface RecordEvidenceInput {
  * row for that test (you get the latest result).
  */
 export async function recordEvidence(input: RecordEvidenceInput): Promise<void> {
+  const phase = input.phase ?? 'phase-10';
   const row: EvidenceRow = {
     recordedAt: new Date().toISOString(),
     testId: input.testId,
@@ -55,17 +58,18 @@ export async function recordEvidence(input: RecordEvidenceInput): Promise<void> 
     tier: input.tier,
     outcome: input.outcome,
     description: input.description,
-    phase: 'phase-10',
+    phase,
     ...(input.details !== undefined ? { details: input.details } : {}),
     ...(input.artifactHash !== undefined ? { artifactHash: input.artifactHash } : {}),
   };
 
+  const dir = phase === 'phase-12' ? EVIDENCE_DIR_PHASE_12 : EVIDENCE_DIR;
   const filename = `${isoDate()}-${slug(input.testId)}.json`;
-  const filepath = path.join(EVIDENCE_DIR, filename);
+  const filepath = path.join(dir, filename);
 
   try {
-    if (!existsSync(EVIDENCE_DIR)) {
-      await mkdir(EVIDENCE_DIR, { recursive: true });
+    if (!existsSync(dir)) {
+      await mkdir(dir, { recursive: true });
     }
     await writeFile(filepath, JSON.stringify(row, null, 2) + '\n', 'utf8');
   } catch (err) {

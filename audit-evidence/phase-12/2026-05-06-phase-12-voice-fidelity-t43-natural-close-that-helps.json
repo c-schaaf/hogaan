@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-06T19:37:23.997Z",
+  "testId": "phase-12/voice-fidelity/T43-natural-close-that-helps",
+  "controlId": "T5.VoiceFidelity.T43_NaturalClose",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Phase 12 R22 — \"that helps\" is a natural acknowledgment ending; closes session.",
+  "phase": "phase-12"
+}

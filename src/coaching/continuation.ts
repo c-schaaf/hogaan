@@ -38,6 +38,11 @@ const CLOSE_TOKENS = [
 
 export type ContinuationDecision = 'continue' | 'close';
 
+// Phase 12 T44 — when an acknowledgment is followed by a coordinating
+// conjunction ("but", "however", "yet") AND substantive content (or a
+// trailing "?"), the user is mid-thought, not closing.
+const TRAILING_CONTINUE_PATTERN = /\b(but|however|yet)\b\s+\S/i;
+
 export function decideContinuation(userMessage: string): ContinuationDecision {
   const norm = userMessage.toLowerCase().trim();
   if (norm.length === 0) {
@@ -48,13 +53,23 @@ export function decideContinuation(userMessage: string): ContinuationDecision {
       return 'close';
     }
     if (t.includes(' ')) {
-      if (norm.includes(t)) {
+      const idx = norm.indexOf(t);
+      if (idx >= 0) {
+        const tail = norm.slice(idx + t.length);
+        if (TRAILING_CONTINUE_PATTERN.test(tail) || tail.includes('?')) {
+          return 'continue';
+        }
         return 'close';
       }
       continue;
     }
     const re = new RegExp(`(^|[^a-z])${t}([^a-z]|$)`, 'i');
-    if (re.test(norm)) {
+    const m = re.exec(norm);
+    if (m !== null) {
+      const tail = norm.slice(m.index + m[0].length);
+      if (TRAILING_CONTINUE_PATTERN.test(tail) || tail.includes('?')) {
+        return 'continue';
+      }
       return 'close';
     }
   }

@@ -628,3 +628,13 @@ async function sendBody(
   }
   return { failed: true, reason: `${r.endEvent}: ${r.reason ?? 'unknown'}` };
 }
+
+export const _internal = {
+  GREETING_RESPONSE,
+  AFFIRMATION_RESPONSE,
+  META_TEMPLATE,
+  PROFILE_ACK_TEMPLATE,
+  MEDIA_REJECT_TEMPLATE,
+  SAFE_TEMPLATE,
+  REJECT_TEMPLATE,
+};
