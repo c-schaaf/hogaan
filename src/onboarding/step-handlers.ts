@@ -69,8 +69,8 @@ export function handleGoalReply(
   const parsed = parseGoals(text);
   if (parsed === 'invalid') {
     if (attemptNumber >= PARSE_RETRY_LIMIT) {
-      // Apply default + flag for review.
-      const goals: GoalOption[] = ['Leadership confidence'];
+      // R14 default: integrity (foundational practice). Was 'Leadership confidence'.
+      const goals: GoalOption[] = ['integrity'];
       return {
         outboundBody: ROLE_PROMPT,
         newStep: 4,

@@ -1,5 +1,5 @@
-import type { GoalOption, RoleOption } from './types.js';
-import { GOAL_OPTIONS, ROLE_OPTIONS } from './types.js';
+import type { RoleOption } from './types.js';
+import { ROLE_OPTIONS } from './types.js';
 import type { PracticeTag } from '../shared/types/index.js';
 
 /**
@@ -97,81 +97,152 @@ function escapeRegex(s: string): string {
 }
 
 /**
- * Goal parser. Accepts:
- *   - `1` or `1, 3` or `1 and 3`
- *   - `leadership confidence` / `communication` / `conflict resolution` / `career growth`
- *   - Partial matches: `confidence`, `comms`, `conflict`, `career`
+ * Phase 12 R14 — 12-practice picker.
+ *
+ * Replaces the old 4-goal parser with a direct practice picker. Accepts:
+ *   - Single practice name (case-insensitive): "integrity", "Empathy"
+ *   - Multi-practice: "integrity, peace, humility" / "empathy and dignity"
+ *   - Level shorthand: "Self", "Team level" → expands to that level's 3
+ *     practices; "all of organization" → assets/innovation/prosperity
+ *   - "ALL" / "all twelve" / "everything" → all 12
+ *   - Fuzzy: Levenshtein-distance ≤ 2 against the 12 practice names
+ *     (handles "humilty" → humility, "empathty" → empathy)
  */
-const GOAL_KEYWORDS: Record<GoalOption, string[]> = {
-  'Leadership confidence': ['leadership', 'confidence', 'confident'],
-  Communication: ['communication', 'communicate', 'comms', 'speaking', 'feedback'],
-  'Conflict resolution': ['conflict', 'tension', 'disagreement', 'mediation', 'resolution'],
-  'Career growth': ['career', 'promotion', 'growth', 'next step', 'advance'],
+const ALL_PRACTICES: PracticeTag[] = [
+  'integrity',
+  'purpose',
+  'accountability',
+  'dignity',
+  'empathy',
+  'inclusion',
+  'assets',
+  'innovation',
+  'prosperity',
+  'humility',
+  'democracy',
+  'peace',
+];
+
+const LEVEL_TO_PRACTICES: Record<string, PracticeTag[]> = {
+  self: ['integrity', 'purpose', 'accountability'],
+  team: ['dignity', 'empathy', 'inclusion'],
+  organization: ['assets', 'innovation', 'prosperity'],
+  org: ['assets', 'innovation', 'prosperity'],
+  community: ['humility', 'democracy', 'peace'],
 };
 
-export interface GoalParseResult {
-  goals: GoalOption[];
-  /** Raw goals matched, deduplicated and order-preserved. */
+export interface PracticeParseResult {
+  practices: PracticeTag[];
   matchedAll: boolean;
 }
 
-export function parseGoals(text: string): GoalParseResult | 'invalid' {
-  const norm = normalize(text);
-  if (norm.length === 0) {
-    return 'invalid';
-  }
+export type GoalParseResult = PracticeParseResult & { goals: PracticeTag[] };
 
-  const matched = new Set<GoalOption>();
-
-  // Numeric tokens 1..4.
-  const nums = norm.match(/\b[1-4]\b/g);
-  if (nums !== null) {
-    for (const n of nums) {
-      const idx = Number.parseInt(n, 10) - 1;
-      const g = GOAL_OPTIONS[idx];
-      if (g !== undefined) {
-        matched.add(g);
-      }
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  if (m === 0) return n;
+  if (n === 0) return m;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array<number>(n + 1).fill(0));
+  for (let i = 0; i <= m; i += 1) dp[i]![0] = i;
+  for (let j = 0; j <= n; j += 1) dp[0]![j] = j;
+  for (let i = 1; i <= m; i += 1) {
+    for (let j = 1; j <= n; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i]![j] = Math.min(
+        dp[i - 1]![j]! + 1,
+        dp[i]![j - 1]! + 1,
+        dp[i - 1]![j - 1]! + cost,
+      );
     }
   }
-
-  // Keyword tokens.
-  for (const [goal, keywords] of Object.entries(GOAL_KEYWORDS) as [GoalOption, string[]][]) {
-    if (keywords.some((k) => norm.includes(k))) {
-      matched.add(goal);
-    }
-  }
-
-  if (matched.size === 0) {
-    return 'invalid';
-  }
-  return { goals: [...matched], matchedAll: matched.size === GOAL_OPTIONS.length };
+  return dp[m]![n]!;
 }
 
-/** Map goals to twelve practices. PRD §7 §3 affinity. */
-export function goalsToPractices(goals: GoalOption[]): PracticeTag[] {
-  const practices = new Set<PracticeTag>();
-  for (const g of goals) {
-    switch (g) {
-      case 'Leadership confidence':
-        practices.add('integrity');
-        practices.add('purpose');
-        break;
-      case 'Communication':
-        practices.add('dignity');
-        practices.add('empathy');
-        break;
-      case 'Conflict resolution':
-        practices.add('empathy');
-        practices.add('peace');
-        break;
-      case 'Career growth':
-        practices.add('accountability');
-        practices.add('purpose');
-        break;
+export function parsePractices(text: string): PracticeParseResult | 'invalid' {
+  const norm = normalize(text);
+  if (norm.length === 0) return 'invalid';
+
+  // ALL / everything
+  if (
+    /\b(all|all twelve|all 12|everything|every practice)\b/.test(norm) &&
+    !/\bnot all\b/.test(norm)
+  ) {
+    return { practices: [...ALL_PRACTICES], matchedAll: true };
+  }
+
+  const matched = new Set<PracticeTag>();
+
+  // Level shorthand
+  for (const [lvl, practices] of Object.entries(LEVEL_TO_PRACTICES)) {
+    const levelRe = new RegExp(`(^|[^a-z])${lvl}( level| practices| ones|$|[^a-z])`);
+    if (levelRe.test(norm)) {
+      for (const p of practices) matched.add(p);
     }
   }
-  return [...practices];
+
+  // Tokenize comma/and/whitespace-separated input. (normalize already
+  // turned commas into spaces, so we split on whitespace + 'and'.)
+  const tokens = norm
+    .split(/\s+|;|\band\b/)
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+
+  for (const tok of tokens) {
+    // Direct match
+    const direct = ALL_PRACTICES.find((p) => p === tok);
+    if (direct !== undefined) {
+      matched.add(direct);
+      continue;
+    }
+    // Substring match (contains the practice as a word)
+    const sub = ALL_PRACTICES.find((p) => tok.includes(p));
+    if (sub !== undefined) {
+      matched.add(sub);
+      continue;
+    }
+    // Fuzzy: Levenshtein within 2 against any practice
+    let best: { p: PracticeTag; d: number } | null = null;
+    for (const p of ALL_PRACTICES) {
+      const d = levenshtein(tok, p);
+      if (d <= 2 && (best === null || d < best.d)) {
+        best = { p, d };
+      }
+    }
+    if (best !== null) {
+      matched.add(best.p);
+    }
+  }
+
+  if (matched.size === 0) return 'invalid';
+  return {
+    practices: [...matched],
+    matchedAll: matched.size === ALL_PRACTICES.length,
+  };
+}
+
+/**
+ * Backwards-compat shim — previous callers used parseGoals(...).goals.
+ * parsePractices returns .practices; this wrapper aliases.
+ */
+export function parseGoals(text: string): GoalParseResult | 'invalid' {
+  const r = parsePractices(text);
+  if (r === 'invalid') return 'invalid';
+  return { ...r, goals: r.practices };
+}
+
+/**
+ * Phase 12 R14 — identity transform. The previous 4-goal taxonomy mapped
+ * 4 buckets → 12 practices via a switch. With the 12-practice picker the
+ * user already chose practice tags directly; "to profile" is identity.
+ */
+export function practicesToProfile(practices: PracticeTag[]): PracticeTag[] {
+  return [...new Set(practices)];
+}
+
+/** Backwards-compat alias. */
+export function goalsToPractices(goals: PracticeTag[]): PracticeTag[] {
+  return practicesToProfile(goals);
 }
 
 /**

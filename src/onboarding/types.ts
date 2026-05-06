@@ -4,14 +4,32 @@ import type { OnboardingEndEvent } from './end-events.js';
 /** Per Process #1 §Resume Router: the 6 entry-point steps (0=fresh start). */
 export type LastCompletedStep = 0 | 2 | 3 | 4 | 5 | 6 | 7;
 
-/** Goals offered in Step 4. Numbered 1–4 in the prompt; mapped to 12 practices. */
-export const GOAL_OPTIONS = [
-  'Leadership confidence',
-  'Communication',
-  'Conflict resolution',
-  'Career growth',
+/**
+ * Phase 12 R14 — 12-practice picker.
+ *
+ * The previous 4-goal taxonomy lost information at the 4→12 mapping. v2
+ * shows all 12 practices upfront. PracticeOption is an alias for
+ * PracticeTag (the canonical 12-element enum from PRD §7).
+ */
+export type PracticeOption = PracticeTag;
+
+// Backwards compatibility — kept until R20-line callers migrate.
+// GoalOption is now an alias of PracticeOption.
+export type GoalOption = PracticeOption;
+export const GOAL_OPTIONS: readonly PracticeOption[] = [
+  'integrity',
+  'purpose',
+  'accountability',
+  'dignity',
+  'empathy',
+  'inclusion',
+  'assets',
+  'innovation',
+  'prosperity',
+  'humility',
+  'democracy',
+  'peace',
 ] as const;
-export type GoalOption = (typeof GOAL_OPTIONS)[number];
 
 /** Roles offered in Step 5. Single-select. */
 export const ROLE_OPTIONS = ['Student', 'Professional', 'Leader'] as const;
