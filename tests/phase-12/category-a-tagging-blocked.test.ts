@@ -23,7 +23,6 @@ describe('Phase 12 — Category A: Tagging accuracy (BLOCKED on keyword signoff)
   it.todo('T11: "same three voices DOMINATE every decision" → democracy / community');
   it.todo('T15: "Monday standup so it does not feel like a status update" → team');
   it.todo('T16: "I do not trust my number two anymore" → team (verify substring match)');
-  it.todo('T17: "Our company values are written down but no one acts on them" → organization');
   it.todo(
     'T18: "Engineering and Product hate each other." → organization (current: self fallback)',
   );

@@ -164,4 +164,27 @@ describe('Phase 12 — Category A: Tagging accuracy (green subset)', () => {
       },
     );
   });
+
+  it('T17 (regression-lock): "Our company values are written down..." → organization', async () => {
+    await withVoiceFidelityEvidence(
+      {
+        testId: 'phase-12/voice-fidelity/T17-company-values',
+        controlId: 'T5.VoiceFidelity.T17_CompanyValues',
+        tier: 'T5',
+        description:
+          'Regression lock: passes against existing code without source change. "company" already routes to LEVEL_KEYWORDS.organization; practice falls back to integrity which satisfies pptx "integrity or accountability" set.',
+        details: {
+          disposition: 'regression-lock',
+          note: 'passed against existing code without source change',
+        },
+      },
+      () => {
+        const r = tagPracticeAndLevel(
+          'Our company values are written down but no one acts on them.',
+        );
+        expect(r.levelTag).toBe('organization');
+        expect(['integrity', 'accountability']).toContain(r.practiceTag);
+      },
+    );
+  });
 });
