@@ -74,3 +74,23 @@
 - I did not find an infinite-loop risk in the QC corrective loop. `MAX_RETRIES = 3` is enforced, every iteration has a bounded-exit return path, and regenerate failures terminate the loop with E6_ServiceUnavailable.
 - I did not find a code path where an opted-out user's `users.status` could be silently overwritten to `onboarded` after STOP. The `recordOptOut` write at [opt-out.ts:69](src/onboarding/opt-out.ts#L69) is unconditional.
 - I could not verify production-trace fidelity (the screenshot-bug root causes are inferred from code paths, not from production logs). The screenshot timestamps anchor the symptoms; the *exact* failure mode for each instance would require trace-level evidence I don't have access to in this run.
+
+## Batch B closure status (2026-05-07)
+
+Branch: `fix/batch-b-orchestrator-structural`. 5 commits, suite at 669 passed / 3 todo / 0 failed.
+
+| Risk | Severity | Status | Test file | Source change | Commit | Evidence |
+|---|---|---|---|---|---|---|
+| R-04 | CRITICAL | PASS | [tests/coaching/orchestrator-prompt-assembly-failure.test.ts](tests/coaching/orchestrator-prompt-assembly-failure.test.ts) | [src/coaching/orchestrator.ts](src/coaching/orchestrator.ts) Step 8 wrapped in try/catch; PromptAssemblyError → finalize E11 + sendBody(FALLBACK_DEGRADED). Unknown errors rethrow. | `cbb1759` | `audit-evidence/phase-12/2026-05-06-audit-r-04-prompt-assembly-failure-handled.json` + `…unknown-error-rethrown.json` |
+| R-01 | HIGH | PASS | [tests/coaching/orchestrator-short-circuit-session-guard.test.ts](tests/coaching/orchestrator-short-circuit-session-guard.test.ts) | [src/coaching/orchestrator.ts](src/coaching/orchestrator.ts) Step 4: Greeting fires only when `session.isNew`; Affirmation fires only when `!session.isNew && turnCount > 0`. Existing [tests/coaching/short-circuit-intents.test.ts](tests/coaching/short-circuit-intents.test.ts) updated. | `1d28ec4` | 4 evidence rows under `audit-evidence/phase-12/2026-05-06-audit-r-01-*.json` |
+| R-02 | HIGH | PASS | [tests/coaching/triage.test.ts](tests/coaching/triage.test.ts) (extended) + [tests/coaching/__snapshots__/triage.test.ts.snap](tests/coaching/__snapshots__/triage.test.ts.snap) | [src/coaching/triage.ts](src/coaching/triage.ts) classifier prompt extracted as `TRIAGE_SYSTEM_PROMPT` constant; Greeting line lists "how are you" / "how was your day" / "hope you're well" / "what's up" as Coaching, NOT Greeting. Affirmation tightened to "never the *opening* of a session." | `67d4f97` | 5 new tests + snapshot drift trip-wire |
+| R-12 | HIGH | PASS | [tests/whatsapp-delivery/queue-processor-no-unhandled-throws.test.ts](tests/whatsapp-delivery/queue-processor-no-unhandled-throws.test.ts) | None — consequence test only. Locks the post-R-04 contract: clean resolve → no dead-letter; TypeError → still dead-letters (negative control). | `36bff4f` | (regression lock — no per-risk JSON beyond R-04's) |
+
+**Production-symptom regression locks:**
+
+- Bug 1 (greeting reuse mid-session) — R-01 tests 1+2 + existing `tests/coaching/short-circuit-intents.test.ts` updates.
+- Bug 2 ("how are u today?" → greeting) — R-02 prompt-content assertions + snapshot.
+- Bug 4 root cause (T9 silent failure on PromptAssemblyError) — R-04 test 1.
+- Bug 3 (FALLBACK_DEGRADED on real coaching) — partially covered by R-04 test 1; live root-cause analysis of the QC service-unavailable path is a separate Batch C/D concern.
+
+**Outstanding from this audit (not closed in Batch B):** R-03, R-05, R-06, R-07, R-08, R-09, R-10, R-11, R-13, R-14, R-15, R-16, R-17, R-18, R-19, R-20, R-21, R-22, R-23. See "Recommended audit-to-TDD batches" section above for grouping. **R-05 (CRITICAL — emotional-distress crisis-adjacency) and R-13 (CRITICAL — Tier-B not in CI) remain open as the Phase A blockers.**
