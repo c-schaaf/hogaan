@@ -27,4 +27,24 @@ describe('decideContinuation', () => {
     expect(decideContinuation('see you')).toBe('close');
     expect(decideContinuation('see ya')).toBe('close');
   });
+
+  it('Phase 12 R22 — natural acknowledgment endings close', () => {
+    expect(decideContinuation('thanks, that helps')).toBe('close');
+    expect(decideContinuation('appreciate it')).toBe('close');
+    expect(decideContinuation('noted')).toBe('close');
+    expect(decideContinuation("that's helpful")).toBe('close');
+    expect(decideContinuation("I'll think about it")).toBe('close');
+    expect(decideContinuation("that's all for now")).toBe('close');
+    expect(decideContinuation('enough for today')).toBe('close');
+    expect(decideContinuation('good to know')).toBe('close');
+    expect(decideContinuation('got it thanks')).toBe('close');
+  });
+
+  it('Phase 12 R22 — "helpful, but..." continues (not close)', () => {
+    expect(decideContinuation('helpful, but I have another question')).toBe('continue');
+  });
+
+  it('Phase 12 R22 — "annotated" does NOT trip "noted" (word boundary)', () => {
+    expect(decideContinuation('I annotated the document')).toBe('continue');
+  });
 });
