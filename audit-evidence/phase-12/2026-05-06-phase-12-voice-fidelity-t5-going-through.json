@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-06T19:49:30.985Z",
+  "testId": "phase-12/voice-fidelity/T5-going-through",
+  "controlId": "T5.VoiceFidelity.T5_GoingThrough",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Personal-life challenge affecting work → empathy practice via \"going through\" keyword.",
+  "phase": "phase-12"
+}

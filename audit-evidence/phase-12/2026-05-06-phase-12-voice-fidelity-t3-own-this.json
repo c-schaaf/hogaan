@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-06T19:49:30.978Z",
+  "testId": "phase-12/voice-fidelity/T3-own-this",
+  "controlId": "T5.VoiceFidelity.T3_OwnThis",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Explicit \"own this\" + missed deadline → accountability practice.",
+  "phase": "phase-12"
+}
