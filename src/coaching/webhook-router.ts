@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { handleOnboardingMessage } from '../onboarding/index.js';
+import { OPT_OUT_CONFIRMATION } from '../onboarding/messages.js';
+import { isOptOutMessage, recordOptOut } from '../onboarding/opt-out.js';
 import { resolveIdentity, type IdentityResult } from '../identity/index.js';
 import { reportP1, reportP2 } from '../incident-handling/index.js';
 import { hashPhone } from '../shared/db/encryption.js';
@@ -9,8 +11,14 @@ import type { Database, SqlClient } from '../shared/db/client.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
-import { asPhoneE164, asUserId, type UserId } from '../shared/types/index.js';
+import {
+  asCorrelationId,
+  asPhoneE164,
+  asUserId,
+  type UserId,
+} from '../shared/types/index.js';
 import type { TraceEmitter } from '../shared/trace/index.js';
+import { sendOutbound } from '../whatsapp-delivery/orchestrator.js';
 import { runCoachingTurn } from './orchestrator.js';
 import type { CoachingTurnResult } from './types.js';
 import type { OnboardingResult } from '../onboarding/types.js';
@@ -37,6 +45,7 @@ export interface InboundWebhookEvent {
 export type RouteOutcome =
   | { kind: 'coaching'; result: CoachingTurnResult }
   | { kind: 'onboarding'; result: OnboardingResult }
+  | { kind: 'opted_out'; reason: string }
   | { kind: 'noop'; reason: string };
 
 /**
@@ -123,6 +132,55 @@ export async function routeInboundMessage(
   // Step 2: write inbound row to message_log so subsequent outbound passes
   // the 24h customer-service-window check.
   await writeInboundLog(deps.db, userId, event);
+
+  // Phase 12 R17 — global STOP keyword. Honored at webhook-router scope so
+  // it fires for ALL inbound regardless of user state (onboarded, mid-onboarding,
+  // mid-scenario, etc). The onboarding orchestrator's own isOptOutMessage check
+  // remains as defense-in-depth.
+  if (isOptOutMessage(event.body)) {
+    try {
+      await recordOptOut(deps.db, deps.redis, userId, phoneHash);
+    } catch (err) {
+      reportP1(
+        'global opt-out: recordOptOut failed',
+        {
+          source: 'Process_2.WebhookRouter.OptOut',
+          extra: { userId, traceId: event.traceId },
+        },
+        err,
+      );
+    }
+    try {
+      await sendOutbound(
+        {
+          config: deps.config,
+          db: deps.db,
+          redis: deps.redis,
+          rateLimiters: deps.rateLimiters,
+          ownerId: 'opt-out',
+        },
+        {
+          correlationId: asCorrelationId(`optout-${event.inboundMessageSid}-${randomUUID().slice(0, 6)}`),
+          callerProcessId: 'webhook-router:opt-out',
+          phoneE164: asPhoneE164(event.fromE164),
+          userId,
+          messageType: 'FreeForm',
+          priority: 'High',
+          body: OPT_OUT_CONFIRMATION,
+        },
+      );
+    } catch (err) {
+      reportP2(
+        'global opt-out: confirmation send failed (non-fatal)',
+        {
+          source: 'Process_2.WebhookRouter.OptOut',
+          extra: { userId, traceId: event.traceId },
+        },
+        err,
+      );
+    }
+    return { kind: 'opted_out', reason: 'global stop keyword' };
+  }
 
   // Step 3: route by status. New users + resumes → onboarding. Onboarded
   // (E1 with status='onboarded') → coaching.
