@@ -1,10 +1,11 @@
 import formbody from '@fastify/formbody';
 import type { FastifyInstance } from 'fastify';
-import { routeInboundMessage } from '../coaching/webhook-router.js';
+import { reportP1 } from '../incident-handling/index.js';
 import type { Database, SqlClient } from '../shared/db/client.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { TraceEmitter } from '../shared/trace/index.js';
+import { claimInboundMessage, enqueueInbound, processInboundFromQueue } from './queue-processor.js';
 import {
   parseInboundMessage,
   parseStatusCallback,
@@ -70,37 +71,78 @@ export async function registerWhatsAppRoutes(
       'twilio inbound received',
     );
 
-    // Phase 7: dispatch through identity → onboarding/coaching. The webhook
-    // returns 204 immediately after the routing call so Twilio doesn't retry;
-    // any internal errors are reported as P1 incidents but never bubble to
-    // Twilio. Outbound replies are dispatched separately by the
-    // orchestrator via Process #11.
+    // Phase 11 R11 — webhook ack is decoupled from pipeline execution.
+    //
+    // Synchronous work in the request path (must complete before 204):
+    //   1. Twilio signature verify (above) — failure is 403, not 204.
+    //   2. Parse the inbound payload (above).
+    //   3. Idempotency claim via Redis SETNX. Re-deliveries of the same
+    //      MessageSid are dropped silently — Twilio retries on 5xx, but
+    //      we don't want to double-process.
+    //   4. Enqueue the payload for the background processor.
+    //
+    // The background processor (queue-processor.ts) runs the existing
+    // routeInboundMessage pipeline asynchronously. Twilio gets its 204
+    // in single-digit ms, regardless of LLM latency. Errors from the
+    // processor land in a dead-letter queue (R22).
+    let claimed = false;
     try {
-      const outcome = await routeInboundMessage(
-        {
-          config: app.config,
-          db: opts.db,
-          sql: opts.sql,
-          redis: opts.redis,
-          rateLimiters: opts.rateLimiters,
-          traceEmitter: opts.traceEmitter,
-        },
-        {
-          fromE164: event.fromE164,
-          body: event.body,
-          mediaUrls: event.mediaUrls,
-          inboundMessageSid: event.waMessageId,
-          receivedAt: event.receivedAt,
-          traceId: req.id,
-        },
-      );
-      req.log.info(
-        { outcome: outcome.kind, reason: 'reason' in outcome ? outcome.reason : undefined },
-        'inbound webhook routed',
-      );
+      claimed = await claimInboundMessage(opts.redis, event.waMessageId);
     } catch (err) {
-      req.log.error({ err }, 'inbound webhook routing failed');
+      reportP1(
+        'inbound idempotency claim failed; dropping payload to avoid double-process',
+        {
+          source: 'inbound_webhook',
+          tags: { inboundMessageSid: event.waMessageId, traceId: req.id },
+        },
+        err,
+      );
+      // Fail-closed: don't queue if we can't claim — Twilio will retry,
+      // and we'd rather skip than risk double-processing on a stale claim.
+      return reply.code(204).send();
     }
+    if (!claimed) {
+      req.log.info(
+        { waMessageId: event.waMessageId },
+        'inbound webhook duplicate (already claimed); ignoring',
+      );
+      return reply.code(204).send();
+    }
+
+    try {
+      await enqueueInbound(opts.redis, {
+        inboundMessageSid: event.waMessageId,
+        fromE164: event.fromE164,
+        body: event.body,
+        mediaUrls: event.mediaUrls,
+        receivedAtIso: event.receivedAt.toISOString(),
+        traceId: req.id,
+      });
+    } catch (err) {
+      reportP1(
+        'inbound enqueue failed; payload dropped',
+        {
+          source: 'inbound_webhook',
+          tags: { inboundMessageSid: event.waMessageId, traceId: req.id },
+        },
+        err,
+      );
+      return reply.code(204).send();
+    }
+
+    // Kick the background processor. Fire-and-forget; the processor is
+    // bounded by an internal concurrency limiter so a burst can't
+    // overwhelm the LLM API.
+    setImmediate(() => {
+      void processInboundFromQueue({
+        config: app.config,
+        db: opts.db,
+        sql: opts.sql,
+        redis: opts.redis,
+        rateLimiters: opts.rateLimiters,
+        traceEmitter: opts.traceEmitter,
+      });
+    });
 
     return reply.code(204).send();
   });

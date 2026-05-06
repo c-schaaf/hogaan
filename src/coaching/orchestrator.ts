@@ -16,6 +16,7 @@ import { chat } from '../shared/llm/chat.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
+import { BRAND_FRAMEWORK_ATTRIBUTION } from '../shared/brand/constants.js';
 import { hashPhone } from '../shared/db/encryption.js';
 import { emitTurnTrace, type TraceEmitter } from '../shared/trace/index.js';
 import { asCorrelationId, type LevelTag, type PracticeTag } from '../shared/types/index.js';
@@ -38,9 +39,14 @@ interface CoachingDeps {
 
 const SAFE_TEMPLATE = `That topic isn't something I can help with from a coaching seat. If it's a leadership challenge underneath, tell me what's at stake for your team and I'll meet you there.`;
 const REJECT_TEMPLATE = `That message lands outside what I can help with. If you have a leadership challenge — a hard conversation, a stuck team, a decision under pressure — that's where I'm built to be useful.`;
-const META_TEMPLATE = `I'm Hogaan — a coaching presence anchored in Hamse Warfa's twelve-practice framework. I'm an AI built around his voice, sponsor-funded for users in the Horn of Africa. I work text-only for now: send me a leadership challenge and I'll respond.`;
+const META_TEMPLATE = `I'm Hogaan — a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION}. I'm an AI built around his voice, sponsor-funded for users in the Horn of Africa. I work text-only for now: send me a leadership challenge and I'll respond.`;
 const PROFILE_ACK_TEMPLATE = `Heard. I've noted that update — I'll show up with it in mind next time. Send a leadership question whenever you're ready.`;
 const MEDIA_REJECT_TEMPLATE = `I work with text only for now. Type out what's on your mind and I'll respond.`;
+// R16 — short-circuit templates for low-content intents. Each ≤80 words,
+// no LLM, no prompt assembly, no QC. Cuts the per-turn cost on greetings
+// and affirmations to a single Twilio send.
+const GREETING_RESPONSE = `Salaam. I'm Hogaan, here when you have a leadership challenge to think through — a hard conversation, a stuck team, a decision under pressure. Tell me what's on your mind.`;
+const AFFIRMATION_RESPONSE = `Glad it landed. I'm here when the next thing surfaces.`;
 
 /**
  * Process #2 — Coaching Conversation orchestrator. Implements the full BPMN.
@@ -145,6 +151,12 @@ export async function runCoachingTurn(
   }
 
   // ---- Step 4: intent router (sub-flows for non-coaching intents) ----
+  // R16 — Greeting / Affirmation / MetaQuestion / ProfileUpdate are templated
+  // short-circuits. They never hit the tagger, prompt assembly, or the LLM,
+  // so a "hi" or "thanks" costs roughly nothing per turn (Twilio send only).
+  // The previous behavior ran the full coaching pipeline on greetings, which
+  // (a) wasted the latency budget and (b) regularly produced robotic
+  // pseudo-coaching replies to "salaam" — both audit findings.
   if (intent === 'MetaQuestion') {
     return await runTemplatedResponse(
       deps,
@@ -167,10 +179,30 @@ export async function runCoachingTurn(
       t0,
     );
   }
+  if (intent === 'Greeting') {
+    return await runTemplatedResponse(
+      deps,
+      inbound,
+      session.sessionId,
+      GREETING_RESPONSE,
+      'greeting',
+      'E1_TurnCompleted',
+      t0,
+    );
+  }
+  if (intent === 'Affirmation') {
+    return await runTemplatedResponse(
+      deps,
+      inbound,
+      session.sessionId,
+      AFFIRMATION_RESPONSE,
+      'affirmation',
+      'E1_TurnCompleted',
+      t0,
+    );
+  }
 
-  // Greeting / Affirmation / ClarificationResponse / Coaching all share the
-  // main coaching path. v1 doesn't differentiate behavior; Phase 8/9 may
-  // tune (e.g., Greeting → shorter response).
+  // ClarificationResponse / Coaching share the main coaching path.
 
   // ---- Step 5: parallel context fetch --------------------------------
   const ctx = await fetchCoachingContext(
@@ -209,7 +241,11 @@ export async function runCoachingTurn(
         systemPrompt: promptBundle.assembledPrompt,
         messages: [{ role: 'user', content: inbound.body }],
         maxTokens: 512,
-        temperature: 0.4,
+        // R15 — was 0.4. The audit found 0.4 produced too much variation
+        // run-to-run on the same input, hurting voice consistency. 0.3
+        // tightens the distribution while leaving enough headroom that
+        // responses don't read as canned.
+        temperature: 0.3,
       },
       SAFE_TEMPLATE,
     );
@@ -316,6 +352,9 @@ export async function runCoachingTurn(
       intent,
       practiceTag: tags.practiceTag,
       levelTag: tags.levelTag,
+      secondaryPracticeTag: tags.secondaryPracticeTag,
+      secondaryLevelTag: tags.secondaryLevelTag,
+      taggerConfidence: tags.confidence,
       responseMode: 'FullCoachingResponse',
       modelUsed: chatResp.modelUsed,
       fallbackPath: chatResp.fallbackPath,

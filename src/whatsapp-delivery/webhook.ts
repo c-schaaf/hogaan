@@ -156,6 +156,11 @@ export async function reconcileStatus(
     return { applied: false, status: existing.currentStatus, endEvent: null };
   }
 
+  // R20 contract — ranks are STRICTLY monotonic: same-rank is a no-op
+  // (e.g. duplicate `delivered` webhooks must not re-fire E4); lower-rank
+  // is dropped (e.g. an out-of-order `sent` after `delivered`). This is
+  // the regression bug we got bitten by in Phase 11 audit — "<" instead
+  // of "<=" would cause duplicate terminal end-event emission.
   if (incomingRank <= currentRank) {
     return { applied: false, status: existing.currentStatus, endEvent: null };
   }

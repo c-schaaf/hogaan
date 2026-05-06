@@ -6,3 +6,7 @@ pnpm-lock.yaml
 *.bpmn
 docs/
 CLAUDE.md
+# Auto-generated audit evidence — JSON shape is fixed by the generator
+# (JSON.stringify with 2-space indent), not by prettier. Generator is
+# the source of truth.
+audit-evidence/

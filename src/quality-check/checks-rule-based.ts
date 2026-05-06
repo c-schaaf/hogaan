@@ -142,4 +142,54 @@ function countWords(text: string): number {
     .filter((w) => w.length > 0).length;
 }
 
+/**
+ * Phase 11 R39 — Voice Rule 11 (formatting discipline).
+ *
+ * WhatsApp does NOT render markdown headers (## / ###); they show up as
+ * literal text. WhatsApp DOES render *bold*, but multiple bolds turn the
+ * response into visual noise that undermines the "warm and pragmatic" voice.
+ *
+ * Hard caps enforced:
+ *   - boldCount  ≤ 1   (the key insight, not a list)
+ *   - headerCount === 0
+ *   - bulletLineCount === 0  (no leading "- " or "* " lines)
+ *
+ * Soft-fail when violated. The QC retry loop gets one chance to fix; if it
+ * regresses again the response is degraded but still delivered (Voice Rule
+ * violations are not safety-critical).
+ */
+export function checkFormattingDiscipline(candidate: string): CheckResult {
+  const headerCount = (candidate.match(/^#{1,6}\s/gm) ?? []).length;
+  // WhatsApp bold is *...* (single asterisk pair). Markdown bold (**...**)
+  // is also flagged — it renders as visual noise on WhatsApp regardless.
+  // Match either form, conservatively: any pair of *...* containing
+  // at least one non-* character.
+  const boldMatches = candidate.match(/\*+[^*\n]+\*+/g) ?? [];
+  const boldCount = boldMatches.length;
+  const bulletLineCount = (candidate.match(/^[ \t]*[-*]\s+\S/gm) ?? []).length;
+
+  const violations: string[] = [];
+  if (headerCount > 0) {
+    violations.push(`${headerCount} markdown header(s) (max 0)`);
+  }
+  if (boldCount > 1) {
+    violations.push(`${boldCount} bold segment(s) (max 1)`);
+  }
+  if (bulletLineCount > 0) {
+    violations.push(`${bulletLineCount} bullet-list line(s) (max 0)`);
+  }
+
+  let outcome: CheckOutcome;
+  if (violations.length === 0) {
+    outcome = { status: 'pass' };
+  } else {
+    outcome = {
+      status: 'soft_fail',
+      reason: `formatting discipline violated: ${violations.join('; ')}`,
+    };
+  }
+
+  return { checkId: 'check_11_formatting_discipline', outcome };
+}
+
 export const _internal = { LENGTH_RANGES, countWords };

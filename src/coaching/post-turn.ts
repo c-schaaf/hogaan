@@ -37,6 +37,12 @@ export interface PostTurnInput {
   intent: string;
   practiceTag: PracticeTag | null;
   levelTag: LevelTag | null;
+  /** Phase 11 R17 — runner-up tags + tagger confidence. NULL on
+   *  short-circuit paths (Greeting/Affirmation/MetaQuestion/ProfileUpdate)
+   *  where the tagger never ran. */
+  secondaryPracticeTag?: PracticeTag | null;
+  secondaryLevelTag?: LevelTag | null;
+  taggerConfidence?: number | null;
   responseMode: ResponseMode;
   modelUsed: string;
   fallbackPath: string;
@@ -81,6 +87,15 @@ export async function persistPostTurn(
           intent: input.intent,
           ...(input.practiceTag !== null ? { practiceTag: input.practiceTag } : {}),
           ...(input.levelTag !== null ? { levelTag: input.levelTag } : {}),
+          ...(input.secondaryPracticeTag !== undefined && input.secondaryPracticeTag !== null
+            ? { secondaryPracticeTag: input.secondaryPracticeTag }
+            : {}),
+          ...(input.secondaryLevelTag !== undefined && input.secondaryLevelTag !== null
+            ? { secondaryLevelTag: input.secondaryLevelTag }
+            : {}),
+          ...(input.taggerConfidence !== undefined && input.taggerConfidence !== null
+            ? { taggerConfidence: input.taggerConfidence.toFixed(3) }
+            : {}),
           responseMode: input.responseMode,
           modelUsed: input.modelUsed,
           fallbackPath: input.fallbackPath,

@@ -26,6 +26,7 @@ import {
 import { loadCrisisCategoryCounts, loadQcSummary } from './aggregation/qc.js';
 import { isSuppressed } from './aggregation/privacy.js';
 import type { Segment } from './aggregation/privacy.js';
+import { BRAND_TAGLINE } from '../shared/brand/constants.js';
 import { cohorts } from '../shared/db/schema/cohorts.js';
 import type { Database } from '../shared/db/client.js';
 import type { RedisBundle } from '../shared/redis/client.js';
@@ -363,7 +364,13 @@ async function renderPage(
   }
   const innerData: Record<string, unknown> = { ...data, session };
   const innerHtml = renderInner(template, innerData);
-  const fullData = { ...data, body: innerHtml, session, active };
+  const fullData = {
+    ...data,
+    body: innerHtml,
+    session,
+    active,
+    brandTagline: BRAND_TAGLINE,
+  };
   return replyWithView.view('layout.eta', fullData);
 }
 

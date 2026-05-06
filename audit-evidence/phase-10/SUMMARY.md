@@ -222,6 +222,92 @@ Output files land in `audit-evidence/phase-10/`. Each filename is
 
 ---
 
+## Phase 11 — Targeted audit mitigations (2026-05-06)
+
+A 13-risk targeted-mitigation batch landed on branch
+`phase-11-audit-mitigations`. Each risk = one commit; CI gates green;
+no scope creep into adjacent code.
+
+### Risk → commit map (one commit per risk, no squash)
+
+| Audit risk | Commit  | What changed                                                                                                          | Tier  |
+| ---------- | ------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
+| **R11**    | 92b44a2 | Inbound webhook decoupled from pipeline. SETNX claim → LPUSH → setImmediate(process) → 204. Tests assert <200ms ack.  | T2/T4 |
+| **R22**    | 108be0b | Bounded dead-letter queue (LTRIM 1000) + scripts/inspect-dead-letter.ts ops triage script. Dedicated failure tests.   | T2    |
+| **R19**    | c163c8c | Audit-log fail-closed contract pinned with 5 explicit tests (CLAUDE.md hard rule #4).                                 | T1/T3 |
+| **R20**    | 02c7e97 | reconcileStatus rank-monotonic regression — 9 cases pin same-rank no-op + out-of-order drop + terminal-positive wins. | T2    |
+| **R16**    | 2109743 | Greeting + Affirmation short-circuit before prompt assembly. Eliminates ~3-4s/turn LLM cost on bare greetings.        | T4    |
+| **R32**    | 7de9562 | Per-Intent length bands (Greeting 10-80, Coaching 150-300, etc.) + checkIntentLength.                                 | T2    |
+| **R36**    | 86fbcfb | Canonical brand strings — `BRAND_FRAMEWORK_NAME`, `BRAND_TAGLINE`, `BRAND_FRAMEWORK_ATTRIBUTION`.                      | n/a   |
+| **R37**    | 7254572 | Tagline rendered in onboarding welcome + sponsor portal header/footer chrome.                                         | n/a   |
+| **R40**    | 28df3b7 | Cultural framing v2 DRAFT — adds Framing 16 (Xil) alongside the existing 15. Hamse signoff pending.                   | T5    |
+| **R39**    | 530763a | Voice rule 11 (formatting discipline) + runtime checkFormattingDiscipline. Voice rules v2 DRAFT.                      | T5    |
+| **R33**    | a7d6921 | checkLivedExperienceDiscipline (Voice Rule 6) — 0/1/2 score; flags credential-without-insight.                        | T5    |
+| **R34**    | 078d5c1 | checkTangibleAction — flags rhetorical-filler endings (no concrete next-step).                                        | T5    |
+| **R17**    | 96e2a2f | Tagger emits primary + secondary + confidence. drizzle/0005 adds three turns columns (NULLABLE; backfill OOS).        | T2    |
+| **R15**    | a9463f8 | Primary LLM temperature 0.4 → 0.3 + checkVoiceConsistency (cosine vs voice-rules positives centroid; threshold 0.65). | T5    |
+
+Plus one CI fix and one prettier cleanup commit:
+
+| Commit  | What changed                                                                                       |
+| ------- | -------------------------------------------------------------------------------------------------- |
+| c1683e4 | `audit-evidence/` excluded from prettier — auto-generated artifacts; resolves pre-existing CI red. |
+| 0965673 | `prettier --write` on three phase-11 files that landed with line-wrap inconsistencies.             |
+
+### Test count and gates
+
+| Metric             | Before   | After   |
+| ------------------ | -------- | ------- |
+| Total tests        | 415      | 489     |
+| New phase-11 tests | n/a      | 74      |
+| `pnpm typecheck`   | clean    | clean   |
+| `pnpm test`        | clean    | clean   |
+| `pnpm lint`        | RED      | clean   |
+
+### Latency profile
+
+R11 + R16 are the load-bearing latency wins. The profile-latency harness
+makes real LLM calls (~$0.50/run) and is gated on ops approval — it has
+NOT been re-run as part of this batch. Expected p99 movement:
+
+- **R11 (webhook decouple)**: Twilio webhook ack drops from waiting on the
+  full pipeline (LLM-bound, p99 ~5-7s) to single-digit ms. The
+  webhook-decouple test asserts <200ms even under a 10-second mocked
+  pipeline. Removes a class of Twilio-retry duplicates.
+- **R16 (greeting/affirmation short-circuit)**: Per-turn p99 for these
+  intent classes drops from ~3-4s (LLM + QC) to ~Twilio-send only
+  (≤500ms in-test). Won't move overall p99 since coaching turns dominate
+  the tail; will move *median* meaningfully.
+
+Ops should re-run `pnpm exec tsx scripts/profile-latency.ts --concurrency 20`
+on a representative environment after this branch merges to confirm
+the p99 budget (≤6000ms) holds.
+
+### Audit findings adjusted
+
+- **Closed**: R11, R22, R19, R20, R16, R32, R36, R37, R39 (runtime check),
+  R33, R34, R17 (schema + tagger fields), R15.
+- **Partially closed (signoff blocked)**: R39 + R40 v2 library publish.
+  Engineering scaffolding is in place (cultural-framing-v2.ts,
+  voice-rules-v2.ts) but the `[DRAFT — Hamse to confirm]` example
+  phrasings must be replaced before promotion to live.
+- **Explicitly out-of-scope**: R17 backfill of existing `turns` rows.
+  Phase 11 ships the new columns NULLABLE; a follow-up batch job will
+  populate `tagger_confidence` for historical rows.
+
+### Decisions requiring Hamse / Muhsin
+
+1. **Hamse**: provide final `examplePhrasings` for Framing 16 (Xil) and
+   for Voice Rule 11 (formatting discipline). Both currently flagged
+   `[DRAFT — Hamse to confirm]`. Once provided, library publish is a
+   small follow-up commit.
+2. **Hamse**: confirm the Xil gloss "duty/obligation that comes with role"
+   — or refine toward "trust given, debt owed".
+3. **Muhsin / ops**: schedule a `profile-latency.ts --concurrency 20`
+   run on the merged branch to confirm the post-Phase-11 p99.
+
+---
+
 ## Existing-test tagging (from prior batches)
 
 The 252 existing tests at the start of Phase 10 already cover many

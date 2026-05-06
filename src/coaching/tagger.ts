@@ -116,6 +116,16 @@ export interface TagResult {
   tagSource: 'profile' | 'message' | 'fallback';
   /** Confidence proxy: how many keyword hits drove the tag (0+). */
   hits: number;
+  /** Phase 11 R17 — runner-up practice if the score table had one. NULL when
+   *  the tagger fell back to profile or default. */
+  secondaryPracticeTag: PracticeTag | null;
+  /** Phase 11 R17 — runner-up level. NULL when only one level scored > 0. */
+  secondaryLevelTag: LevelTag | null;
+  /** Phase 11 R17 — confidence ∈ [0, 1]. Computed from hit counts and
+   *  source: message hits get full credit, profile fallback ~0.4, hard
+   *  default 0.1. Turns with confidence < 0.6 should land on the review
+   *  queue. */
+  confidence: number;
 }
 
 const VALID_PRACTICES: readonly PracticeTag[] = [
@@ -155,6 +165,7 @@ export function tagPracticeAndLevel(message: string, profileMapped: PracticeTag[
 
   // Pick practice: highest message score, breaking ties via profile.mappedPractices order.
   let practice: PracticeTag | null = null;
+  let secondaryPractice: PracticeTag | null = null;
   let source: TagResult['tagSource'] = 'fallback';
   let hits = 0;
   if (practiceScores.size > 0) {
@@ -177,6 +188,16 @@ export function tagPracticeAndLevel(message: string, profileMapped: PracticeTag[
       practice = best;
       source = 'message';
       hits = bestScore;
+      // Phase 11 R17 — secondary = next-best non-zero score (skip the winner).
+      let runnerUp: PracticeTag | null = null;
+      let runnerUpScore = 0;
+      for (const [p, s] of practiceScores) {
+        if (p !== best && s > runnerUpScore) {
+          runnerUp = p;
+          runnerUpScore = s;
+        }
+      }
+      secondaryPractice = runnerUp;
     }
   }
 
@@ -193,9 +214,11 @@ export function tagPracticeAndLevel(message: string, profileMapped: PracticeTag[
     source = 'fallback';
   }
 
-  // Score levels similarly; default to 'self'.
+  // Score levels similarly; default to 'self'. Track runner-up for R17.
   let level: LevelTag = 'self';
   let bestLevelScore = 0;
+  let secondLevel: LevelTag | null = null;
+  let secondLevelScore = 0;
   for (const [lvl, keywords] of Object.entries(LEVEL_KEYWORDS) as [LevelTag, string[]][]) {
     let s = 0;
     for (const k of keywords) {
@@ -204,12 +227,40 @@ export function tagPracticeAndLevel(message: string, profileMapped: PracticeTag[
       }
     }
     if (s > bestLevelScore) {
+      secondLevel = level;
+      secondLevelScore = bestLevelScore;
       level = lvl;
       bestLevelScore = s;
+    } else if (s > secondLevelScore && s > 0) {
+      secondLevel = lvl;
+      secondLevelScore = s;
     }
   }
+  // secondLevel must be non-zero score AND distinct from primary.
+  const secondaryLevel: LevelTag | null = secondLevelScore > 0 ? secondLevel : null;
 
-  return { practiceTag: practice, levelTag: level, tagSource: source, hits };
+  // Phase 11 R17 — confidence in [0, 1].
+  //   message source: hit count → 0.6 floor + 0.1 per extra hit, capped at 1.0
+  //   profile source: 0.4 (informed but not message-driven)
+  //   fallback:       0.1 (we are guessing)
+  let confidence: number;
+  if (source === 'message') {
+    confidence = Math.min(1.0, 0.6 + 0.1 * Math.max(0, hits - 1));
+  } else if (source === 'profile') {
+    confidence = 0.4;
+  } else {
+    confidence = 0.1;
+  }
+
+  return {
+    practiceTag: practice,
+    levelTag: level,
+    tagSource: source,
+    hits,
+    secondaryPracticeTag: secondaryPractice,
+    secondaryLevelTag: secondaryLevel,
+    confidence,
+  };
 }
 
 /** Test seam — exposes the keyword tables for audit. */

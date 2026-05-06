@@ -9,6 +9,8 @@
     header { background: #222; color: #fff; padding: 16px 32px; }
     header h1 { margin: 0; font-size: 20px; font-weight: 600; }
     header .meta { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+    header .tagline { font-style: italic; }
+    footer { max-width: 960px; margin: 32px auto 16px; padding: 0 32px; font-size: 12px; color: #888; text-align: right; }
     nav { background: #fff; border-bottom: 1px solid #e2e2dc; padding: 0 32px; }
     nav a { display: inline-block; padding: 12px 16px; color: #222; text-decoration: none; border-bottom: 2px solid transparent; }
     nav a.active { border-bottom-color: #222; font-weight: 600; }
@@ -31,6 +33,7 @@
 <body>
   <header>
     <h1>Hogaan sponsor portal</h1>
+    <div class="meta tagline"><%= it.brandTagline %></div>
     <% if (it.session) { %>
     <div class="meta">Signed in: <%= it.session.email %> · <%= it.session.role %></div>
     <% } %>
@@ -45,5 +48,6 @@
   <main>
     <%~ it.body %>
   </main>
+  <footer><%= it.brandTagline %> · Hogaan</footer>
 </body>
 </html>
