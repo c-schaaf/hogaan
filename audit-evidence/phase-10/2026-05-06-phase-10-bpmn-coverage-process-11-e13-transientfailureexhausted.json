@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-05-06T08:17:50.118Z",
+  "testId": "phase-10/bpmn-coverage/process-11/E13_TransientFailureExhausted",
+  "controlId": "T2.Process11.E13_TransientFailureExhausted",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #11 E13_TransientFailureExhausted is referenced in 1 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "WhatsAppDelivery",
+    "endEvent": "E13_TransientFailureExhausted",
+    "coveringFiles": [
+      "tests\\whatsapp-delivery\\end-events.test.ts"
+    ],
+    "hits": 1
+  }
+}

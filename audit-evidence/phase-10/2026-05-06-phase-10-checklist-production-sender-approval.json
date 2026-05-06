@@ -1,0 +1,14 @@
+{
+  "recordedAt": "2026-05-06T08:17:55.336Z",
+  "testId": "phase-10/checklist/production-sender-approval",
+  "controlId": "T1.OperationalReadiness.ProductionSenderApproval",
+  "tier": "T1",
+  "outcome": "deferred",
+  "description": "+254 production WhatsApp Business sender registration + display-name approval by Meta. Currently using Twilio sandbox; production sender registration is an ops blocker for Phase A launch.",
+  "phase": "phase-10",
+  "details": {
+    "gating": "pre-launch",
+    "owner": "ops",
+    "currentStatus": "sandbox"
+  }
+}

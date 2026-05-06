@@ -1,0 +1,19 @@
+{
+  "recordedAt": "2026-05-06T08:17:50.169Z",
+  "testId": "phase-10/bpmn-coverage/process-12/aggregate",
+  "controlId": "T2.Process12.AggregateCoverage",
+  "tier": "T2",
+  "outcome": "fail",
+  "description": "Process #12 Identity: 9/11 end events covered. Phase A gate is 100%; this row stays 'fail' until gaps close.",
+  "phase": "phase-10",
+  "details": {
+    "process": "Identity",
+    "covered": 9,
+    "total": 11,
+    "ratio": 0.8181818181818182,
+    "uncovered": [
+      "E6_BlockedUser",
+      "E9_WebSessionInvalid"
+    ]
+  }
+}

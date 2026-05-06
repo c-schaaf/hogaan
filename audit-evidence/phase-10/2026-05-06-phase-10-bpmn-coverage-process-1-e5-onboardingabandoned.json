@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-05-06T08:17:49.788Z",
+  "testId": "phase-10/bpmn-coverage/process-1/E5_OnboardingAbandoned",
+  "controlId": "T2.Process1.E5_OnboardingAbandoned",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #1 E5_OnboardingAbandoned is referenced in 1 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "Onboarding",
+    "endEvent": "E5_OnboardingAbandoned",
+    "coveringFiles": [
+      "tests\\onboarding\\end-events.test.ts"
+    ],
+    "hits": 1
+  }
+}

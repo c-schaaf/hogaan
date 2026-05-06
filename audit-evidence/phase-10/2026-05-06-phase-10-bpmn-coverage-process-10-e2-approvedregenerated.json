@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-05-06T08:17:50.022Z",
+  "testId": "phase-10/bpmn-coverage/process-10/E2_ApprovedRegenerated",
+  "controlId": "T2.Process10.E2_ApprovedRegenerated",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #10 E2_ApprovedRegenerated is referenced in 1 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "QualityCheck",
+    "endEvent": "E2_ApprovedRegenerated",
+    "coveringFiles": [
+      "tests\\quality-check\\end-events.test.ts"
+    ],
+    "hits": 1
+  }
+}

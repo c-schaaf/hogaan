@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-06T08:17:55.318Z",
+  "testId": "phase-10/checklist/synthetic-p2",
+  "controlId": "T1.AccessControl.P2Alerting",
+  "tier": "T1",
+  "outcome": "pass",
+  "description": "Synthetic P2 incident fires through reportP2 without throwing. Routes to Axiom only.",
+  "phase": "phase-10"
+}

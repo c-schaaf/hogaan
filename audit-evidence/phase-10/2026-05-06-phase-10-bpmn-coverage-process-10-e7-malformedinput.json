@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-05-06T08:17:50.075Z",
+  "testId": "phase-10/bpmn-coverage/process-10/E7_MalformedInput",
+  "controlId": "T2.Process10.E7_MalformedInput",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #10 E7_MalformedInput is referenced in 1 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "QualityCheck",
+    "endEvent": "E7_MalformedInput",
+    "coveringFiles": [
+      "tests\\quality-check\\end-events.test.ts"
+    ],
+    "hits": 1
+  }
+}

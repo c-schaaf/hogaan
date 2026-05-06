@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-05-06T08:17:50.030Z",
+  "testId": "phase-10/bpmn-coverage/process-10/E3_MaxRetriesExceeded",
+  "controlId": "T2.Process10.E3_MaxRetriesExceeded",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #10 E3_MaxRetriesExceeded is referenced in 1 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "QualityCheck",
+    "endEvent": "E3_MaxRetriesExceeded",
+    "coveringFiles": [
+      "tests\\quality-check\\end-events.test.ts"
+    ],
+    "hits": 1
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "recordedAt": "2026-05-06T08:17:55.274Z",
+  "testId": "phase-10/checklist/privacy-floor-30",
+  "controlId": "T3.PrivacyControls.SegmentSizeFloor",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "requireSegmentSize() returns the locked sentinel copy when distinct user count < 30. Proven by tests/sponsor-portal/privacy.test.ts and verify-phase-9.ts live verification (10/10 PASS, 29-user subsegment correctly suppressed).",
+  "phase": "phase-10",
+  "details": {
+    "floor": 30,
+    "sentinelCopy": "Segment too small to display — we protect individual users by suppressing groups smaller than 30.",
+    "provingTests": [
+      "tests/sponsor-portal/privacy.test.ts"
+    ],
+    "provingScripts": [
+      "scripts/verify-phase-9.ts"
+    ]
+  }
+}

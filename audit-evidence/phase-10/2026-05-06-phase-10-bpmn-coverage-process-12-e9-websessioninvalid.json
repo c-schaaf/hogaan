@@ -1,0 +1,15 @@
+{
+  "recordedAt": "2026-05-06T08:17:50.155Z",
+  "testId": "phase-10/bpmn-coverage/process-12/E9_WebSessionInvalid",
+  "controlId": "T2.Process12.E9_WebSessionInvalid",
+  "tier": "T2",
+  "outcome": "fail",
+  "description": "Process #12 E9_WebSessionInvalid has NO test coverage — gap blocks Phase A launch gate",
+  "phase": "phase-10",
+  "details": {
+    "process": "Identity",
+    "endEvent": "E9_WebSessionInvalid",
+    "coveringFiles": [],
+    "hits": 0
+  }
+}

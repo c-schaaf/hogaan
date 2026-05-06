@@ -1,0 +1,18 @@
+{
+  "recordedAt": "2026-05-06T08:17:50.069Z",
+  "testId": "phase-10/bpmn-coverage/process-10/E6_ServiceUnavailable",
+  "controlId": "T2.Process10.E6_ServiceUnavailable",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #10 E6_ServiceUnavailable is referenced in 2 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "QualityCheck",
+    "endEvent": "E6_ServiceUnavailable",
+    "coveringFiles": [
+      "tests\\onboarding\\end-events.test.ts",
+      "tests\\quality-check\\end-events.test.ts"
+    ],
+    "hits": 2
+  }
+}
