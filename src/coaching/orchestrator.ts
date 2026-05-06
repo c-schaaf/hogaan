@@ -187,7 +187,9 @@ export async function runCoachingTurn(
       'ProfileUpdate',
     );
   }
-  if (intent === 'Greeting') {
+  // R-01 — only fire on a genuinely new session. Mid-session courtesy
+  // beats classified as Greeting fall through to the coaching path.
+  if (intent === 'Greeting' && session.isNew) {
     return await runTemplatedResponse(
       deps,
       inbound,
@@ -199,7 +201,10 @@ export async function runCoachingTurn(
       'Greeting',
     );
   }
-  if (intent === 'Affirmation') {
+  // R-01 — only fire when there's a prior turn to acknowledge. New
+  // sessions classified as Affirmation are still openings, not closings;
+  // fall through to the coaching path.
+  if (intent === 'Affirmation' && !session.isNew && session.turnCount > 0) {
     return await runTemplatedResponse(
       deps,
       inbound,

@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-06T23:29:43.819Z",
+  "testId": "audit/R-01-affirmation-returning-fires",
+  "controlId": "T3.Audit.R01_AffirmationReturningFires",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "R-01 regression: returning session + Affirmation intent still gets the templated affirmation reply.",
+  "phase": "phase-12"
+}
