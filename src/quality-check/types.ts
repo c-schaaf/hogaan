@@ -30,7 +30,11 @@ export type CheckId =
   | 'check_06_useful_to_society'
   | 'check_07_tone'
   | 'check_08_safety_crisis'
-  | 'check_09_length';
+  | 'check_09_length'
+  | 'check_10_lived_experience'
+  | 'check_11_formatting_discipline'
+  | 'check_12_tangible_action'
+  | 'check_13_voice_consistency';
 
 export type CheckOutcome =
   | { status: 'pass' }
