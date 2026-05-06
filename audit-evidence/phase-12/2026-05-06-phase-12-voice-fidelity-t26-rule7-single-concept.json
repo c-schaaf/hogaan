@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-06T20:03:30.407Z",
+  "testId": "phase-12/voice-fidelity/T26-rule7-single-concept",
+  "controlId": "T5.VoiceFidelity.T26_Rule7SomaliTerms",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Voice Rule 7 — selection enforces at most one Somali term per response by returning a single concept. Structural invariant; runtime LLM-output validation deferred to voice-smoke (BLOCKER §6).",
+  "phase": "phase-12"
+}

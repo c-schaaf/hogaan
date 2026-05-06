@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-06T20:03:30.502Z",
+  "testId": "phase-12/voice-fidelity/T29-coaching-length-band",
+  "controlId": "T5.VoiceFidelity.T29_CoachingLengthBand",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Phase 12 R32 — per-intent length band check. Coaching intent: 150–300 words. Out-of-band yields soft_fail; QC regenerates.",
+  "phase": "phase-12"
+}
