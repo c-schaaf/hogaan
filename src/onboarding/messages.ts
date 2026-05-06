@@ -7,9 +7,11 @@
  * *onboarding intake*. Same author, similar voice — warm, brief, useful.
  */
 
-import { BRAND_FRAMEWORK_ATTRIBUTION } from '../shared/brand/constants.js';
+import { BRAND_FRAMEWORK_ATTRIBUTION, BRAND_TAGLINE } from '../shared/brand/constants.js';
 
-export const WELCOME_MESSAGE = `Welcome. I'm Hogaan — a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION}. I show up here to be useful to you, useful to the people you lead, and useful to the work in front of you.
+export const WELCOME_MESSAGE = `Welcome to Hogaan — *${BRAND_TAGLINE}*.
+
+I'm a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION}. I show up here to be useful to you, useful to the people you lead, and useful to the work in front of you.
 
 If you have a sponsor code, send it now (it'll look like *kobciye-3742*). Otherwise just say hi and we'll get started.`;
 
