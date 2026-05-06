@@ -25,6 +25,15 @@ export const turns = pgTable('turns', {
   intent: text('intent'),
   practiceTag: text('practice_tag'),
   levelTag: text('level_tag'),
+  /** Phase 11 R17 — secondary tagger output (when the tagger surfaces a runner-up
+   *  practice/level alongside the primary). NULL when the tagger had only one
+   *  signal. Used by the QC review queue to surface ambiguous turns. */
+  secondaryPracticeTag: text('secondary_practice_tag'),
+  secondaryLevelTag: text('secondary_level_tag'),
+  /** Phase 11 R17 — tagger confidence ∈ [0, 1]. Turns with confidence < 0.6
+   *  are queued for human review. Defaults to NULL on existing rows; the
+   *  tagger writes a real value going forward. */
+  taggerConfidence: text('tagger_confidence'),
   responseMode: text('response_mode'),
   /** 'claude-haiku-4-5' | 'llama-3.3-70b' | 'safe-template' | 'none'. */
   modelUsed: text('model_used'),
