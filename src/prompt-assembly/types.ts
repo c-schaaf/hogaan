@@ -25,6 +25,12 @@ export interface InputPayload {
   /** Required for modes that inject practice + level framing. */
   practiceTag?: PracticeTag;
   levelTag?: LevelTag;
+  /** Phase 12 R24 — Phase 11 R17 tagger fields, threaded into the
+   *  determinism hash. Optional for backwards compatibility; orchestrator
+   *  passes them when available. */
+  secondaryPracticeTag?: PracticeTag | null;
+  secondaryLevelTag?: LevelTag | null;
+  taggerConfidence?: number | null;
   userMessage: string;
   /** From the user record. Not all fields required; missing ones get omitted. */
   userProfile: {
