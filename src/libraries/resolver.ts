@@ -149,8 +149,29 @@ export function verifyIntegrity(resolved: ResolvedLibraries): void {
   }
 }
 
+/**
+ * Phase 12 R10 — coupling: the QC voice-consistency check memoizes a
+ * centroid of voice_rules positiveExamples. When a new voice_rules
+ * version is published, that centroid is stale; clear both caches in
+ * lockstep so the next checkVoiceConsistency call recomputes against
+ * the new examples.
+ *
+ * Imported lazily to avoid a circular dep (voice-consistency depends on
+ * libraries via embedQuery → config; we don't want libraries to depend
+ * on quality-check at module-init time).
+ */
 export function invalidateLibraryCache(): void {
   cache = undefined;
+  // Lazy import; resolver.ts must not eagerly pull in quality-check.
+  void import('../quality-check/voice-consistency.js')
+    .then((mod) => {
+      mod.invalidateVoiceCentroidCache();
+    })
+    .catch(() => {
+      // Module not loaded yet — fine. The cache is module-level state,
+      // and if voice-consistency hasn't been imported, there's nothing
+      // to invalidate.
+    });
 }
 
 /** Test/teardown only. */

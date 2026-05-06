@@ -134,6 +134,22 @@ export function _resetVoiceCentroidCache(): void {
   voiceCentroidCache = null;
 }
 
+/**
+ * Phase 12 R10 — public cache invalidation hook.
+ *
+ * The library cache (src/libraries/resolver.ts) calls this when a new
+ * voice_rules version is published, so checkVoiceConsistency picks up
+ * the new positiveExamples on the next call. Without this coupling, the
+ * centroid would persist across a v1 → v2 publish and the check would
+ * score against stale Hamse-voice samples.
+ *
+ * Same body as _resetVoiceCentroidCache; named differently to make the
+ * coupling visible.
+ */
+export function invalidateVoiceCentroidCache(): void {
+  voiceCentroidCache = null;
+}
+
 export const _internal = {
   cosineSimilarity,
   averageVectors,
