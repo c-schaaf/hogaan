@@ -17,6 +17,7 @@ import {
   check9Length,
   checkFormattingDiscipline,
 } from './checks-rule-based.js';
+import { checkIntentLengthAsCheckResult } from './intent-length-bands.js';
 import { checkVoiceConsistency } from './voice-consistency.js';
 import { regenerate } from './corrective.js';
 import { fallbackDegraded, fallbackMaxRetries } from './fallbacks.js';
@@ -231,6 +232,7 @@ async function runAllChecks(
     check6UsefulToSociety(deps.libraries.voiceRules.payload, candidate, input.predictedLevelTag),
     check9Length(candidate, input.responseMode),
     checkFormattingDiscipline(candidate),
+    checkIntentLengthAsCheckResult(candidate, input.intent),
   ];
   const llm = await Promise.all([
     check3SignatureStructure(deps.config, candidate),

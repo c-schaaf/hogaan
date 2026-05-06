@@ -1,4 +1,5 @@
 import type {
+  Intent,
   LevelTag,
   PracticeTag,
   ResponseMode,
@@ -13,6 +14,10 @@ export interface QcInput {
   /** The user message that prompted this candidate. Needed for Check 8 second-line crisis. */
   userMessage: string;
   responseMode: ResponseMode;
+  /** Phase 12 R2 — Intent classification from triage. Used by checkIntentLength
+   *  (per-Intent length bands). Intersects with check9Length (per-ResponseMode);
+   *  both can fail independently. */
+  intent: Intent;
   predictedPracticeTag?: PracticeTag;
   predictedLevelTag?: LevelTag;
   /** Tracking IDs — included on crisis_events / incidents but never on the LLM prompts. */
@@ -34,7 +39,8 @@ export type CheckId =
   | 'check_10_lived_experience'
   | 'check_11_formatting_discipline'
   | 'check_12_tangible_action'
-  | 'check_13_voice_consistency';
+  | 'check_13_voice_consistency'
+  | 'check_14_intent_length';
 
 export type CheckOutcome =
   | { status: 'pass' }

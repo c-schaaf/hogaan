@@ -269,6 +269,7 @@ async function advanceActiveScenario(
       candidateResponseText: chatResp.text,
       userMessage: inbound.body,
       responseMode: 'ScenarioRolePlay',
+      intent: 'ScenarioRequest',
       predictedPracticeTag: scenario.practice,
       predictedLevelTag: scenario.level,
       userId: inbound.userId,

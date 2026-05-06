@@ -1,4 +1,5 @@
 import type { Intent } from '../shared/types/index.js';
+import type { CheckResult } from './types.js';
 
 /**
  * Phase 11 R32 — per-intent length bands.
@@ -65,4 +66,33 @@ export function checkIntentLength(candidate: string, intent: Intent): LengthChec
     return { status: 'too_long', words, max: band.max, intent };
   }
   return { status: 'pass', words };
+}
+
+/**
+ * QC orchestrator adapter — converts the discriminated LengthCheckOutcome
+ * into the CheckResult shape expected by runAllChecks. Produces a soft_fail
+ * with the concrete (words, band) values in the reason for QC's corrective
+ * prompt.
+ */
+export function checkIntentLengthAsCheckResult(candidate: string, intent: Intent): CheckResult {
+  const outcome = checkIntentLength(candidate, intent);
+  if (outcome.status === 'pass') {
+    return { checkId: 'check_14_intent_length', outcome: { status: 'pass' } };
+  }
+  if (outcome.status === 'too_short') {
+    return {
+      checkId: 'check_14_intent_length',
+      outcome: {
+        status: 'soft_fail',
+        reason: `${outcome.words} words below ${intent} min ${outcome.min}`,
+      },
+    };
+  }
+  return {
+    checkId: 'check_14_intent_length',
+    outcome: {
+      status: 'soft_fail',
+      reason: `${outcome.words} words above ${intent} max ${outcome.max}`,
+    },
+  };
 }

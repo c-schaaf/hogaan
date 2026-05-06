@@ -45,6 +45,7 @@ const ALL_CHECK_IDS: readonly CheckId[] = [
   'check_11_formatting_discipline',
   'check_12_tangible_action',
   'check_13_voice_consistency',
+  'check_14_intent_length',
 ];
 
 const fakeLibraries: ResolvedLibraries = {
@@ -102,6 +103,7 @@ describe('Phase 12 R1 — runAllChecks produces every CheckId in the catalog', (
           'Your sleeplessness is integrity working. The next step is to name what your team needs from you, useful to the people you lead. Hold a 1:1 tomorrow with the senior engineer and ask: what would you change if you ran this team?',
         userMessage: 'I cannot sleep about this team',
         responseMode: 'FullCoachingResponse',
+        intent: 'Coaching',
       },
     );
 

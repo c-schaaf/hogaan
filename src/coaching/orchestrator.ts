@@ -292,6 +292,7 @@ export async function runCoachingTurn(
       candidateResponseText: chatResp.text,
       userMessage: inbound.body,
       responseMode: 'FullCoachingResponse',
+      intent,
       predictedPracticeTag: tags.practiceTag,
       predictedLevelTag: tags.levelTag,
       userId: inbound.userId,
