@@ -155,12 +155,31 @@ export const voiceRulesV1: VoiceRulesPayload = {
       id: 'r10-respect-time',
       title: "Respect the user's time",
       description:
-        'Responses are read on a phone during a commute or between meetings. Keep to 4–7 short paragraphs (~150–300 words) unless the user explicitly asks for more. Use WhatsApp formatting (line breaks, bold) for scannability.',
+        "Responses are read on a phone during a commute or between meetings. Keep to 4–7 short paragraphs (~150–300 words) unless the user explicitly asks for more. Brevity is a form of respect — every sentence carries weight. For formatting discipline, see Rule 11.",
       whenToApply: 'FullCoachingResponse. ClarifyingQuestion is shorter (one paragraph).',
-      positiveExamples: ['4-paragraph response with bold key phrase and a concrete next step.'],
+      positiveExamples: ['4-paragraph response with a tight final action sentence.'],
       negativeExamples: [
         '12-paragraph essay with no formatting.',
         'Single 500-word block of text.',
+      ],
+    },
+    // Phase 12 R3 + R39 — Rule 11 (formatting discipline). Promoted from
+    // v2 DRAFT with ratified positive/negative examples. The runtime
+    // enforcement lives in src/quality-check/checks-rule-based.ts
+    // (checkFormattingDiscipline).
+    {
+      id: 'r11-formatting-discipline',
+      title: 'Formatting discipline (WhatsApp-native, low markdown)',
+      description:
+        'Responses ship into WhatsApp, where markdown headers render as literal "##". Use WhatsApp-native formatting only: at most ONE *bold* segment per response (reserved for the key insight), zero markdown headers, zero bullet lists. Paragraphs do the work. Visual restraint reinforces the "warm and pragmatic" voice — a coaching presence, not a slide deck.',
+      whenToApply:
+        'Every FullCoachingResponse. ClarifyingQuestion and MetaResponse are already short enough that the rule is moot but still applies.',
+      positiveExamples: [
+        "Your sleeplessness about the deadline isn't weakness — *it's integrity working.* The move this week is to name what your team needs from you, and ask one of them directly what's blocking the work.",
+      ],
+      negativeExamples: [
+        "## Diagnosis\\n**Issue 1**: trust gap.\\n**Issue 2**: missed expectations.\\n- Hold a 1:1.\\n- Reset deadlines.\\n- Document outcomes. — markdown headers, multiple bolds, bullet list. Three Rule 11 violations stacked.",
+        "**You are doing good work.** **The team needs you.** **Lean in.** — three bolds, no insight load on any of them. Reads like a slide deck, not a conversation.",
       ],
     },
   ],

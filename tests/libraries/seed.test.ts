@@ -10,10 +10,10 @@ import {
 import { LEVEL_TAGS, PRACTICE_TAGS, RESPONSE_MODES } from '../../src/shared/types/index.js';
 
 describe('library seed content invariants', () => {
-  it('voice_rules has exactly 10 rules with stable ids', () => {
-    expect(voiceRulesV1.rules).toHaveLength(10);
+  it('voice_rules has exactly 11 rules with stable ids (Phase 12 R3: Rule 11 promoted)', () => {
+    expect(voiceRulesV1.rules).toHaveLength(11);
     const ids = voiceRulesV1.rules.map((r) => r.id);
-    expect(new Set(ids).size).toBe(10);
+    expect(new Set(ids).size).toBe(11);
   });
 
   it('voice_rules ships hero-phrase flags + useful-to-society anchor patterns', () => {
