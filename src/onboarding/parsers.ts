@@ -264,6 +264,16 @@ const ROLE_KEYWORDS: Record<RoleOption, string[]> = {
     'head of',
     'lead',
   ],
+  // Phase 12 R15
+  CommunityLeader: [
+    'community leader',
+    'organizer',
+    'community organizing',
+    'movement',
+    'civic leader',
+    'civic',
+  ],
+  Advocate: ['advocate', 'advocacy', 'activist', 'campaign', 'campaigner', 'human rights', 'rights'],
 };
 
 export function parseRole(text: string): RoleOption | 'invalid' {
@@ -272,8 +282,8 @@ export function parseRole(text: string): RoleOption | 'invalid' {
     return 'invalid';
   }
 
-  // Exact-number first.
-  const nums = norm.match(/\b[1-3]\b/);
+  // Exact-number first (1-5 for the 5-option set after R15).
+  const nums = norm.match(/\b[1-5]\b/);
   if (nums !== null) {
     const idx = Number.parseInt(nums[0], 10) - 1;
     const r = ROLE_OPTIONS[idx];
@@ -282,9 +292,18 @@ export function parseRole(text: string): RoleOption | 'invalid' {
     }
   }
 
-  // Keyword match. Prefer Leader over Professional when both could match
-  // (a "lead engineer" should resolve to Leader, not Professional).
-  const keywordOrder: RoleOption[] = ['Leader', 'Student', 'Professional'];
+  // Keyword match. Phase 12 R15: prefer CommunityLeader > Advocate >
+  // Leader > Student > Professional. CommunityLeader before Leader
+  // because "community leader" contains "leader". Advocate is distinct
+  // enough that order against Leader doesn't matter, but we put it
+  // ahead of Leader defensively in case "advocate-leader" comes up.
+  const keywordOrder: RoleOption[] = [
+    'CommunityLeader',
+    'Advocate',
+    'Leader',
+    'Student',
+    'Professional',
+  ];
   for (const r of keywordOrder) {
     const keywords = ROLE_KEYWORDS[r];
     if (keywords.some((k) => norm.includes(k))) {

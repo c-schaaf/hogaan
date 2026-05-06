@@ -31,8 +31,18 @@ export const GOAL_OPTIONS: readonly PracticeOption[] = [
   'peace',
 ] as const;
 
-/** Roles offered in Step 5. Single-select. */
-export const ROLE_OPTIONS = ['Student', 'Professional', 'Leader'] as const;
+/**
+ * Roles offered in Step 5. Single-select.
+ * Phase 12 R15 — added CommunityLeader and Advocate. Existing
+ * Student/Professional/Leader users are unaffected (additive).
+ */
+export const ROLE_OPTIONS = [
+  'Student',
+  'Professional',
+  'Leader',
+  'CommunityLeader',
+  'Advocate',
+] as const;
 export type RoleOption = (typeof ROLE_OPTIONS)[number];
 
 /**

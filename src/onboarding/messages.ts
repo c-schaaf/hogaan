@@ -106,15 +106,15 @@ export function formatPracticeAcknowledgment(practices: string[]): string {
   return `Good — ${head[0]} (${ga}), ${head[1]} (${gb}), ${head[2]} (${gc}), plus ${rest.join(', ')}. Tell me what's on your mind this week.`;
 }
 
-export const ROLE_PROMPT = `Which best describes where you are right now?
+// Phase 12 R15 — flowing prose, no bullet picker. CommunityLeader and
+// Advocate added to the role taxonomy. The bold role names are
+// structural enumeration (the picker), audit-accepted same exception
+// as GOAL_PROMPT.
+export const ROLE_PROMPT = `Where are you leading from right now?
 
-1. *Student* — still building the foundation.
-2. *Professional* — leading work, projects, or small teams.
-3. *Leader* — running an organization, function, or larger team.
+Reply with what fits — Student, Professional, Leader, Community leader, or Advocate. Pick the closest; you can change it later.`;
 
-Reply with one number or word.`;
-
-export const ROLE_RETRY_PROMPT = `Pick one — Student / Professional / Leader (or 1 / 2 / 3).`;
+export const ROLE_RETRY_PROMPT = `Pick the closest — Student, Professional, Leader, Community leader, or Advocate.`;
 
 export const LOCATION_PROMPT = `Where are you reaching me from? City and country is enough — or just reply *skip* to keep it private.
 
