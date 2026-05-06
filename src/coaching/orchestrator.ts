@@ -241,7 +241,11 @@ export async function runCoachingTurn(
         systemPrompt: promptBundle.assembledPrompt,
         messages: [{ role: 'user', content: inbound.body }],
         maxTokens: 512,
-        temperature: 0.4,
+        // R15 — was 0.4. The audit found 0.4 produced too much variation
+        // run-to-run on the same input, hurting voice consistency. 0.3
+        // tightens the distribution while leaving enough headroom that
+        // responses don't read as canned.
+        temperature: 0.3,
       },
       SAFE_TEMPLATE,
     );
