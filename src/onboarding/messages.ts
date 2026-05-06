@@ -15,15 +15,19 @@ I'm a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION}. I show up he
 
 If you have a sponsor code, send it now (it'll look like *kobciye-3742*). Otherwise just say hi and we'll get started.`;
 
-export const CONSENT_PROMPT = `Before we begin, three quick checks:
+// Phase 12 R16 — rewritten as flowing prose. The previous version had 3
+// numbered bullets with 3 separate bolds per item — Voice Rule 11
+// formatting-discipline violations. Now: one bold ("aggregate"), zero
+// headers, no bullets. Same content, same disclosures.
+export const CONSENT_PROMPT = `Three quick checks before we begin.
 
-1. *AI coaching disclosure.* I'm an AI built around Hamse's voice and framework. I'm not a therapist, not a doctor, not a lawyer. For crisis support, I'll point you to specific resources.
+I'm an AI built around Hamse's voice and framework — not a therapist, doctor, or lawyer. For mental health crises, I'll point you to specific resources rather than try to handle it myself.
 
-2. *Data handling.* Your phone number is hashed for identity. Your messages stay between us, used only to coach you. Sponsors see *aggregate* engagement, never your individual conversations.
+Your phone number is hashed for identity. Your messages stay between us — sponsors see *aggregate* engagement only, never your individual conversations.
 
-3. *WhatsApp messaging.* I'll send daily prompts and respond to your questions on this number. Reply STOP at any time to opt out.
+I'll send daily prompts on this number. Reply STOP at any time to opt out, completely.
 
-Are you good with these three? Reply *yes* / *sow* to continue, or anything else if not.`;
+Are you good with these three? Reply yes / sow to continue, or anything else if not.`;
 
 export const CONSENT_DECLINED_MESSAGE = `Understood. I'll stop here. If you change your mind, message again — we can pick up where we left off.`;
 
