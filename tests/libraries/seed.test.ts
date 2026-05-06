@@ -21,10 +21,10 @@ describe('library seed content invariants', () => {
     expect(voiceRulesV1.usefulToSocietyPatterns.length).toBeGreaterThan(0);
   });
 
-  it('cultural_framing has exactly 15 framings with unique concepts', () => {
-    expect(culturalFramingV1.framings).toHaveLength(15);
+  it('cultural_framing has exactly 16 framings with unique concepts (Phase 12 R7-9: Xil added)', () => {
+    expect(culturalFramingV1.framings).toHaveLength(16);
     const concepts = culturalFramingV1.framings.map((f) => f.concept);
-    expect(new Set(concepts).size).toBe(15);
+    expect(new Set(concepts).size).toBe(16);
   });
 
   it('cultural_framing every framing has at least one applicableWhen + examplePhrasings', () => {
