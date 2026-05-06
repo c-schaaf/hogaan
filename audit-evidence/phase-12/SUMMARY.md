@@ -101,6 +101,28 @@ without requiring a process restart.
 
 ---
 
+## Post-merge production diagnostic (2026-05-06)
+
+A read-only diagnostic against the production `turns` table and
+`library_versions` table found that the v2 promotions documented in
+"Library promotion notes" above **never landed in the DB**. Active rows
+for both `voice_rules` and `cultural_framing` are pre-Phase-12 hashes
+published 2026-05-04; the Phase-12-ratified content lives only in the
+seed files. This drives a content split between prompt assembly (DB
+content) and the voice-consistency centroid (seed content), and is the
+likely root cause of the elevated regen / fallback rate observed
+post-merge.
+
+Full report: [2026-05-06-phase-12-fallback-diagnostic.md](2026-05-06-phase-12-fallback-diagnostic.md).
+
+Triage actions are recorded in the report; they include adding
+`publish-voice-rules-v2.ts` and `publish-cultural-framing-v2.ts`
+scripts modeled on the existing `publish-crisis-resources-v2.ts`, plus
+adding per-check persistence so future incidents are diagnosable from
+data rather than from local replay.
+
+---
+
 ## Decisions still requiring Muhsin
 
 1. **Ops**: schedule a `pnpm exec tsx scripts/profile-latency.ts --concurrency 20`
