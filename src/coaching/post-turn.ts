@@ -210,3 +210,136 @@ export async function persistPostTurn(
     },
   };
 }
+
+/**
+ * Phase 12 R20+R21 — lightweight turn persistence for short-circuit paths
+ * (greeting / affirmation / meta / profile-ack).
+ *
+ * The full coaching pipeline persists rich turn rows via persistPostTurn.
+ * Short-circuit responses (orchestrator's runTemplatedResponse) used to
+ * persist nothing — sponsor portal aggregations under-counted activity, and
+ * the bot's memory had no record of "user said hi yesterday" so it
+ * reintroduced itself on every greeting.
+ *
+ * persistShortCircuitTurn writes:
+ *   - turn row with response_mode mapped from the templated callerSubId,
+ *     practice_tag/level_tag/library_versions/determinism_hash all NULL
+ *     (no LLM ran)
+ *   - memory row (R21) with the user message + templated response so the
+ *     conversational continuity holds
+ *
+ * Sponsor portal note: aggregations may want to filter
+ *   response_mode in (greeting, affirmation, meta, profile-ack)
+ * when they want "coaching engagement only," or include them as "any
+ * inbound activity." Decision is the aggregation's, not the persister's.
+ *
+ * Same fail-open pattern as persistPostTurn — failures emit P1 incidents
+ * but never propagate. Crisis (E7) and silent-drop (E12) paths skip this
+ * persistence entirely (E7 has its own crisis_events row; E12 has nothing
+ * to persist).
+ */
+export interface ShortCircuitTurnInput {
+  userId: UserId;
+  sessionId: SessionId;
+  userMessage: string;
+  responseText: string;
+  /** 'greeting' | 'affirmation' | 'meta' | 'profile-ack' — maps to response_mode. */
+  callerSubId: string;
+  /** Triage classifier intent — written to turns.intent. */
+  intent: string;
+  terminalEvent: string;
+  latencyMs: number;
+  deliveryReceipt: { waMessageId?: string };
+  completedAt?: Date;
+}
+
+const CALLER_SUB_TO_RESPONSE_MODE: Record<string, ResponseMode | undefined> = {
+  greeting: undefined, // No ResponseMode for bare greeting; turns.response_mode stays NULL
+  affirmation: undefined,
+  meta: 'MetaResponse',
+  'profile-ack': 'ProfileUpdateAcknowledgment',
+};
+
+export async function persistShortCircuitTurn(
+  deps: PostTurnDeps,
+  input: ShortCircuitTurnInput,
+): Promise<{ turnId: TurnId | null; memoryWritten: boolean }> {
+  const completedAt = input.completedAt ?? new Date();
+  const responseMode = CALLER_SUB_TO_RESPONSE_MODE[input.callerSubId];
+
+  let turnId: TurnId | null = null;
+  try {
+    const inserted = await deps.db
+      .insert(turns)
+      .values({
+        sessionId: input.sessionId,
+        userId: input.userId,
+        userMessage: input.userMessage,
+        responseText: input.responseText,
+        intent: input.intent,
+        ...(responseMode !== undefined ? { responseMode } : {}),
+        modelUsed: 'none',
+        fallbackPath: 'none',
+        qaOutcome: 'short_circuit',
+        retryCount: 0,
+        latencyMs: input.latencyMs,
+        deliveryReceipt: input.deliveryReceipt,
+        terminalEvent: input.terminalEvent,
+        createdAt: completedAt,
+      })
+      .returning({ id: turns.id });
+    turnId = inserted[0] !== undefined ? asTurnId(inserted[0].id) : null;
+  } catch (err) {
+    reportP1(
+      'short-circuit turn-row insert failed (fail-open)',
+      {
+        source: 'Process_2.ShortCircuit.TurnRow',
+        extra: { userId: input.userId, callerSubId: input.callerSubId },
+      },
+      err,
+    );
+  }
+
+  // Phase 12 R21 — memory write. Even short-circuit turns inform the bot's
+  // memory so the next coaching turn doesn't reintroduce itself.
+  let memoryWritten = false;
+  if (turnId !== null) {
+    try {
+      const memoryContent = `User: ${input.userMessage}\nHogaan: ${input.responseText}`;
+      await writeMemory(deps.config, deps.db, {
+        userId: input.userId,
+        content: memoryContent,
+        kind: 'turn',
+        sessionId: input.sessionId,
+        turnId,
+        extraMetadata: { intent: input.intent, callerSubId: input.callerSubId },
+      });
+      memoryWritten = true;
+    } catch (err) {
+      reportP1(
+        'short-circuit memory write failed (fail-open)',
+        {
+          source: 'Process_2.ShortCircuit.MemoryWrite',
+          extra: { userId: input.userId, callerSubId: input.callerSubId },
+        },
+        err,
+      );
+    }
+  }
+
+  // Session bump too — short-circuit turns count toward turn_count + last_turn_at.
+  try {
+    await bumpSessionAfterTurn(deps.db, input.sessionId, completedAt);
+  } catch (err) {
+    reportP1(
+      'short-circuit session bump failed (fail-open)',
+      {
+        source: 'Process_2.ShortCircuit.SessionBump',
+        extra: { userId: input.userId, sessionId: input.sessionId },
+      },
+      err,
+    );
+  }
+
+  return { turnId, memoryWritten };
+}
