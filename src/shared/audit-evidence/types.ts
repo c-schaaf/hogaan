@@ -54,7 +54,7 @@ export interface EvidenceRow {
   /** Optional structured details — assertion values, latency numbers, sampled inputs. NO PII. */
   details?: Record<string, unknown>;
   /** Phase that produced this row. */
-  phase: 'phase-10';
+  phase: 'phase-10' | 'phase-12';
   /** Hash of the relevant code under test, when applicable. */
   artifactHash?: string;
 }
