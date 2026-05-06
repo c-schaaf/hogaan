@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fastPathTriage, _CRISIS_KEYWORDS } from '../../src/coaching/index.js';
+import { TRIAGE_SYSTEM_PROMPT } from '../../src/coaching/triage.js';
 
 describe('fastPathTriage — synchronous decisions', () => {
   it('flags empty body and no media → empty', () => {
@@ -34,5 +35,32 @@ describe('fastPathTriage — synchronous decisions', () => {
   it('case-insensitive — "I WANT TO DIE" matches', () => {
     const r = fastPathTriage('I WANT TO DIE', []);
     expect(r?.status).toBe('crisis');
+  });
+});
+
+describe('R-02 classifier disambiguation', () => {
+  it('classifier prompt explicitly lists "how are you" as Coaching, not Greeting', () => {
+    expect(TRIAGE_SYSTEM_PROMPT).toContain('how are you');
+  });
+
+  it('classifier prompt lists additional courtesy-beat negative examples', () => {
+    expect(TRIAGE_SYSTEM_PROMPT).toContain('how was your day');
+    expect(TRIAGE_SYSTEM_PROMPT).toContain("hope you're well");
+    expect(TRIAGE_SYSTEM_PROMPT).toContain("what's up");
+  });
+
+  it('classifier prompt notes embedded "hi" routes to Coaching (e.g., "hi i feel sad")', () => {
+    expect(TRIAGE_SYSTEM_PROMPT).toContain('hi i feel sad');
+  });
+
+  it('Affirmation description tightened: never the opening of a session', () => {
+    expect(TRIAGE_SYSTEM_PROMPT.toLowerCase()).toContain('opening');
+  });
+
+  it('classifier system prompt snapshot — drift detection trip-wire', () => {
+    // Snapshot file at tests/coaching/__snapshots__/triage.test.ts.snap
+    // Any unintentional rewording of the prompt will RED this assertion.
+    // Update with `pnpm test -u` only when the change is intentional.
+    expect(TRIAGE_SYSTEM_PROMPT).toMatchSnapshot();
   });
 });

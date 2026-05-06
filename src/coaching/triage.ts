@@ -98,8 +98,11 @@ export function fastPathTriage(body: string, mediaUrls: string[]): TriageResult 
  * to ('valid', 'Coaching') so the user gets a response. Process #10 Check 8
  * is the safety backstop for crises the first-line classifier missed.
  */
-export async function llmTriage(config: AppConfig, body: string): Promise<TriageResult> {
-  const system = `You are the first-line classifier for Hogaan, a leadership coaching presence. Two outputs required as STRICT JSON:
+// R-02 — system prompt extracted as a named constant so the disambiguation
+// rules for Greeting / Affirmation are auditable and snapshot-testable.
+// Courtesy beats like "how are you" / "how was your day" are explicitly
+// listed as Coaching, NOT Greeting, to fix the screenshot Bug 2 mis-route.
+export const TRIAGE_SYSTEM_PROMPT = `You are the first-line classifier for Hogaan, a leadership coaching presence. Two outputs required as STRICT JSON:
 
 {"status": "pass" | "crisis" | "reject", "intent": "Coaching" | "ScenarioRequest" | "ProfileUpdate" | "MetaQuestion" | "Greeting" | "Affirmation" | "ClarificationResponse" | "OutOfScope", "reason": "≤80 chars"}
 
@@ -113,12 +116,15 @@ intent:
   - "ScenarioRequest"      — explicitly asks for role-play / scenario practice.
   - "ProfileUpdate"        — "I got promoted", "I switched roles", "I moved cities".
   - "MetaQuestion"         — about Hogaan itself ("who are you", "are you AI", "what can you do").
-  - "Greeting"             — bare "hi", "hello", "salaam".
-  - "Affirmation"          — "thanks", "ok got it" (acknowledgment, not a question).
+  - "Greeting"             — bare "hi", "hello", "salaam", "good morning". Specifically NOT "how are you", "how was your day", "hope you're well", "what's up" — those are courtesy beats and route to Coaching. Even "hi" embedded in a longer message ("hi i feel sad") routes to Coaching, not Greeting.
+  - "Affirmation"          — "thanks", "ok got it" (acknowledgment of a prior coaching turn, never the *opening* of a session).
   - "ClarificationResponse"— answering a clarifying question Hogaan just asked.
   - "OutOfScope"           — politics, religion debate, legal/medical/financial advice (default to Coaching only if leadership-adjacent).
 
 If unsure, prefer pass + Coaching.`;
+
+export async function llmTriage(config: AppConfig, body: string): Promise<TriageResult> {
+  const system = TRIAGE_SYSTEM_PROMPT;
 
   try {
     const res = await groqChat(config, {
