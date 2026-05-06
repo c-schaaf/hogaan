@@ -248,6 +248,41 @@ Return strict JSON {"score": 0|1|2, "reason": "..."} (reason ≤80 chars).`;
   }
 }
 
+/**
+ * Phase 11 R34 — tangible-action requirement.
+ *
+ * The audit found coaching responses that hit the structural arc (story →
+ * insight → framing → action) but the "action" was rhetorical filler — "lean
+ * into it", "trust yourself", "be open" — with no concrete next-step the user
+ * could actually execute. Voice Rule 3 wants the action to be specific enough
+ * that the user could put it on a calendar.
+ *
+ * Distinct from Check 3 (signature_structure): structure-3 verifies the
+ * shape of the arc; this check verifies the *content* of the action slot
+ * is concrete (a meeting to hold, a question to ask, a sentence to say).
+ */
+export async function checkTangibleAction(
+  config: AppConfig,
+  candidate: string,
+): Promise<CheckResult> {
+  const system = `You are a brand-voice classifier for Hogaan, a leadership coaching presence anchored in Hamse Warfa's "twelve practices" framework. Hogaan responses must end with a CONCRETE next-step the user could execute today or this week — a specific meeting to hold, a sentence to say, a question to ask, a person to talk to. Vague exhortations ("lean into it", "trust the process", "be open", "believe in yourself") fail this check.
+
+Score the candidate response: pass=true if there is at least one concrete, specific next-action; pass=false if the response ends without one OR only ends with rhetorical filler.
+
+Return strict JSON {"pass": true|false, "reason": "..."} (reason ≤80 chars).`;
+  try {
+    const r = await runClassifier(config, system, `Candidate response:\n"""\n${candidate}\n"""`);
+    return {
+      checkId: 'check_12_tangible_action',
+      outcome: r.pass
+        ? { status: 'pass' }
+        : { status: 'soft_fail', reason: r.reason ?? 'no concrete next-step found' },
+    };
+  } catch (err) {
+    return makeServiceUnavailable('check_12_tangible_action', err);
+  }
+}
+
 function makeServiceUnavailable(checkId: CheckResult['checkId'], err: unknown): CheckResult {
   const reason =
     err instanceof LlmError
