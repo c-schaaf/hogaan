@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-05-06T08:17:55.263Z",
+  "recordedAt": "2026-05-06T09:04:29.861Z",
   "testId": "phase-10/checklist/audit-log-fail-closed",
   "controlId": "T1.AccessControl.AuditLogFailClosed",
   "tier": "T1",

@@ -1,17 +1,18 @@
 {
-  "recordedAt": "2026-05-06T08:17:49.925Z",
+  "recordedAt": "2026-05-06T09:04:22.513Z",
   "testId": "phase-10/bpmn-coverage/process-2/E12_SilentDrop",
   "controlId": "T2.Process2.E12_SilentDrop",
   "tier": "T2",
   "outcome": "pass",
-  "description": "Process #2 E12_SilentDrop is referenced in 1 test file(s)",
+  "description": "Process #2 E12_SilentDrop is referenced in 2 test file(s)",
   "phase": "phase-10",
   "details": {
     "process": "CoachingConversation",
     "endEvent": "E12_SilentDrop",
     "coveringFiles": [
-      "tests\\coaching\\end-events.test.ts"
+      "tests\\coaching\\end-events.test.ts",
+      "tests\\phase-10\\bpmn-coverage-process-2.test.ts"
     ],
-    "hits": 1
+    "hits": 2
   }
 }

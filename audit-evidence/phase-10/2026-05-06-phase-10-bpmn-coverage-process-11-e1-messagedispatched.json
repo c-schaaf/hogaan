@@ -1,17 +1,18 @@
 {
-  "recordedAt": "2026-05-06T08:17:50.081Z",
+  "recordedAt": "2026-05-06T09:04:22.622Z",
   "testId": "phase-10/bpmn-coverage/process-11/E1_MessageDispatched",
   "controlId": "T2.Process11.E1_MessageDispatched",
   "tier": "T2",
   "outcome": "pass",
-  "description": "Process #11 E1_MessageDispatched is referenced in 1 test file(s)",
+  "description": "Process #11 E1_MessageDispatched is referenced in 2 test file(s)",
   "phase": "phase-10",
   "details": {
     "process": "WhatsAppDelivery",
     "endEvent": "E1_MessageDispatched",
     "coveringFiles": [
+      "tests\\phase-10\\bpmn-coverage-process-2.test.ts",
       "tests\\whatsapp-delivery\\end-events.test.ts"
     ],
-    "hits": 1
+    "hits": 2
   }
 }

@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-06T09:04:31.140Z",
+  "testId": "phase-10/bpmn-coverage/process-11/e9-template-missing-name",
+  "controlId": "T2.Process11.E9_TemplateInvalid",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "A Template request with empty templateName is rejected — caught by the validation step before Step 5 template lookup",
+  "phase": "phase-10"
+}

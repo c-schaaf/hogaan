@@ -1,21 +1,16 @@
 {
-  "recordedAt": "2026-05-06T08:17:50.127Z",
+  "recordedAt": "2026-05-06T09:04:22.695Z",
   "testId": "phase-10/bpmn-coverage/process-11/aggregate",
   "controlId": "T2.Process11.AggregateCoverage",
   "tier": "T2",
-  "outcome": "fail",
-  "description": "Process #11 WhatsAppDelivery: 11/15 end events covered. Phase A gate is 100%; this row stays 'fail' until gaps close.",
+  "outcome": "pass",
+  "description": "Process #11 WhatsAppDelivery: 15/15 end events covered. Phase A gate is 100%; this row stays 'fail' until gaps close.",
   "phase": "phase-10",
   "details": {
     "process": "WhatsAppDelivery",
-    "covered": 11,
+    "covered": 15,
     "total": 15,
-    "ratio": 0.7333333333333333,
-    "uncovered": [
-      "E6_MalformedRequest",
-      "E7_SuppressedRecipient",
-      "E8_WindowClosedFreeFormBlocked",
-      "E9_TemplateInvalid"
-    ]
+    "ratio": 1,
+    "uncovered": []
   }
 }

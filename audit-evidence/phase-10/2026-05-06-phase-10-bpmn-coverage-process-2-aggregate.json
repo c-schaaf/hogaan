@@ -1,23 +1,16 @@
 {
-  "recordedAt": "2026-05-06T08:17:49.931Z",
+  "recordedAt": "2026-05-06T09:04:22.535Z",
   "testId": "phase-10/bpmn-coverage/process-2/aggregate",
   "controlId": "T2.Process2.AggregateCoverage",
   "tier": "T2",
-  "outcome": "fail",
-  "description": "Process #2 CoachingConversation: 6/12 end events covered. Phase A gate is 100%; this row stays 'fail' until gaps close.",
+  "outcome": "pass",
+  "description": "Process #2 CoachingConversation: 12/12 end events covered. Phase A gate is 100%; this row stays 'fail' until gaps close.",
   "phase": "phase-10",
   "details": {
     "process": "CoachingConversation",
-    "covered": 6,
+    "covered": 12,
     "total": 12,
-    "ratio": 0.5,
-    "uncovered": [
-      "E4_ScenarioHandoff",
-      "E5_ProfileAck",
-      "E6_MetaResponse",
-      "E8_MediaNotSupported",
-      "E9_MessageRejected",
-      "E10_ClarifyingQuestionSent"
-    ]
+    "ratio": 1,
+    "uncovered": []
   }
 }

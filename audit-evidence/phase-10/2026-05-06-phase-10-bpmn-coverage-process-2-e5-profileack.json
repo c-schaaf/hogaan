@@ -1,15 +1,17 @@
 {
-  "recordedAt": "2026-05-06T08:17:49.879Z",
+  "recordedAt": "2026-05-06T09:04:22.470Z",
   "testId": "phase-10/bpmn-coverage/process-2/E5_ProfileAck",
   "controlId": "T2.Process2.E5_ProfileAck",
   "tier": "T2",
-  "outcome": "fail",
-  "description": "Process #2 E5_ProfileAck has NO test coverage — gap blocks Phase A launch gate",
+  "outcome": "pass",
+  "description": "Process #2 E5_ProfileAck is referenced in 1 test file(s)",
   "phase": "phase-10",
   "details": {
     "process": "CoachingConversation",
     "endEvent": "E5_ProfileAck",
-    "coveringFiles": [],
-    "hits": 0
+    "coveringFiles": [
+      "tests\\phase-10\\bpmn-coverage-process-2.test.ts"
+    ],
+    "hits": 1
   }
 }
