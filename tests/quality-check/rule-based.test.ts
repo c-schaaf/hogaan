@@ -88,19 +88,28 @@ describe('check6UsefulToSociety', () => {
     expect(r.outcome.status).toBe('soft_fail');
   });
 
-  it('returns not_required on Team/Organization when anchor is missing', () => {
+  it('Phase 12 R5 — soft-fails on Team/Organization when anchor missing (now universal)', () => {
     const r1 = check6UsefulToSociety(
       voiceRulesV1,
       'Just optimize your KPIs and ship the deal.',
       'team',
     );
-    expect(r1.outcome.status).toBe('not_required');
+    expect(r1.outcome.status).toBe('soft_fail');
     const r2 = check6UsefulToSociety(
       voiceRulesV1,
       'Just optimize your KPIs and ship the deal.',
       'organization',
     );
-    expect(r2.outcome.status).toBe('not_required');
+    expect(r2.outcome.status).toBe('soft_fail');
+  });
+
+  it('Phase 12 R5 — passes Team/Organization when anchor IS present (implicit anchoring OK)', () => {
+    const r = check6UsefulToSociety(
+      voiceRulesV1,
+      "Lead in service of the team's work that matters in the next ten years.",
+      'team',
+    );
+    expect(r.outcome.status).toBe('pass');
   });
 
   it('returns not_required when level is undefined (e.g. ClarifyingQuestion)', () => {

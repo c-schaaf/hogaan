@@ -63,33 +63,37 @@ export function check5HeroToGuide(voiceRules: VoiceRulesPayload, candidate: stri
 /**
  * Process #10 Check 6 — "useful to society" anchor presence.
  *
- * **Fail-closed for Self + Community levels**: the anchor MUST appear (any
- * pattern from voice_rules.usefulToSocietyPatterns matches). For Team + Org
- * levels, the anchor may be implicit, so a missing anchor returns
- * `not_required` rather than soft_fail.
+ * **Phase 12 R5 — required across all 4 levels**. Self- and Community-level
+ * responses must land the anchor explicitly; Team- and Organization-level
+ * may anchor it more implicitly (in service of the team's mission, the
+ * org's purpose, the community impact) but must still land it.
  *
- * Modes that don't carry a level tag (ClarifyingQuestion, MetaResponse) are
- * `not_required`.
+ * The R4 tightening of usefulToSocietyPatterns (phrasal anchors only)
+ * prevents incidental mentions from passing falsely.
+ *
+ * Modes that don't carry a level tag (ClarifyingQuestion, MetaResponse,
+ * ProfileUpdateAcknowledgment) are `not_required` — those responses don't
+ * need the anchor.
  */
 export function check6UsefulToSociety(
   voiceRules: VoiceRulesPayload,
   candidate: string,
   level: LevelTag | undefined,
 ): CheckResult {
-  const required = level === 'self' || level === 'community';
+  if (level === undefined) {
+    return { checkId: 'check_06_useful_to_society', outcome: { status: 'not_required' } };
+  }
   const lower = candidate.toLowerCase();
   const matched = voiceRules.usefulToSocietyPatterns.some((p) => lower.includes(p.toLowerCase()));
 
   let outcome: CheckOutcome;
   if (matched) {
     outcome = { status: 'pass' };
-  } else if (required) {
+  } else {
     outcome = {
       status: 'soft_fail',
-      reason: 'useful-to-society anchor missing on a Self/Community-level response',
+      reason: `useful-to-society anchor missing on a ${level}-level response`,
     };
-  } else {
-    outcome = { status: 'not_required' };
   }
 
   return { checkId: 'check_06_useful_to_society', outcome };
