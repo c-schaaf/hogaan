@@ -17,8 +17,25 @@ import type { LevelTag, PracticeTag } from '../shared/types/index.js';
 // as bare keywords; they fired on far too many leadership-context messages.
 // Phrasal anchors are more specific to the practice the user is wrestling
 // with.
+// Phase 12 R11 + R13 — common-word keywords replaced with phrasal anchors;
+// situational triggers added. The R13 audit found that the canonical "I had
+// to fire someone" prompt didn't tag accountability — only abstract terms
+// like 'accountable' and 'ownership' did. Real users describe situations,
+// not principles, so the keyword set now covers both axes.
 const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
-  integrity: ['integrity', 'principle', 'standard', 'compromise my', 'cut corners', 'doing right'],
+  integrity: [
+    'integrity',
+    'principle',
+    'standard',
+    'compromise my',
+    'cut corners',
+    'doing right',
+    // R13 — situational triggers
+    'right thing to do',
+    'against my values',
+    'compromised',
+    'not who i am',
+  ],
   purpose: [
     'purpose',
     'meaning',
@@ -37,6 +54,15 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'own that',
     'my fault',
     'on me',
+    // R13 — situational triggers
+    'had to fire',
+    'had to let go',
+    'decision fell to me',
+    'ended up making the call',
+    'stuck with the call',
+    'on my shoulders',
+    'i made the call',
+    'my call to make',
   ],
   dignity: [
     'dignity',
@@ -55,6 +81,11 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'their side',
     'where they',
     'walk in',
+    // R13 — situational triggers
+    'going through',
+    'struggling with',
+    'hard time at home',
+    'team member is dealing with',
   ],
   inclusion: [
     'inclusion',
@@ -65,6 +96,11 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'excluded',
     'unheard',
     'quieter voice',
+    // R13 — situational triggers
+    "doesn't speak up",
+    'never says anything',
+    'gets talked over',
+    'silent in meetings',
   ],
   assets: ['asset', 'strength', 'capability', 'resource', 'what we have', 'what i have'],
   innovation: [
@@ -91,7 +127,21 @@ const PRACTICE_KEYWORDS: Record<PracticeTag, string[]> = {
     'voice in the decision',
     'voice at the table',
   ],
-  peace: ['peace', 'feud', 'conflict', 'tension', 'rivalry', 'cycle', 'escalation', 'de-escalate'],
+  peace: [
+    'peace',
+    'feud',
+    'conflict',
+    'tension',
+    'rivalry',
+    'cycle',
+    'escalation',
+    'de-escalate',
+    // R13 — situational triggers
+    'at each other',
+    "won't talk",
+    'stalemate',
+    'deadlocked',
+  ],
 };
 
 const LEVEL_KEYWORDS: Record<LevelTag, string[]> = {
