@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-06T23:08:06.672Z",
+  "testId": "audit/R-04-prompt-assembly-failure-handled",
+  "controlId": "T3.Audit.R04_PromptAssemblyFailure",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "R-04: Step 8 catch wraps assemblePrompt and routes PromptAssemblyError to E11 + FALLBACK_DEGRADED via sendOutbound. The orchestrator must not rethrow.",
+  "phase": "phase-12"
+}
