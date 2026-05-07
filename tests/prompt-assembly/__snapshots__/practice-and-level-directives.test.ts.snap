@@ -1,0 +1,6 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Batch P Piece 1 — directives block > buildDirectivesBlock — snapshot trip-wire > canonical (integrity, self) directives block snapshot 1`] = `
+"## Required directives
+Your response must use **integrity** as the organizing frame of the answer, not just as a vocabulary word. Anchor at **self-level**: anchor on the leader's interior — what they feel, see, decide, learn — not on the people around them."
+`;
