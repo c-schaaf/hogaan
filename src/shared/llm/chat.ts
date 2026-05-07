@@ -15,7 +15,7 @@ export interface ChatRequest {
   messages: { role: 'user' | 'assistant'; content: string }[];
   /** Token budget for the model output. */
   maxTokens: number;
-  /** Per-call hard cap. Process #2 Step 9 caps primary at 5000ms. */
+  /** Per-call hard cap. Process #2 Step 9 caps primary at 12000ms. */
   primaryTimeoutMs?: number;
   fallbackTimeoutMs?: number;
   temperature?: number;
@@ -35,7 +35,7 @@ export interface ChatResponse {
 
 /**
  * Process #2 Step 9 dispatch:
- *   1. Anthropic Claude Haiku 4.5, hard-cap 5s
+ *   1. Anthropic Claude Haiku 4.5, hard-cap 12s
  *   2. On timeout / rate-limit / circuit-open → Groq Llama 3.3 70B fast model
  *   3. On content-filter from either provider → safe template (no model retry)
  *   4. On 5xx from primary → fail-closed (caller maps to E11)
@@ -47,7 +47,16 @@ export interface ChatResponse {
  * scenarios, supplied by the caller (Process #10 owns the canonical text).
  */
 
-const PRIMARY_TIMEOUT_DEFAULT_MS = 5000;
+// Raised from 5000ms to 12000ms on 2026-05-07 based on production diagnostic
+// showing Haiku TTFT + streaming on 3700-token coaching prompts routinely
+// exceeds 5s from Render-Virginia → Anthropic. Result: every coaching turn
+// was timing out Haiku and falling through to Llama, which fails Hogaan
+// voice rules at 4/9 QC checks. The 5000ms cap was a Batch C era default
+// tuned for small prompts. The total turn budget (LATENCY_BUDGET_MS = 15000)
+// gives room for this raise — primary should be ~80% of the budget, leaving
+// headroom for context-fetch, tagger, prompt-assembly, QC, and delivery.
+// See debug/full-pipeline-instrumentation 2026-05-07 logs for evidence.
+const PRIMARY_TIMEOUT_DEFAULT_MS = 12000;
 const FALLBACK_TIMEOUT_DEFAULT_MS = 2000;
 
 let primaryBreaker:
