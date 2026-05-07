@@ -32,13 +32,14 @@ async function runClassifier(
   systemPrompt: string,
   userPrompt: string,
 ): Promise<ClassifierJson> {
-  const res = await groqChat(config, {
-    model: 'llama-3.3-70b-versatile',
+  // Batch H — migrated from Groq Llama to Anthropic Haiku 4.5 via the
+  // classifierChat wrapper. Same JSON contract; the prefill-`{` pattern
+  // inside classifierChat handles Anthropic's lack of native JSON mode.
+  // Covers Checks 3, 4, 7, 12, 15 — every caller of runClassifier.
+  const res = await classifierChat(config, {
     systemPrompt,
-    messages: [{ role: 'user', content: userPrompt }],
+    userPrompt,
     maxTokens: CLASSIFIER_MAX_TOKENS,
-    temperature: 0,
-    jsonMode: true,
     timeoutMs: CLASSIFIER_TIMEOUT_MS,
   });
   let parsed: unknown;
