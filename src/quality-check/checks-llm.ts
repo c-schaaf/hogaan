@@ -156,13 +156,15 @@ Return strict JSON {"status": "pass"|"soft_fail"|"crisis"|"hard_fail", "reason":
   const userPrompt = `User message:\n"""\n${userMessage}\n"""\n\nCandidate response:\n"""\n${candidate}\n"""`;
 
   try {
-    const res = await groqChat(config, {
-      model: 'llama-3.3-70b-versatile',
+    // Batch H — migrated from Groq Llama to Anthropic Haiku 4.5 via the
+    // classifierChat wrapper. Same JSON contract; same fail-closed
+    // semantics on any error (catch block at function tail). Judge prompt
+    // and verdict-mapping switch are untouched per safety-critical
+    // contract (CLAUDE.md hard rule #1).
+    const res = await classifierChat(config, {
       systemPrompt: system,
-      messages: [{ role: 'user', content: userPrompt }],
+      userPrompt,
       maxTokens: CLASSIFIER_MAX_TOKENS,
-      temperature: 0,
-      jsonMode: true,
       timeoutMs: CLASSIFIER_TIMEOUT_MS,
     });
     const parsed = JSON.parse(res.text) as SafetyClassifierJson;
