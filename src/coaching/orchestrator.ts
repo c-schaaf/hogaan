@@ -459,6 +459,38 @@ export async function runCoachingTurn(
       ? 'E2_TurnCompletedSessionClosed'
       : 'E1_TurnCompleted';
 
+  // Batch P Piece 4 — extract verdicts from check_16 / check_17 outcomes
+  // for the trace. Both fields stay undefined when the corresponding
+  // check returned 'not_required' (which it should never on a coaching
+  // turn, but defensive). Service-unavailable flows through for visibility.
+  const groundingCheck = qc.checks.find((c) => c.checkId === 'check_17_practice_grounding');
+  const levelCheck = qc.checks.find((c) => c.checkId === 'check_16_level_fidelity');
+  let practiceGroundingVerdict:
+    | 'grounded'
+    | 'mentioned'
+    | 'absent'
+    | 'service_unavailable'
+    | undefined;
+  if (groundingCheck !== undefined) {
+    const o = groundingCheck.outcome;
+    if (o.status === 'pass') {
+      practiceGroundingVerdict = 'grounded';
+    } else if (o.status === 'soft_fail') {
+      practiceGroundingVerdict = o.reason.includes('absent') ? 'absent' : 'mentioned';
+    } else if (o.status === 'service_unavailable') {
+      practiceGroundingVerdict = 'service_unavailable';
+    }
+  }
+  let levelFidelityVerdict: 'pass' | 'drift' | undefined;
+  if (levelCheck !== undefined) {
+    const o = levelCheck.outcome;
+    if (o.status === 'pass') {
+      levelFidelityVerdict = 'pass';
+    } else if (o.status === 'soft_fail') {
+      levelFidelityVerdict = 'drift';
+    }
+  }
+
   // ---- Trace emit + return -------------------------------------------
   emitTurnTrace(deps.traceEmitter, inbound.traceId, {
     userIdHash,
@@ -476,6 +508,8 @@ export async function runCoachingTurn(
           : qc.endEvent === 'E6_ServiceUnavailable'
             ? 'service-unavailable'
             : 'skipped',
+    ...(practiceGroundingVerdict !== undefined ? { practiceGroundingVerdict } : {}),
+    ...(levelFidelityVerdict !== undefined ? { levelFidelityVerdict } : {}),
     degradationFlags: {
       memoryTruncated: promptBundle.degradationFlags.memoryTruncated,
       sessionTruncated: promptBundle.degradationFlags.sessionTruncated,
