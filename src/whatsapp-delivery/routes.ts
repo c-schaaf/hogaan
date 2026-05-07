@@ -1,6 +1,7 @@
 import formbody from '@fastify/formbody';
 import type { FastifyInstance } from 'fastify';
 import { reportP1 } from '../incident-handling/index.js';
+import { debugWarn } from '../shared/observability/debug-log.js';
 import type { Database, SqlClient } from '../shared/db/client.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
@@ -13,6 +14,27 @@ import {
   verifyTwilioSignature,
   WebhookSignatureError,
 } from './webhook.js';
+
+/** Helper: log via Fastify req.log.warn but never throw on failure. The
+ *  whole point of the debug branch is that nothing in instrumentation can
+ *  break the handler. If req.log itself is broken, fall through to the
+ *  no-pino debugWarn path. */
+function safeReqWarn(
+  req: { log?: { warn?: (obj: object, msg: string) => void } },
+  obj: object,
+  msg: string,
+): void {
+  try {
+    if (req.log !== undefined && typeof req.log.warn === 'function') {
+      req.log.warn(obj, msg);
+      return;
+    }
+  } catch {
+    /* fall through to debugWarn */
+  }
+  // Fallback: bypass pino entirely, write directly to stderr.
+  debugWarn('WEBHOOK', msg, obj as Record<string, unknown>);
+}
 
 export interface RoutesOptions {
   db: Database;
@@ -46,13 +68,17 @@ export async function registerWhatsAppRoutes(
   await app.register(formbody);
 
   app.post('/webhooks/twilio/inbound', async (req, reply) => {
-    // DEBUG INSTRUMENTATION (debug/full-pipeline-instrumentation) — remove
-    // once production silent-failure root cause is identified.
-    req.log.warn({ traceId: req.id }, 'WEBHOOK: handler entered');
-
+    // ORIGINAL handler entry (do not touch — was firing reliably for weeks).
     const signature = req.headers['x-twilio-signature'];
     const params = (req.body ?? {}) as Record<string, string>;
     const fullUrl = `${opts.publicBaseUrl.replace(/\/$/, '')}/webhooks/twilio/inbound`;
+
+    // DEBUG INSTRUMENTATION (debug/full-pipeline-instrumentation) —
+    // INTENTIONALLY placed AFTER the known-good lines above. The previous
+    // version put this as the first line of the handler, which created a
+    // new failure surface at handler entry. Now it cannot prevent the
+    // signature-verify path from running. safeReqWarn never throws.
+    safeReqWarn(req, { traceId: req.id ?? 'unknown' }, 'WEBHOOK: handler entered');
 
     try {
       verifyTwilioSignature(
@@ -68,11 +94,22 @@ export async function registerWhatsAppRoutes(
 
     const event = parseInboundMessage(params);
     if (event.kind !== 'inbound') {
-      req.log.warn({ kind: event.kind }, 'WEBHOOK: non-inbound event, returning 204');
+      safeReqWarn(req, { kind: event.kind }, 'WEBHOOK: non-inbound event, returning 204');
       return reply.code(204).send();
     }
-    req.log.warn(
+    // ORIGINAL info-level line — restored verbatim. Anyone grepping for
+    // 'twilio inbound received' must keep finding it. The new WEBHOOK:
+    // warn lines are ADDITIVE, not replacements.
+    req.log.info(
       { waMessageId: event.waMessageId, hasMedia: event.mediaUrls.length > 0 },
+      'twilio inbound received',
+    );
+    safeReqWarn(
+      req,
+      {
+        waMessageId: event.waMessageId ?? 'unknown',
+        hasMedia: event.mediaUrls?.length ?? 0 > 0,
+      },
       'WEBHOOK: inbound parsed',
     );
 
@@ -114,7 +151,7 @@ export async function registerWhatsAppRoutes(
       return reply.code(204).send();
     }
 
-    req.log.warn({ waMessageId: event.waMessageId }, 'WEBHOOK: about to enqueue');
+    safeReqWarn(req, { waMessageId: event.waMessageId ?? 'unknown' }, 'WEBHOOK: about to enqueue');
     try {
       await enqueueInbound(opts.redis, {
         inboundMessageSid: event.waMessageId,
@@ -124,14 +161,16 @@ export async function registerWhatsAppRoutes(
         receivedAtIso: event.receivedAt.toISOString(),
         traceId: req.id,
       });
-      req.log.warn(
-        { waMessageId: event.waMessageId, status: 'success' },
+      safeReqWarn(
+        req,
+        { waMessageId: event.waMessageId ?? 'unknown', status: 'success' },
         'WEBHOOK: enqueue returned',
       );
     } catch (err) {
-      req.log.warn(
+      safeReqWarn(
+        req,
         {
-          waMessageId: event.waMessageId,
+          waMessageId: event.waMessageId ?? 'unknown',
           status: 'failure',
           err: err instanceof Error ? err.message : String(err),
         },
