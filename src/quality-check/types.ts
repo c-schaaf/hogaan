@@ -46,7 +46,9 @@ export type CheckId =
   | 'check_12_tangible_action'
   | 'check_13_voice_consistency'
   | 'check_14_intent_length'
-  | 'check_15_useful_to_society_anchor';
+  | 'check_15_useful_to_society_anchor'
+  | 'check_16_level_fidelity'
+  | 'check_17_practice_grounding';
 
 export type CheckOutcome =
   | { status: 'pass' }

@@ -196,4 +196,108 @@ export function checkFormattingDiscipline(candidate: string): CheckResult {
   return { checkId: 'check_11_formatting_discipline', outcome };
 }
 
-export const _internal = { LENGTH_RANGES, countWords };
+/**
+ * Batch P Piece 2 — Check 16 deterministic level-fidelity.
+ *
+ * Density signal: count off-level phrases (drawn from the OTHER three
+ * levels' phrase sets) against on-level phrases for the tagged level. If
+ * off-level density meaningfully exceeds on-level density, soft_fail with
+ * the count signal. Conservative thresholds — false positives cost a
+ * regen round; false negatives are handled by the LLM-judged Check 17.
+ *
+ * Engineering-authored phrase lists; not Hamse content. Per level:
+ *   ON-level phrases — small set that signals correct anchoring.
+ *   OFF-level phrases — phrases from the OTHER 3 levels that signal drift.
+ *
+ * Skip semantics:
+ *   - responseMode !== 'FullCoachingResponse' → not_required
+ *   - levelTag undefined                       → not_required
+ */
+const ON_LEVEL_PHRASES: Record<LevelTag, string[]> = {
+  self: ['i feel', 'i notice', "i'm sitting with", 'within me', 'my own'],
+  team: ['my team', 'my report', 'one-on-one', 'team meeting'],
+  organization: ['the org', 'company-wide', 'cross-functional'],
+  community: ['civic', 'community', 'sector', 'public'],
+};
+
+const OFF_LEVEL_PHRASES: Record<LevelTag, string[]> = {
+  // For self-tagged: drift = team / org / community phrasing
+  self: [
+    'your team needs',
+    'the team should',
+    'your colleagues',
+    'cross-functional',
+    'company-wide',
+    'the org',
+    'the sector',
+  ],
+  // For team-tagged: drift = self-introspection or org-structural
+  team: [
+    'your own integrity',
+    'within yourself',
+    'company-wide',
+    'the org',
+    'cross-functional',
+    'civic',
+    'sectoral',
+  ],
+  // For org-tagged: drift = self-introspection or team-meeting specifics
+  organization: [
+    'within yourself',
+    'your own',
+    'the team meeting',
+    'one-on-one',
+    'civic',
+    'community at large',
+  ],
+  // For community-tagged: drift = self / team / private-org
+  community: ['within yourself', 'your own', 'your team', 'company-wide', 'the org'],
+};
+
+function countSubstringHits(haystack: string, needles: string[]): number {
+  let n = 0;
+  for (const needle of needles) {
+    let idx = 0;
+    while ((idx = haystack.indexOf(needle, idx)) !== -1) {
+      n += 1;
+      idx += needle.length;
+    }
+  }
+  return n;
+}
+
+export function check16LevelFidelity(
+  candidate: string,
+  levelTag: LevelTag | undefined,
+  responseMode: ResponseMode,
+): CheckResult {
+  if (responseMode !== 'FullCoachingResponse' || levelTag === undefined) {
+    return { checkId: 'check_16_level_fidelity', outcome: { status: 'not_required' } };
+  }
+  const lower = candidate.toLowerCase();
+  const onHits = countSubstringHits(lower, ON_LEVEL_PHRASES[levelTag]);
+  const offHits = countSubstringHits(lower, OFF_LEVEL_PHRASES[levelTag]);
+
+  // Trigger condition: at least 2 off-level hits AND off-level density > 2× on-level.
+  // The 2-hit floor avoids tripping on a one-word incidental mention; the
+  // 2× ratio gives the response room to reference other levels in passing.
+  const triggers = offHits >= 2 && offHits > Math.max(1, onHits) * 2;
+
+  let outcome: CheckOutcome;
+  if (triggers) {
+    outcome = {
+      status: 'soft_fail',
+      reason: `level drift: ${offHits} off-level phrase hit(s) vs ${onHits} on-level for tagged ${levelTag}`,
+    };
+  } else {
+    outcome = { status: 'pass' };
+  }
+  return { checkId: 'check_16_level_fidelity', outcome };
+}
+
+export const _internal = {
+  LENGTH_RANGES,
+  countWords,
+  ON_LEVEL_PHRASES,
+  OFF_LEVEL_PHRASES,
+};

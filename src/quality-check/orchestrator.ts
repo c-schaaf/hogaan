@@ -16,6 +16,7 @@ import {
   check5HeroToGuide,
   check6UsefulToSociety,
   check9Length,
+  check16LevelFidelity,
   checkFormattingDiscipline,
 } from './checks-rule-based.js';
 import { checkIntentLengthAsCheckResult } from './intent-length-bands.js';
@@ -256,6 +257,8 @@ async function runAllChecks(
     check9Length(candidate, input.responseMode),
     checkFormattingDiscipline(candidate),
     checkIntentLengthAsCheckResult(candidate, input.intent),
+    // Batch P Piece 2 — deterministic level-fidelity (off-level density signal).
+    check16LevelFidelity(candidate, input.predictedLevelTag, input.responseMode),
   ];
   const llm = await Promise.all([
     check3SignatureStructure(deps.config, candidate),
