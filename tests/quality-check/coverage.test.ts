@@ -48,6 +48,7 @@ const ALL_CHECK_IDS: readonly CheckId[] = [
   'check_14_intent_length',
   'check_15_useful_to_society_anchor',
   'check_16_level_fidelity',
+  'check_17_practice_grounding',
 ];
 
 const fakeLibraries: ResolvedLibraries = {

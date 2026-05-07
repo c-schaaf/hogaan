@@ -6,6 +6,7 @@ import {
   check4AssetBased,
   check7Tone,
   check8SafetyCrisis,
+  check17PracticeGrounding,
   checkLivedExperienceDiscipline,
   checkTangibleAction,
   checkUsefulToSocietyAnchor,
@@ -269,6 +270,8 @@ async function runAllChecks(
     checkTangibleAction(deps.config, candidate),
     checkVoiceConsistency(deps.config, candidate),
     checkUsefulToSocietyAnchor(deps.config, candidate),
+    // Batch P Piece 3 — LLM-judged practice grounding (parallel batch).
+    check17PracticeGrounding(deps.config, input.userMessage, candidate, input.predictedPracticeTag),
   ]);
   return [...sync, ...llm];
 }

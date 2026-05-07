@@ -1,6 +1,7 @@
 import { groqChat } from '../shared/llm/groq.js';
 import { LlmError } from '../shared/llm/errors.js';
 import type { AppConfig } from '../shared/secrets/config.js';
+import type { PracticeTag } from '../shared/types/index.js';
 import type { CheckOutcome, CheckResult } from './types.js';
 
 /**
@@ -331,4 +332,95 @@ function makeServiceUnavailable(checkId: CheckResult['checkId'], err: unknown): 
     checkId,
     outcome: { status: 'service_unavailable', reason },
   };
+}
+
+/**
+ * Batch P Piece 3 — Check 17 LLM-judged practice grounding.
+ *
+ * Asks Groq Llama whether the response uses the tagged practice as the
+ * organizing frame of the answer or merely as a vocabulary word.
+ *
+ * Deterministic precheck: if the candidate (lowercased) does not include
+ * the practice tag word at all, skip the LLM call and auto-set verdict
+ * to soft_fail. Saves cost on the easy negative cases.
+ *
+ * Verdict mapping:
+ *   - 'grounded'  → pass
+ *   - 'mentioned' → soft_fail (drift; eligible for regen)
+ *   - 'absent'    → soft_fail (drift; eligible for regen)
+ *
+ * Skip semantics:
+ *   - practiceTag undefined → not_required (untagged response modes
+ *     don't reach QC anyway, but defensive guard)
+ */
+interface GroundingClassifierJson {
+  verdict: 'grounded' | 'mentioned' | 'absent';
+  evidence_quote?: string;
+}
+
+export async function check17PracticeGrounding(
+  config: AppConfig,
+  userMessage: string,
+  candidate: string,
+  practiceTag: PracticeTag | undefined,
+): Promise<CheckResult> {
+  if (practiceTag === undefined) {
+    return { checkId: 'check_17_practice_grounding', outcome: { status: 'not_required' } };
+  }
+
+  // Deterministic precheck — if the practice word is not present at all,
+  // the LLM call is unnecessary; verdict is 'absent' by construction.
+  if (!candidate.toLowerCase().includes(practiceTag.toLowerCase())) {
+    return {
+      checkId: 'check_17_practice_grounding',
+      outcome: {
+        status: 'soft_fail',
+        reason: `practice grounding absent: tag "${practiceTag}" not present in response`,
+      },
+    };
+  }
+
+  const system = `You are evaluating whether a coaching response uses a tagged practice as its organizing frame. Return STRICT JSON: {"verdict": "grounded" | "mentioned" | "absent", "evidence_quote": "≤120 chars"}. "grounded" = the practice shapes the structure of the answer. "mentioned" = the word appears but the answer is organized around something else. "absent" = the practice is not represented.`;
+  const userPrompt = `Tagged practice: ${practiceTag}\n\nUser message:\n"""\n${userMessage}\n"""\n\nResponse:\n"""\n${candidate}\n"""`;
+
+  try {
+    const res = await groqChat(config, {
+      model: 'llama-3.3-70b-versatile',
+      systemPrompt: system,
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens: CLASSIFIER_MAX_TOKENS,
+      temperature: 0,
+      jsonMode: true,
+      timeoutMs: CLASSIFIER_TIMEOUT_MS,
+    });
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(res.text);
+    } catch {
+      throw new Error(`grounding classifier returned invalid JSON: ${res.text.slice(0, 200)}`);
+    }
+    if (parsed === null || typeof parsed !== 'object') {
+      throw new Error('grounding classifier did not return an object');
+    }
+    const obj = parsed as Record<string, unknown>;
+    const verdict = obj['verdict'];
+    if (verdict !== 'grounded' && verdict !== 'mentioned' && verdict !== 'absent') {
+      throw new Error(`grounding classifier missing valid verdict (got: ${String(verdict)})`);
+    }
+    const grounding: GroundingClassifierJson['verdict'] = verdict;
+    const evidenceQuote = typeof obj['evidence_quote'] === 'string' ? obj['evidence_quote'] : '';
+
+    let outcome: CheckOutcome;
+    if (grounding === 'grounded') {
+      outcome = { status: 'pass' };
+    } else {
+      outcome = {
+        status: 'soft_fail',
+        reason: `practice ${grounding}${evidenceQuote.length > 0 ? `: ${evidenceQuote}` : ''}`,
+      };
+    }
+    return { checkId: 'check_17_practice_grounding', outcome };
+  } catch (err) {
+    return makeServiceUnavailable('check_17_practice_grounding', err);
+  }
 }
