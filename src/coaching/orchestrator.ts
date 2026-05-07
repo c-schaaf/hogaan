@@ -349,6 +349,9 @@ export async function runCoachingTurn(
       predictedLevelTag: tags.levelTag,
       userId: inbound.userId,
       sessionId: session.sessionId,
+      // R-07 — propagate the turn budget so QC can skip regen rather
+      // than blow PRD §5.1's 6000ms cap.
+      deadlineAt: t0 + LATENCY_BUDGET_MS,
     },
   );
 

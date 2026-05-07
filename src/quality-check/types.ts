@@ -24,6 +24,11 @@ export interface QcInput {
   userId?: UserId;
   sessionId?: SessionId;
   turnId?: TurnId;
+  /** Audit R-07 — wall-clock timestamp (Date.now()) past which the regen
+   *  loop must skip and return E6 + degraded fallback. Caller computes as
+   *  `t0 + LATENCY_BUDGET_MS`. Optional: when undefined, the regen loop
+   *  runs to MAX_RETRIES without elapsed-time skipping. */
+  deadlineAt?: number;
 }
 
 export type CheckId =

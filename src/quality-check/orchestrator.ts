@@ -168,6 +168,28 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
       };
     }
 
+    // R-07 — skip regen if the turn budget is already exhausted. A regen
+    // attempt past the deadline can only push the total turn well past
+    // PRD §5.1's 6000ms cap; degrade gracefully instead.
+    if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
+      reportIncident('P2', 'QC regen skipped — turn budget already exhausted', {
+        source: 'Process_10.RegenSkipBudget',
+        extra: {
+          retryCount,
+          failedChecks: failingChecks.map((c) => c.checkId),
+        },
+      });
+      return {
+        endEvent: 'E6_ServiceUnavailable',
+        responseText: fallbackDegraded(),
+        crisisDetected: false,
+        retryCount,
+        degraded: true,
+        checks,
+        correctivePromptHistory,
+      };
+    }
+
     // 6. Build corrective prompt and regenerate.
     const regenResult = await regenerate(deps.config, {
       originalSystemPrompt: deps.originalSystemPrompt,
