@@ -24,6 +24,19 @@ vi.mock('../../src/shared/llm/groq.js', () => ({
   ),
 }));
 
+// Batch G — check_17 practice grounding migrated from groqChat to
+// classifierChat (Anthropic Haiku 4.5). Mock returns a valid 'grounded'
+// verdict so the check produces a pass outcome.
+vi.mock('../../src/shared/llm/classifier.js', () => ({
+  classifierChat: vi.fn(() =>
+    Promise.resolve({
+      text: JSON.stringify({ verdict: 'grounded', evidence_quote: 'q' }),
+      inputTokens: 100,
+      outputTokens: 20,
+    }),
+  ),
+}));
+
 vi.mock('../../src/shared/embeddings/index.js', () => ({
   embedQuery: vi.fn(() => Promise.resolve(new Array(1024).fill(0.01))),
   embedDocument: vi.fn(() => Promise.resolve(new Array(1024).fill(0.01))),
