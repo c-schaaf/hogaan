@@ -292,9 +292,14 @@ export async function runCoachingTurn(
     );
   } catch (err) {
     if (isFailClosedLlmError(err)) {
+      // R-04 cousin (Batch B.1) — dispatch the user-facing fallback before
+      // finalize. Pre-fix the orchestrator returned `responseText: ''` and
+      // the user received nothing on a primary+fallback LLM failure.
+      const body = fallbackDegraded();
+      await sendBody(deps, inbound, body, 'llm-call-failure');
       return finalize(deps, inbound, {
         endEvent: 'E11_ServiceUnavailable',
-        responseText: '',
+        responseText: body,
         practiceTag: tags.practiceTag,
         levelTag: tags.levelTag,
         latencyMs: Date.now() - t0,

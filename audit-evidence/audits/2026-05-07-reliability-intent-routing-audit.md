@@ -94,3 +94,15 @@ Branch: `fix/batch-b-orchestrator-structural`. 5 commits, suite at 669 passed / 
 - Bug 3 (FALLBACK_DEGRADED on real coaching) — partially covered by R-04 test 1; live root-cause analysis of the QC service-unavailable path is a separate Batch C/D concern.
 
 **Outstanding from this audit (not closed in Batch B):** R-03, R-05, R-06, R-07, R-08, R-09, R-10, R-11, R-13, R-14, R-15, R-16, R-17, R-18, R-19, R-20, R-21, R-22, R-23. See "Recommended audit-to-TDD batches" section above for grouping. **R-05 (CRITICAL — emotional-distress crisis-adjacency) and R-13 (CRITICAL — Tier-B not in CI) remain open as the Phase A blockers.**
+
+## Batch B.1 closure status (2026-05-07)
+
+Branch: `fix/batch-b1-step9-llm-error-dispatch`. 1 source commit + 1 docs commit, suite at 672 passed / 3 todo / 0 failed.
+
+| Risk | Severity | Status | Test file | Source change | Commit | Evidence |
+|---|---|---|---|---|---|---|
+| R-04 cousin (Step 9) | (CRITICAL — same class as R-04) | PASS | [tests/coaching/orchestrator-llm-call-failure.test.ts](tests/coaching/orchestrator-llm-call-failure.test.ts) | [src/coaching/orchestrator.ts](src/coaching/orchestrator.ts) lines 294–308: insert `sendBody(...fallbackDegraded()...)` before `finalize`, set `responseText: body` instead of `''`. Mirrors R-04's Step 8 fix on the primary LLM call path. Narrow `isFailClosedLlmError` discriminator preserved; content-filter and rethrow branches untouched. | `7b96518` | 3 evidence rows under `audit-evidence/phase-12/2026-05-07-audit-r-04-cousin-*.json` |
+
+**Bug 3 regression lock complete:** Bug 3 (FALLBACK_DEGRADED on real coaching prompt) was previously possible from either Step 8 (R-04 closed) or Step 9 (this batch). Both code paths now dispatch the user-visible body before `finalize`. Test 3 of `orchestrator-llm-call-failure.test.ts` is the explicit lock: `expect(result.responseText).toBe(FALLBACK_DEGRADED)`.
+
+**`finalizeAsServiceUnavailable` helper** to dedupe Step 8 + Step 9 catches remains DEFERRED — both call sites now follow identical patterns and the duplication is a candidate for a future refactor batch.
