@@ -15,27 +15,6 @@ import {
   WebhookSignatureError,
 } from './webhook.js';
 
-/** Helper: log via Fastify req.log.warn but never throw on failure. The
- *  whole point of the debug branch is that nothing in instrumentation can
- *  break the handler. If req.log itself is broken, fall through to the
- *  no-pino debugWarn path. */
-function safeReqWarn(
-  req: { log?: { warn?: (obj: object, msg: string) => void } },
-  obj: object,
-  msg: string,
-): void {
-  try {
-    if (req.log !== undefined && typeof req.log.warn === 'function') {
-      req.log.warn(obj, msg);
-      return;
-    }
-  } catch {
-    /* fall through to debugWarn */
-  }
-  // Fallback: bypass pino entirely, write directly to stderr.
-  debugWarn('WEBHOOK', msg, obj as Record<string, unknown>);
-}
-
 export interface RoutesOptions {
   db: Database;
   sql: SqlClient;
@@ -66,6 +45,27 @@ export async function registerWhatsAppRoutes(
   opts: RoutesOptions,
 ): Promise<void> {
   await app.register(formbody);
+
+  // Helper: log via Fastify req.log.warn but never throw on failure. The
+  // whole point of the debug branch is that nothing in instrumentation can
+  // break the handler. If req.log itself is broken, fall through to the
+  // no-pino debugWarn path. Scoped inside registerWhatsAppRoutes so it has
+  // zero module-level surface.
+  const safeReqWarn = (
+    req: { log?: { warn?: (obj: object, msg: string) => void } },
+    obj: object,
+    msg: string,
+  ): void => {
+    try {
+      if (req.log !== undefined && typeof req.log.warn === 'function') {
+        req.log.warn(obj, msg);
+        return;
+      }
+    } catch {
+      /* fall through to debugWarn */
+    }
+    debugWarn('WEBHOOK', msg, obj as Record<string, unknown>);
+  };
 
   app.post('/webhooks/twilio/inbound', async (req, reply) => {
     // ORIGINAL handler entry (do not touch — was firing reliably for weeks).
