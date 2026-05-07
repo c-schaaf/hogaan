@@ -72,10 +72,11 @@ const LATENCY_BUDGET_MS = 15000;
  * Process #2 — Coaching Conversation orchestrator. Implements the full BPMN.
  *
  * Latency budget: total turn p99 ≤ 15s (raised from 6s on 2026-05-07; see
- * LATENCY_BUDGET_MS rationale above). Primary LLM cap 5s. Triage (parallel
- * keyword + Groq, ~1s p99). Context fetch ~250ms. QC ~1s. Comfortable
- * worst case: 1s triage + 250ms context + 5s primary + 1s QC ≈ 7.5s,
- * which now fits well inside the budget rather than racing it.
+ * LATENCY_BUDGET_MS rationale above). Primary LLM cap 12s (raised from 5s
+ * on 2026-05-07; see PRIMARY_TIMEOUT_DEFAULT_MS rationale in chat.ts).
+ * Triage (parallel keyword + Groq, ~1s p99). Context fetch ~250ms. QC ~1s.
+ * Comfortable worst case: 1s triage + 250ms context + 12s primary + 1s QC
+ * ≈ 14.25s, which sits just inside the 15s budget.
  */
 export async function runCoachingTurn(
   deps: CoachingDeps,
