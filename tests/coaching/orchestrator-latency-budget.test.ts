@@ -21,12 +21,17 @@ import {
 } from '../phase-10/helpers/fakes.js';
 
 /**
- * R-06 (HIGH audit risk) — total turn budget (PRD §5.1, p99 ≤ 6000ms)
- * must be enforced before delivery. Pre-fix: a pathological turn could
- * run multi-tens-of-seconds and the user would either wait or receive
- * a stale-feeling answer. Post-fix: when elapsed time exceeds
- * LATENCY_BUDGET_MS at the deadline check (just before Step 11), the
- * orchestrator routes to FALLBACK_DEGRADED + E11_ServiceUnavailable.
+ * R-06 (HIGH audit risk) — total turn budget must be enforced before
+ * delivery. Pre-fix: a pathological turn could run multi-tens-of-seconds
+ * and the user would either wait or receive a stale-feeling answer.
+ * Post-fix: when elapsed time exceeds LATENCY_BUDGET_MS at the deadline
+ * check (just before Step 11), the orchestrator routes to
+ * FALLBACK_DEGRADED + E11_ServiceUnavailable.
+ *
+ * Budget value: 15000ms (raised from PRD §5.1's 6000ms target on
+ * 2026-05-07; see [src/coaching/orchestrator.ts](src/coaching/orchestrator.ts)
+ * LATENCY_BUDGET_MS rationale). The PRD target stays as the long-term
+ * goal once geographic-route latency improves.
  *
  * Tests use Date.now mocking (not fake timers) for deterministic elapsed
  * control without coupling to setTimeout internals.
@@ -240,8 +245,8 @@ afterEach(() => {
 });
 
 describe('R-06 latency budget', () => {
-  it('LATENCY_BUDGET_MS is 6000ms (PRD §5.1)', () => {
-    expect(_internal.LATENCY_BUDGET_MS).toBe(6000);
+  it('LATENCY_BUDGET_MS is 15000ms (raised from 6000ms on 2026-05-07; see orchestrator.ts rationale)', () => {
+    expect(_internal.LATENCY_BUDGET_MS).toBe(15000);
   });
 
   it('over-budget pre-delivery → FALLBACK_DEGRADED + E11', async () => {
@@ -251,10 +256,10 @@ describe('R-06 latency budget', () => {
         controlId: 'T3.Audit.R06_LatencyBudget_OverBudget',
         tier: 'T3',
         description:
-          'R-06: when elapsed time at the deadline check exceeds LATENCY_BUDGET_MS (6000ms), orchestrator routes to FALLBACK_DEGRADED + E11_ServiceUnavailable instead of shipping the coaching response.',
+          'R-06: when elapsed time at the deadline check exceeds LATENCY_BUDGET_MS (15000ms), orchestrator routes to FALLBACK_DEGRADED + E11_ServiceUnavailable instead of shipping the coaching response.',
       },
       async () => {
-        const restore = withFakeNow(7000); // 7s elapsed — over budget
+        const restore = withFakeNow(16000); // 16s elapsed — over budget
         try {
           const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
           const sendSpy = vi.mocked(wppMod.sendOutbound);
@@ -309,17 +314,17 @@ describe('R-06 latency budget', () => {
     );
   });
 
-  it('exactly at boundary (6000ms) is treated as under (predicate is `>`, not `>=`)', async () => {
+  it('exactly at boundary (15000ms) is treated as under (predicate is `>`, not `>=`)', async () => {
     await withVoiceFidelityEvidence(
       {
         testId: 'audit/R-06-boundary-pass',
         controlId: 'T3.Audit.R06_LatencyBudget_Boundary',
         tier: 'T3',
         description:
-          'R-06 boundary: an elapsed-time of exactly 6000ms ships normally. The deadline predicate is strict `>`, not `>=`. Locks the boundary semantics.',
+          'R-06 boundary: an elapsed-time of exactly 15000ms ships normally. The deadline predicate is strict `>`, not `>=`. Locks the boundary semantics.',
       },
       async () => {
-        const restore = withFakeNow(6000); // exactly at the boundary
+        const restore = withFakeNow(15000); // exactly at the boundary
         try {
           const result = await runCoachingTurn(deps(), buildInbound('boundary question'));
           expect(result.endEvent).toBe('E1_TurnCompleted');
