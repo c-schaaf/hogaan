@@ -106,3 +106,20 @@ Branch: `fix/batch-b1-step9-llm-error-dispatch`. 1 source commit + 1 docs commit
 **Bug 3 regression lock complete:** Bug 3 (FALLBACK_DEGRADED on real coaching prompt) was previously possible from either Step 8 (R-04 closed) or Step 9 (this batch). Both code paths now dispatch the user-visible body before `finalize`. Test 3 of `orchestrator-llm-call-failure.test.ts` is the explicit lock: `expect(result.responseText).toBe(FALLBACK_DEGRADED)`.
 
 **`finalizeAsServiceUnavailable` helper** to dedupe Step 8 + Step 9 catches remains DEFERRED — both call sites now follow identical patterns and the duplication is a candidate for a future refactor batch.
+
+## Batch C closure status (2026-05-07)
+
+Branch: `fix/batch-c-latency-budget-enforcement`. 2 source commits + 1 docs commit, suite at 680 passed / 3 todo / 0 failed.
+
+| Risk | Severity | Status | Test file | Source change | Commit |
+|---|---|---|---|---|---|
+| R-06 | HIGH | PASS | [tests/coaching/orchestrator-latency-budget.test.ts](tests/coaching/orchestrator-latency-budget.test.ts) | [src/coaching/orchestrator.ts](src/coaching/orchestrator.ts) — new `LATENCY_BUDGET_MS = 6000` constant + soft-deadline check between QC return and Step 11 delivery. On overrun: `sendBody(...fallbackDegraded()...)` then `finalize(E11, reason: 'budget exceeded')`. Strict `>` predicate: 6000ms exactly still ships. `LATENCY_BUDGET_MS` exposed via `_internal`. | `9c56c67` |
+| R-07 | HIGH | PASS | [tests/quality-check/corrective.test.ts](tests/quality-check/corrective.test.ts) | Four coordinated changes: (1) [src/quality-check/corrective.ts](src/quality-check/corrective.ts) `REGEN_TIMEOUT_MS` reduced 15_000 → 3_000 + `_internal` export; (2) [src/quality-check/types.ts](src/quality-check/types.ts) `QcInput` gains optional `deadlineAt?: number`; (3) [src/quality-check/orchestrator.ts](src/quality-check/orchestrator.ts) pre-regen guard returns E6 + `fallbackDegraded()` when `Date.now() >= deadlineAt`; (4) [src/coaching/orchestrator.ts](src/coaching/orchestrator.ts) Step 10 invocation passes `deadlineAt: t0 + LATENCY_BUDGET_MS`. | `1789922` |
+
+**Coupled enforcement:** R-06 catches turns that already ran over the budget at the deadline check. R-07's elapsed-time guard prevents QC from compounding the overrun — regen is skipped rather than allowed to push the total turn deep into multi-tens-of-seconds territory. Together, the worst-case turn is now ≤ ~6s + one in-flight regen attempt at ≤3s = ~9s, vs the pre-Batch-C worst case of 51s.
+
+**Tradeoff documented:** R-07's 3000ms regen cap will time out cross-region Anthropic Haiku calls (typical 4–5s). This is an accepted trade-off — regen quality < total latency budget per PRD §5.1. Cross-region migration would relax this; production-region steady-state should fit within 3s.
+
+**Strategy 2 (multi-point R-06 checks)** remains DEFERRED. If telemetry post-Batch-C shows late-turn aborts (i.e., the orchestrator routinely runs over budget by the time the deadline check fires), follow up with checks at each step boundary. For now the single check is sufficient.
+
+**`finalizeAsServiceUnavailable` helper** now has FOUR matching call sites (Step 8 R-04, Step 9 R-04 cousin, Step 11 R-06, R-07's E6 path). The dedup refactor candidate is increasingly justified but remains DEFERRED for a future cleanup batch.
