@@ -55,20 +55,28 @@ const MEDIA_REJECT_TEMPLATE = `I work with text only for now. Type out what's on
 const GREETING_RESPONSE = `Salaam. I'm Hogaan, here when you have a leadership challenge to think through — a hard conversation, a stuck team, a decision under pressure. Tell me what's on your mind.`;
 const AFFIRMATION_RESPONSE = `Glad it landed. I'm here when the next thing surfaces.`;
 
-// R-06 — total turn budget (PRD §5.1). Soft deadline checked just before
-// Step 11 delivery. When exceeded the orchestrator routes to the existing
+// R-06 — total turn budget. Soft deadline checked just before Step 11
+// delivery. When exceeded the orchestrator routes to the existing
 // E11_ServiceUnavailable path with FALLBACK_DEGRADED. Predicate is `>` not
 // `>=`: a turn that lands exactly at the boundary still ships.
-const LATENCY_BUDGET_MS = 6000;
+//
+// Raised from 6000ms to 15000ms on 2026-05-07 based on production smoke-test
+// evidence: post-Batch-H Haiku latencies on long prompts (3700+ tokens) from
+// the Render-Virginia → Anthropic geographic route routinely exceed 6s,
+// causing every coaching turn to fail the budget and ship FALLBACK_DEGRADED.
+// Trade-off: longer wait when system is healthy, in exchange for actually
+// delivering coaching. Diverges from PRD §5.1's 6s target — revisit when we
+// have edge POPs or smaller prompts.
+const LATENCY_BUDGET_MS = 15000;
 
 /**
  * Process #2 — Coaching Conversation orchestrator. Implements the full BPMN.
  *
- * Latency budget: total turn p99 ≤ 6s. Primary LLM cap 5s. Triage
- * (parallel keyword + Groq, ~1s p99). Context fetch ~250ms. QC ~1s.
- * Worst case: 1s triage + 250ms context + 5s primary + 1s QC = ~7.25s in
- * extreme cases — caller must accept that the budget is a target, not a
- * hard SLA.
+ * Latency budget: total turn p99 ≤ 15s (raised from 6s on 2026-05-07; see
+ * LATENCY_BUDGET_MS rationale above). Primary LLM cap 5s. Triage (parallel
+ * keyword + Groq, ~1s p99). Context fetch ~250ms. QC ~1s. Comfortable
+ * worst case: 1s triage + 250ms context + 5s primary + 1s QC ≈ 7.5s,
+ * which now fits well inside the budget rather than racing it.
  */
 export async function runCoachingTurn(
   deps: CoachingDeps,
@@ -430,7 +438,7 @@ export async function runCoachingTurn(
       userId: inbound.userId,
       sessionId: session.sessionId,
       // R-07 — propagate the turn budget so QC can skip regen rather
-      // than blow PRD §5.1's 6000ms cap.
+      // than blow LATENCY_BUDGET_MS.
       deadlineAt: t0 + LATENCY_BUDGET_MS,
     },
   );
