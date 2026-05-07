@@ -184,3 +184,53 @@ Branch: `fix/batch-c-latency-budget-enforcement`. 2 source commits + 1 docs comm
 - Migrating the eight Groq-backed LLM-judged QC checks (3/4/7/8/10/12/13/15) via `runClassifier`. Same one-line swap pattern; deferred until 503s manifest there too.
 - Migrating the chat fallback path off Groq. Currently `chat.ts` is `Anthropic primary → Groq fallback → safe template`. Replacing the Groq fallback would require designing a new fallback strategy (Anthropic with smaller model? template-only?). Out of scope for a reliability hotfix.
 - Smoke-running real Haiku 4.5 traffic against the Tier-B indirect-crisis fixtures to validate recall parity with Groq Llama 70B. CI keeps the structural mock; live verification is a Bucket-3 voice-smoke entry.
+
+---
+
+## Batch H — Groq → Anthropic Haiku migration completion (2026-05-07)
+
+**Trigger:** Production logs from 2026-05-07 confirm Step 10 QC was returning E6_ServiceUnavailable under load because eight LLM-judged checks still ran on Groq and Groq was intermittently 503-ing. Batch G migrated 2/10 sites (triage + Check 17). Batch H finishes the remaining 7 (Check 13 turned out to be embedding-based, not Groq — see scope correction below).
+
+**Scope correction from initial brief:** The initial brief listed eight remaining sites (3, 4, 7, 8, 10, 12, 13, 15). On exploration, **Check 13 (voice-consistency) does not use Groq at all** — it uses Voyage embeddings + cosine similarity in [src/quality-check/voice-consistency.ts](src/quality-check/voice-consistency.ts). Real Batch H scope: **7 sites** (3, 4, 7, 8, 10, 12, 15).
+
+**Architecture:** All seven sites converged on the existing [classifierChat](src/shared/llm/classifier.ts) wrapper from Batch G. No new wrapper or new dependency. The `runClassifier` helper inside [src/quality-check/checks-llm.ts](src/quality-check/checks-llm.ts) is shared by 5 of the 7 (Checks 3, 4, 7, 12, 15) — single source edit migrates all five. The other two (Checks 8, 10) had inline `groqChat` calls (because their JSON contracts return `{status}` and `{score}` rather than `{pass}`); migrated separately.
+
+**Failure semantics preserved:**
+- Checks 3, 4, 7, 10, 12, 15: any LlmError → service_unavailable. Orchestrator treats as quality-shaping skip (not safety fail-closed). Behavior unchanged.
+- Check 8: any LlmError → service_unavailable, fail-closed. Orchestrator MUST route to E6 (CLAUDE.md hard rule #1). Behavior unchanged. Judge prompt and verdict-mapping switch explicitly preserved (pinned by a system-prompt structure test).
+
+**Test coverage gap closed:** Before Batch H, only Checks 10, 12, and 17 had dedicated unit tests; Checks 3, 4, 7, 8, 15 had only indirect coverage via [coverage.test.ts](tests/quality-check/coverage.test.ts). Most consequential gap: Check 8, the safety-critical Tier-B crisis re-classifier, had **zero direct tests**. Batch H adds dedicated test files for all five missing checks, including a 9-test suite for Check 8 with explicit crisis-routing negative assertions.
+
+| Group | Status | Test files | Source change | Commits (RED → GREEN) |
+|---|---|---|---|---|
+| A — `runClassifier` migration (Checks 3, 4, 7, 12, 15) | PASS | NEW: [signature-structure.test.ts](tests/quality-check/signature-structure.test.ts), [asset-based.test.ts](tests/quality-check/asset-based.test.ts), [tone.test.ts](tests/quality-check/tone.test.ts), [useful-to-society-anchor.test.ts](tests/quality-check/useful-to-society-anchor.test.ts) (5 tests each); UPDATED [tangible-action.test.ts](tests/quality-check/tangible-action.test.ts) (mock repoint + regression guard) | [checks-llm.ts](src/quality-check/checks-llm.ts) — `runClassifier` body swap from `groqChat` to `classifierChat`. [coverage.test.ts](tests/quality-check/coverage.test.ts) — `classifier.js` mock upgraded to union response (`verdict`+`pass`+`status`+`score`+`reason`). | `685e300` → `4caf5d8` |
+| B — Check 8 safety-crisis migration | PASS | NEW: [safety-crisis.test.ts](tests/quality-check/safety-crisis.test.ts) (9 tests including crisis-routing negative + system-prompt structure pin) | [checks-llm.ts](src/quality-check/checks-llm.ts) — `check8SafetyCrisis` inline `groqChat` call swapped for `classifierChat`. Judge prompt + verdict-mapping + fail-closed catch block UNTOUCHED. | `e1500b5` → `cd22ddc` |
+| C — Check 10 lived-experience migration | PASS | UPDATED: [lived-experience.test.ts](tests/quality-check/lived-experience.test.ts) (mock repoint + regression guard); UPDATED: [corrective.test.ts](tests/quality-check/corrective.test.ts) (added classifier.js mock so R-07 regen tests survive the migration) | [checks-llm.ts](src/quality-check/checks-llm.ts) — `checkLivedExperienceDiscipline` inline call swap; `groqChat` import removed (no callers left in this file); file header docblock updated to reflect Anthropic Haiku 4.5 + new check coverage list. | `4c71edd` → `d602b22` |
+
+**Suite delta:** 735 → 766 tests passing (+31 net: 25 new for Checks 3/4/7/15/12 (5 tests × 5 files, of which 5 in tangible-action.test.ts replaced existing 4 + added 1 regression guard); 9 new for Check 8; 1 new regression guard for Check 10). Typecheck + lint clean at every commit boundary.
+
+**Test-discipline notes:**
+- Each migration group is committed as a RED → GREEN pair: the test commit lands first with the source still calling `groqChat` (suite RED at HEAD), then the source commit flips it GREEN. Bisecting between the two commits in any group will show the source change as the GREEN-flipping moment.
+- Three commits intentionally land RED at HEAD (Group A RED, Group B RED, Group C RED). This is documented TDD discipline rather than broken-window negligence.
+
+**Cost & latency impact (cumulative with Batch G):**
+- Total Anthropic calls per coaching turn after Batch H: 2 (triage + primary chat) + 7 LLM-judged QC checks (3, 4, 7, 8, 10, 12, 15) + 1 (Check 17) = **10 Anthropic calls per turn**.
+- Per-turn cost increase from Batch G state: ~$0.003/turn → ~$3,000 per million coaching turns. Trivial at MVP scale.
+- All 7 QC LLM calls run in parallel via `Promise.all` inside the orchestrator. Wall-clock budget bounded by the slowest single Haiku call — same shape as before, just on Anthropic infrastructure. p99 turn budget remains well under the 6s PRD ceiling.
+
+**Reliability impact:** removes Groq 503s as a cause of E6_ServiceUnavailable on the QC pass. The Tier-B safety re-classifier (Check 8) — which is fail-closed — was the most consequential surface for Groq downtime; its migration to Haiku eliminates the most user-visible production failure mode from today's logs.
+
+**Files unchanged (intentionally):**
+- [src/shared/llm/groq.ts](src/shared/llm/groq.ts) — wrapper retained; chat.ts fallback path still uses it.
+- [src/shared/llm/chat.ts](src/shared/llm/chat.ts) — Groq fallback unchanged (out of scope for reliability hotfix per Batch G deferred list).
+- [src/quality-check/voice-consistency.ts](src/quality-check/voice-consistency.ts) — Voyage embeddings; nothing to migrate.
+- All judge prompts in `checks-llm.ts` — verbatim from pre-Batch-H to satisfy the Batch G + Batch H invariant: "no judge prompt change during the provider migration."
+- [src/coaching/libraries/](src/coaching/libraries/) and [src/libraries/seed/](src/libraries/seed/) — Hamse-owned content, unmodified.
+
+**Pre-existing finding (not introduced by Batch H):** When branched off `main`, `pnpm lint` failed on three files ([src/index.ts](src/index.ts), [src/whatsapp-delivery/queue-processor.ts](src/whatsapp-delivery/queue-processor.ts), [src/whatsapp-delivery/routes.ts](src/whatsapp-delivery/routes.ts)) due to Windows checkout line-ending mismatch with the `.gitattributes` LF normalization (Phase 12 R2 commit `59a37c1`). Running `prettier --write` on this branch's working tree resolved it locally; git showed no actual content diff, so no separate format commit was needed. Anyone with a fresh clone or who runs `prettier --write` once will see clean lint.
+
+**Deferred from Batch H (named):**
+- Deletion of [src/shared/llm/groq.ts](src/shared/llm/groq.ts) — chat.ts fallback path still uses it. Separate cleanup batch after the fallback also migrates.
+- Removal of `groqApiKey` from [src/shared/secrets/config.ts](src/shared/secrets/config.ts) — same rationale as above.
+- Migrating the chat fallback path off Groq (carried forward from Batch G deferred list).
+- Smoke-run validation of Check 8's recall parity on Haiku 4.5 vs Groq Llama 70B against the Tier-B indirect-crisis fixtures. CI mocks ensure the migration didn't change the structural contract; recall calibration is a Bucket-3 voice-smoke entry.
