@@ -1,4 +1,3 @@
-import { groqChat } from '../shared/llm/groq.js';
 import { classifierChat } from '../shared/llm/classifier.js';
 import { LlmError } from '../shared/llm/errors.js';
 import type { AppConfig } from '../shared/secrets/config.js';
@@ -6,17 +5,21 @@ import type { PracticeTag } from '../shared/types/index.js';
 import type { CheckOutcome, CheckResult } from './types.js';
 
 /**
- * LLM-backed checks (3, 4, 7, 8). All run on Groq Llama 3.3 70B with strict
- * JSON output, ≤200 max_tokens, and a 4-second per-call budget so the full
- * QC pass stays well under the 6s p99 turn budget even when all four LLM
- * checks fire in sequence.
+ * LLM-backed checks (3, 4, 7, 8, 10, 12, 15, 17). All run on Anthropic
+ * Haiku 4.5 via the classifierChat wrapper (Batch G + Batch H migration
+ * from Groq Llama 3.3 70B). Strict JSON output via prefill-`{` pattern,
+ * ≤200 max_tokens, and a 4-second per-call budget so the full QC pass
+ * stays well under the 6s p99 turn budget even when every LLM check
+ * fires in parallel.
  *
  * Failure semantics differ by check:
- *   - Checks 3, 4, 7: any LlmError → service_unavailable, but the orchestrator
- *     treats this as "skip" rather than fail-closed (Process #10 plan note:
- *     these are quality-shaping, not safety-critical).
+ *   - Checks 3, 4, 7, 10, 12, 15, 17: any LlmError → service_unavailable,
+ *     but the orchestrator treats this as "skip" rather than fail-closed
+ *     (Process #10 plan note: these are quality-shaping, not
+ *     safety-critical).
  *   - Check 8: any LlmError → service_unavailable, and orchestrator MUST
- *     route to E6 (no approval without verified safety).
+ *     route to E6 (no approval without verified safety; CLAUDE.md hard
+ *     rule #1).
  */
 
 const CLASSIFIER_TIMEOUT_MS = 4000;
@@ -224,13 +227,13 @@ Score the candidate response on a 0/1/2 scale:
 
 Return strict JSON {"score": 0|1|2, "reason": "..."} (reason ≤80 chars).`;
   try {
-    const res = await groqChat(config, {
-      model: 'llama-3.3-70b-versatile',
+    // Batch H — migrated from Groq Llama to Anthropic Haiku 4.5 via the
+    // classifierChat wrapper. Same JSON contract; quality-shaping
+    // soft-fail semantics on score=2 unchanged.
+    const res = await classifierChat(config, {
       systemPrompt: system,
-      messages: [{ role: 'user', content: `Candidate response:\n"""\n${candidate}\n"""` }],
+      userPrompt: `Candidate response:\n"""\n${candidate}\n"""`,
       maxTokens: CLASSIFIER_MAX_TOKENS,
-      temperature: 0,
-      jsonMode: true,
       timeoutMs: CLASSIFIER_TIMEOUT_MS,
     });
     const parsed = JSON.parse(res.text) as { score?: unknown; reason?: unknown };
