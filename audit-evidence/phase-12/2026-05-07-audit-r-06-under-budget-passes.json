@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-07T07:58:19.451Z",
+  "testId": "audit/R-06-under-budget-passes",
+  "controlId": "T3.Audit.R06_LatencyBudget_UnderBudget",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "R-06 regression: under-budget turns proceed to normal delivery. Guards against over-correction (we did not break the happy path).",
+  "phase": "phase-12"
+}

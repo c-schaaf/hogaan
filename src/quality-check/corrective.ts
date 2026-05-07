@@ -31,16 +31,16 @@ export interface CorrectiveOptions {
 }
 
 /**
- * QC regen runs OFF the happy path — only when at least one check soft-failed.
- * The 5s primary-LLM cap from Process #2 §9 doesn't apply here because the
- * user has already waited through the original generation + QC checks. We
- * give regen 15s of headroom (cross-region Anthropic steady-state runs
- * 4–5s for a ~300-token response; production region should be faster).
- *
- * If a regen takes >15s we treat it as a service-unavailability and route to
- * E6_ServiceUnavailable rather than queue the user for longer.
+ * R-07 — regen timeout reduced from 15s to 3s. Original 15s pre-dated the
+ * R-06 total-budget check; with PRD §5.1's 6000ms total cap enforced
+ * before delivery, a single regen round was already capable of blowing
+ * the total budget by 2.5×. The elapsed-time skip guard in QC
+ * orchestrator (also R-07) ensures regen only runs when there's slack;
+ * this cap ensures even the allowed regens fit within the remaining
+ * budget. Cross-region Anthropic 4–5s now times out — accepted
+ * trade-off: regen quality < total latency budget.
  */
-const REGEN_TIMEOUT_MS = 15_000;
+const REGEN_TIMEOUT_MS = 3_000;
 const REGEN_MAX_TOKENS = 1024;
 
 export function buildCorrectivePrompt(opts: CorrectiveOptions): string {
@@ -111,3 +111,6 @@ export async function regenerate(
     };
   }
 }
+
+/** Test seam — exposes the regen timing constants for direct assertion. */
+export const _internal = { REGEN_TIMEOUT_MS, REGEN_MAX_TOKENS };
