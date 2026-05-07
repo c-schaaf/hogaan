@@ -54,6 +54,12 @@ const MEDIA_REJECT_TEMPLATE = `I work with text only for now. Type out what's on
 const GREETING_RESPONSE = `Salaam. I'm Hogaan, here when you have a leadership challenge to think through — a hard conversation, a stuck team, a decision under pressure. Tell me what's on your mind.`;
 const AFFIRMATION_RESPONSE = `Glad it landed. I'm here when the next thing surfaces.`;
 
+// R-06 — total turn budget (PRD §5.1). Soft deadline checked just before
+// Step 11 delivery. When exceeded the orchestrator routes to the existing
+// E11_ServiceUnavailable path with FALLBACK_DEGRADED. Predicate is `>` not
+// `>=`: a turn that lands exactly at the boundary still ships.
+const LATENCY_BUDGET_MS = 6000;
+
 /**
  * Process #2 — Coaching Conversation orchestrator. Implements the full BPMN.
  *
@@ -372,6 +378,24 @@ export async function runCoachingTurn(
   const isDegraded =
     qc.endEvent === 'E3_MaxRetriesExceeded' || qc.endEvent === 'E6_ServiceUnavailable';
 
+  // R-06 — soft deadline check. Exceeding the budget by the time we're
+  // ready to ship is a service-unavailability for the user; route to
+  // FALLBACK_DEGRADED instead of delivering a stale-feeling answer.
+  if (Date.now() - t0 > LATENCY_BUDGET_MS) {
+    const body = fallbackDegraded();
+    await sendBody(deps, inbound, body, 'budget-exceeded');
+    return finalize(deps, inbound, {
+      endEvent: 'E11_ServiceUnavailable',
+      responseText: body,
+      practiceTag: tags.practiceTag,
+      levelTag: tags.levelTag,
+      latencyMs: Date.now() - t0,
+      reason: 'budget exceeded',
+      sessionId: session.sessionId,
+      turnId: null,
+    });
+  }
+
   // ---- Step 11: delivery ---------------------------------------------
   const delivery = await sendBody(deps, inbound, responseText, 'coaching-response');
   if (delivery.failed) {
@@ -671,4 +695,5 @@ export const _internal = {
   MEDIA_REJECT_TEMPLATE,
   SAFE_TEMPLATE,
   REJECT_TEMPLATE,
+  LATENCY_BUDGET_MS,
 };
