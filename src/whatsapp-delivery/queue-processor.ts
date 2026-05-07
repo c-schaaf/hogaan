@@ -1,5 +1,6 @@
 import { reportP1 } from '../incident-handling/index.js';
 import { recordEvidence } from '../shared/audit-evidence/index.js';
+import { debugWarn } from '../shared/observability/debug-log.js';
 import type { Database, SqlClient } from '../shared/db/client.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
@@ -105,6 +106,10 @@ export async function enqueueInbound(redis: RedisBundle, item: QueueItem): Promi
  */
 export async function processInboundFromQueue(deps: QueueProcessorDeps): Promise<void> {
   if (inFlight >= MAX_CONCURRENCY) {
+    debugWarn('QUEUE-PROC', 'tick skipped — at MAX_CONCURRENCY', {
+      inFlight,
+      maxConcurrency: MAX_CONCURRENCY,
+    });
     return;
   }
   inFlight += 1;
@@ -130,6 +135,11 @@ export async function processInboundFromQueue(deps: QueueProcessorDeps): Promise
       return;
     }
 
+    debugWarn('QUEUE-PROC', 'picked up item', {
+      waMessageId: item.inboundMessageSid,
+      traceId: item.traceId,
+    });
+
     const t0 = Date.now();
     try {
       const outcome = await routeInboundMessage(
@@ -150,6 +160,12 @@ export async function processInboundFromQueue(deps: QueueProcessorDeps): Promise
           traceId: item.traceId,
         },
       );
+      const latencyMs = Date.now() - t0;
+      debugWarn('QUEUE-PROC', 'orchestrator done', {
+        waMessageId: item.inboundMessageSid,
+        outcomeKind: outcome.kind,
+        latencyMs,
+      });
       await recordEvidence({
         testId: `phase-11/webhook-decouple/${item.inboundMessageSid}`,
         controlId: 'T2.WebhookDecouple.PipelineProcessed',
@@ -159,10 +175,15 @@ export async function processInboundFromQueue(deps: QueueProcessorDeps): Promise
         details: {
           inboundMessageSid: item.inboundMessageSid,
           outcomeKind: outcome.kind,
-          pipelineLatencyMs: Date.now() - t0,
+          pipelineLatencyMs: latencyMs,
         },
       });
     } catch (err) {
+      debugWarn('QUEUE-PROC', 'handler caught throw', {
+        waMessageId: item.inboundMessageSid,
+        err: err instanceof Error ? err.message : String(err),
+        errName: err instanceof Error ? err.name : 'unknown',
+      });
       await handleProcessingFailure(deps.redis, item, err);
     }
   } finally {

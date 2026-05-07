@@ -46,6 +46,10 @@ export async function registerWhatsAppRoutes(
   await app.register(formbody);
 
   app.post('/webhooks/twilio/inbound', async (req, reply) => {
+    // DEBUG INSTRUMENTATION (debug/full-pipeline-instrumentation) — remove
+    // once production silent-failure root cause is identified.
+    req.log.warn({ traceId: req.id }, 'WEBHOOK: handler entered');
+
     const signature = req.headers['x-twilio-signature'];
     const params = (req.body ?? {}) as Record<string, string>;
     const fullUrl = `${opts.publicBaseUrl.replace(/\/$/, '')}/webhooks/twilio/inbound`;
@@ -64,11 +68,12 @@ export async function registerWhatsAppRoutes(
 
     const event = parseInboundMessage(params);
     if (event.kind !== 'inbound') {
+      req.log.warn({ kind: event.kind }, 'WEBHOOK: non-inbound event, returning 204');
       return reply.code(204).send();
     }
-    req.log.info(
+    req.log.warn(
       { waMessageId: event.waMessageId, hasMedia: event.mediaUrls.length > 0 },
-      'twilio inbound received',
+      'WEBHOOK: inbound parsed',
     );
 
     // Phase 11 R11 — webhook ack is decoupled from pipeline execution.
@@ -109,6 +114,7 @@ export async function registerWhatsAppRoutes(
       return reply.code(204).send();
     }
 
+    req.log.warn({ waMessageId: event.waMessageId }, 'WEBHOOK: about to enqueue');
     try {
       await enqueueInbound(opts.redis, {
         inboundMessageSid: event.waMessageId,
@@ -118,7 +124,19 @@ export async function registerWhatsAppRoutes(
         receivedAtIso: event.receivedAt.toISOString(),
         traceId: req.id,
       });
+      req.log.warn(
+        { waMessageId: event.waMessageId, status: 'success' },
+        'WEBHOOK: enqueue returned',
+      );
     } catch (err) {
+      req.log.warn(
+        {
+          waMessageId: event.waMessageId,
+          status: 'failure',
+          err: err instanceof Error ? err.message : String(err),
+        },
+        'WEBHOOK: enqueue returned',
+      );
       reportP1(
         'inbound enqueue failed; payload dropped',
         {

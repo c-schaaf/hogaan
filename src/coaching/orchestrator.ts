@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { handoff as crisisHandoff } from '../crisis-handoff/index.js';
 import { reportP1 } from '../incident-handling/index.js';
+import { debugWarn } from '../shared/observability/debug-log.js';
 import { getActiveLibraryVersions } from '../libraries/index.js';
 import { assemblePrompt, PromptAssemblyError } from '../prompt-assembly/index.js';
 import { runQualityCheck } from '../quality-check/index.js';
@@ -75,8 +76,13 @@ export async function runCoachingTurn(
 ): Promise<CoachingTurnResult> {
   const t0 = Date.now();
   const userIdHash = hashPhone(inbound.phoneE164);
+  debugWarn('ORCH', 'entered', {
+    waMessageId: inbound.inboundMessageId,
+    traceId: inbound.traceId,
+  });
 
   // ---- Step 1: triage + crisis ---------------------------------------
+  debugWarn('ORCH', 'step 1 start (triage)', { waMessageId: inbound.inboundMessageId });
   const triageResult = await triage(deps.config, inbound.body, inbound.mediaUrls);
 
   if (triageResult.status === 'crisis') {
@@ -122,11 +128,23 @@ export async function runCoachingTurn(
   }
 
   const intent = triageResult.intent ?? 'Coaching';
+  debugWarn('ORCH', 'step 1 done (triage)', {
+    waMessageId: inbound.inboundMessageId,
+    intent,
+    triageStatus: triageResult.status,
+  });
 
   // ---- Step 2: session state -----------------------------------------
+  debugWarn('ORCH', 'step 2 start (session)', { waMessageId: inbound.inboundMessageId });
   const session = await resolveSession(deps.db, {
     userId: inbound.userId,
     now: inbound.receivedAt,
+  });
+  debugWarn('ORCH', 'step 2 done (session)', {
+    waMessageId: inbound.inboundMessageId,
+    sessionId: session.sessionId,
+    isNew: session.isNew,
+    turnCount: session.turnCount,
   });
 
   // ---- Step 4 (pre): scenario routing --------------------------------
@@ -226,6 +244,9 @@ export async function runCoachingTurn(
   // ClarificationResponse / Coaching share the main coaching path.
 
   // ---- Step 5: parallel context fetch --------------------------------
+  debugWarn('ORCH', 'step 5 start (context-fetch)', {
+    waMessageId: inbound.inboundMessageId,
+  });
   const ctx = await fetchCoachingContext(
     { config: deps.config, db: deps.db },
     {
@@ -234,9 +255,21 @@ export async function runCoachingTurn(
       query: inbound.body,
     },
   );
+  debugWarn('ORCH', 'step 5 done (context-fetch)', {
+    waMessageId: inbound.inboundMessageId,
+    memCount: ctx.memories.length,
+    partialFailure: ctx.partialFailure,
+  });
 
   // ---- Step 6: practice + level tagging ------------------------------
+  debugWarn('ORCH', 'step 6 start (tagger)', { waMessageId: inbound.inboundMessageId });
   const tags = tagPracticeAndLevel(inbound.body, ctx.profile.mappedPractices ?? []);
+  debugWarn('ORCH', 'step 6 done (tagger)', {
+    waMessageId: inbound.inboundMessageId,
+    practice: tags.practiceTag,
+    level: tags.levelTag,
+    confidence: tags.confidence,
+  });
 
   // ---- Step 7: clarification decision (v1: skip — always advance) ----
 
@@ -245,6 +278,9 @@ export async function runCoachingTurn(
   // E11_ServiceUnavailable + dispatch FALLBACK_DEGRADED so the user
   // receives a response instead of the queue-processor dead-lettering
   // a silent failure. Unknown errors rethrow (preserve bug-report semantics).
+  debugWarn('ORCH', 'step 8 start (prompt-assembly)', {
+    waMessageId: inbound.inboundMessageId,
+  });
   let promptBundle;
   try {
     promptBundle = await assemblePrompt(deps.config, deps.db, {
@@ -263,7 +299,17 @@ export async function runCoachingTurn(
     });
   } catch (err) {
     if (err instanceof PromptAssemblyError) {
+      debugWarn('ORCH', 'step 8 CAUGHT (prompt-assembly)', {
+        waMessageId: inbound.inboundMessageId,
+        err: err.message,
+        endEvent: err.endEvent,
+      });
       const body = fallbackDegraded();
+      debugWarn('ORCH', 'dispatching FALLBACK_DEGRADED', {
+        waMessageId: inbound.inboundMessageId,
+        site: 'step-8-prompt-assembly',
+        reason: `prompt-assembly: ${err.endEvent}`,
+      });
       await sendBody(deps, inbound, body, 'prompt-assembly-failure');
       return finalize(deps, inbound, {
         endEvent: 'E11_ServiceUnavailable',
@@ -276,10 +322,19 @@ export async function runCoachingTurn(
         turnId: null,
       });
     }
+    debugWarn('ORCH', 'step 8 CAUGHT (unknown, rethrow)', {
+      waMessageId: inbound.inboundMessageId,
+      err: err instanceof Error ? err.message : String(err),
+    });
     throw err;
   }
+  debugWarn('ORCH', 'step 8 done (prompt-assembly)', {
+    waMessageId: inbound.inboundMessageId,
+    promptTokens: promptBundle.tokenCount,
+  });
 
   // ---- Step 9: primary LLM call --------------------------------------
+  debugWarn('ORCH', 'step 9 start (primary LLM)', { waMessageId: inbound.inboundMessageId });
   let chatResp;
   try {
     chatResp = await chat(
@@ -298,10 +353,24 @@ export async function runCoachingTurn(
     );
   } catch (err) {
     if (isFailClosedLlmError(err)) {
+      debugWarn('ORCH', 'step 9 CAUGHT (fail-closed LLM)', {
+        waMessageId: inbound.inboundMessageId,
+        err: err instanceof Error ? err.message : String(err),
+        errName: err instanceof Error ? err.name : 'unknown',
+      });
       // R-04 cousin (Batch B.1) — dispatch the user-facing fallback before
       // finalize. Pre-fix the orchestrator returned `responseText: ''` and
       // the user received nothing on a primary+fallback LLM failure.
       const body = fallbackDegraded();
+      const reason =
+        err instanceof LlmServiceUnavailableError
+          ? 'primary LLM 5xx + fallback failed'
+          : 'primary LLM auth/internal failure';
+      debugWarn('ORCH', 'dispatching FALLBACK_DEGRADED', {
+        waMessageId: inbound.inboundMessageId,
+        site: 'step-9-llm-failure',
+        reason,
+      });
       await sendBody(deps, inbound, body, 'llm-call-failure');
       return finalize(deps, inbound, {
         endEvent: 'E11_ServiceUnavailable',
@@ -309,15 +378,15 @@ export async function runCoachingTurn(
         practiceTag: tags.practiceTag,
         levelTag: tags.levelTag,
         latencyMs: Date.now() - t0,
-        reason:
-          err instanceof LlmServiceUnavailableError
-            ? 'primary LLM 5xx + fallback failed'
-            : 'primary LLM auth/internal failure',
+        reason,
         sessionId: session.sessionId,
         turnId: null,
       });
     }
     if (err instanceof LlmContentFilterError) {
+      debugWarn('ORCH', 'step 9 content-filter past safe-template', {
+        waMessageId: inbound.inboundMessageId,
+      });
       // chat() should have already rendered SAFE_TEMPLATE for us; re-raising
       // here means something else went wrong.
       reportP1(
@@ -329,10 +398,21 @@ export async function runCoachingTurn(
         err,
       );
     }
+    debugWarn('ORCH', 'step 9 CAUGHT (rethrow)', {
+      waMessageId: inbound.inboundMessageId,
+      err: err instanceof Error ? err.message : String(err),
+    });
     throw err;
   }
+  debugWarn('ORCH', 'step 9 done (primary LLM)', {
+    waMessageId: inbound.inboundMessageId,
+    modelUsed: chatResp.modelUsed,
+    fallbackPath: chatResp.fallbackPath,
+    latencyMs: chatResp.latencyMs,
+  });
 
   // ---- Step 10: quality check ----------------------------------------
+  debugWarn('ORCH', 'step 10 start (QC)', { waMessageId: inbound.inboundMessageId });
   const libs = await getActiveLibraryVersions(deps.db);
   const qc = await runQualityCheck(
     {
@@ -355,7 +435,18 @@ export async function runCoachingTurn(
     },
   );
 
+  debugWarn('ORCH', 'step 10 done (QC)', {
+    waMessageId: inbound.inboundMessageId,
+    qcEndEvent: qc.endEvent,
+    retryCount: qc.retryCount,
+    degraded: qc.degraded,
+    crisisDetected: qc.crisisDetected,
+  });
+
   if (qc.endEvent === 'E4_CrisisEscalation') {
+    debugWarn('ORCH', 'QC returned crisis — routing to crisis handoff', {
+      waMessageId: inbound.inboundMessageId,
+    });
     return await handleCrisis(
       deps,
       inbound,
@@ -365,6 +456,9 @@ export async function runCoachingTurn(
     );
   }
   if (qc.endEvent === 'E5_SafetyHardFailure') {
+    debugWarn('ORCH', 'QC returned hard safety fail → E11 with empty body', {
+      waMessageId: inbound.inboundMessageId,
+    });
     return finalize(deps, inbound, {
       endEvent: 'E11_ServiceUnavailable',
       responseText: '',
@@ -384,8 +478,19 @@ export async function runCoachingTurn(
   // R-06 — soft deadline check. Exceeding the budget by the time we're
   // ready to ship is a service-unavailability for the user; route to
   // FALLBACK_DEGRADED instead of delivering a stale-feeling answer.
-  if (Date.now() - t0 > LATENCY_BUDGET_MS) {
+  const elapsedAtBudgetCheck = Date.now() - t0;
+  if (elapsedAtBudgetCheck > LATENCY_BUDGET_MS) {
+    debugWarn('ORCH', 'budget exceeded at deadline check', {
+      waMessageId: inbound.inboundMessageId,
+      elapsedMs: elapsedAtBudgetCheck,
+      budgetMs: LATENCY_BUDGET_MS,
+    });
     const body = fallbackDegraded();
+    debugWarn('ORCH', 'dispatching FALLBACK_DEGRADED', {
+      waMessageId: inbound.inboundMessageId,
+      site: 'budget-exceeded',
+      reason: 'budget exceeded',
+    });
     await sendBody(deps, inbound, body, 'budget-exceeded');
     return finalize(deps, inbound, {
       endEvent: 'E11_ServiceUnavailable',
@@ -400,6 +505,19 @@ export async function runCoachingTurn(
   }
 
   // ---- Step 11: delivery ---------------------------------------------
+  if (isDegraded) {
+    debugWarn('ORCH', 'dispatching FALLBACK_DEGRADED', {
+      waMessageId: inbound.inboundMessageId,
+      site: 'qc-degraded',
+      qcEndEvent: qc.endEvent,
+      reason: qc.endEvent === 'E3_MaxRetriesExceeded' ? 'qc max retries' : 'qc service unavailable',
+    });
+  }
+  debugWarn('ORCH', 'step 11 start (delivery)', {
+    waMessageId: inbound.inboundMessageId,
+    bodyLen: responseText.length,
+    isDegraded,
+  });
   const delivery = await sendBody(deps, inbound, responseText, 'coaching-response');
   if (delivery.failed) {
     return finalize(deps, inbound, {
