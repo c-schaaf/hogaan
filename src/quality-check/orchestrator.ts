@@ -172,7 +172,7 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
 
     // R-07 — skip regen if the turn budget is already exhausted. A regen
     // attempt past the deadline can only push the total turn well past
-    // PRD §5.1's 6000ms cap; degrade gracefully instead.
+    // LATENCY_BUDGET_MS (Process #2); degrade gracefully instead.
     if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
       reportIncident('P2', 'QC regen skipped — turn budget already exhausted', {
         source: 'Process_10.RegenSkipBudget',
