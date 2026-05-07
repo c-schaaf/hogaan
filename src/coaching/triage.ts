@@ -1,5 +1,5 @@
 import { LlmError } from '../shared/llm/errors.js';
-import { groqChat } from '../shared/llm/groq.js';
+import { classifierChat } from '../shared/llm/classifier.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import type { Intent } from '../shared/types/index.js';
 import { reportP1 } from '../incident-handling/index.js';
@@ -127,13 +127,13 @@ export async function llmTriage(config: AppConfig, body: string): Promise<Triage
   const system = TRIAGE_SYSTEM_PROMPT;
 
   try {
-    const res = await groqChat(config, {
-      model: 'llama-3.3-70b-versatile',
+    // Batch G — migrated from Groq Llama to Anthropic Haiku 4.5 via the
+    // classifierChat wrapper. Same JSON contract; the prefill-`{` pattern
+    // inside classifierChat handles Anthropic's lack of native JSON mode.
+    const res = await classifierChat(config, {
       systemPrompt: system,
-      messages: [{ role: 'user', content: `User message:\n"""\n${body}\n"""` }],
+      userPrompt: `User message:\n"""\n${body}\n"""`,
       maxTokens: TRIAGE_MAX_TOKENS,
-      temperature: 0,
-      jsonMode: true,
       timeoutMs: TRIAGE_TIMEOUT_MS,
     });
     const parsed = JSON.parse(res.text) as ClassifierJson;
