@@ -148,3 +148,39 @@ Branch: `fix/batch-c-latency-budget-enforcement`. 2 source commits + 1 docs comm
 - R-14 broader trace work (`qaFailedChecks: CheckId[]` for ALL failed checks) — Batch D scope; Piece 4 is a focused two-field addition that does not preempt R-14.
 - `finalizeAsServiceUnavailable` helper extraction (still deferred from Batch B).
 - Refactor unifying LEVEL_GUIDANCE + ON/OFF_LEVEL_PHRASES into a `src/coaching/levels.ts` module (cleaner long-term but YAGNI).
+
+---
+
+## Batch G — Groq → Anthropic Haiku migration (2026-05-07)
+
+**Trigger:** Groq's developer tier is unavailable for upgrade and the free tier is producing intermittent 503s in production, breaking coaching turns. Two non-coaching LLM call sites needed to move off Groq:
+
+1. `llmTriage` in [src/coaching/triage.ts](src/coaching/triage.ts) — runs on every inbound coaching turn (intent classifier).
+2. `check17PracticeGrounding` in [src/quality-check/checks-llm.ts](src/quality-check/checks-llm.ts) — runs once per coaching response (LLM-judged practice-grounding).
+
+**JSON-mode equivalence:** Anthropic has no native `response_format: json_object` like Groq/OpenAI. To force JSON we use the prefill-`{` pattern: append an assistant turn whose content is the literal `{`. Haiku continues from `{` and emits well-formed JSON; the wrapper reconstructs the full JSON by prepending `{` to the response text. Defensive guard: if Haiku ignores the prefill and returns text already starting with `{`, the wrapper returns it unchanged.
+
+**Failure semantics preserved:**
+- `llmTriage`: LlmError → `reportP1` + fail-open `(valid, Coaching)`. Process #10 §Check 8 second-line crisis classifier remains the safety backstop. CLAUDE.md hard rule #1 unchanged.
+- `check17PracticeGrounding`: LlmError → `service_unavailable`. Orchestrator treats this as a quality-shaping skip (not safety fail-closed).
+
+**Scope (what stayed on Groq):** the chat fallback path in [src/shared/llm/chat.ts](src/shared/llm/chat.ts) and the eight other LLM-judged QC checks routed through `runClassifier` (Checks 3, 4, 7, 8, 10, 12, 13, 15). Migrating those is a future batch decision once we see whether the same 503 pattern shows up there.
+
+| Piece | Status | Test file | Source change | Commit |
+|---|---|---|---|---|
+| 1 — `classifierChat` wrapper | PASS | [tests/shared/llm/classifier.test.ts](tests/shared/llm/classifier.test.ts) (5 tests) | [src/shared/llm/classifier.ts](src/shared/llm/classifier.ts) — new wrapper around `anthropicChat` with `claude-haiku-4-5`, temperature 0, prefill-`{` pattern, JSON reconstruction with no-double-prepend defensive guard, configurable `maxTokens` / `timeoutMs` / `temperatureOverride`. `_internal` exports for test seams. | `d9d98ac` |
+| 2 — `llmTriage` migration | PASS | [tests/coaching/triage.test.ts](tests/coaching/triage.test.ts) (6 new tests in 'Batch G — llmTriage on Haiku' describe block) | [src/coaching/triage.ts](src/coaching/triage.ts) — replaced `groqChat` import + call with `classifierChat`; same `TRIAGE_SYSTEM_PROMPT` (existing snapshot stays valid); same `TRIAGE_TIMEOUT_MS` / `TRIAGE_MAX_TOKENS`. | `1bcbd07` |
+| 3 — `check17PracticeGrounding` migration | PASS | [tests/quality-check/practice-grounding.test.ts](tests/quality-check/practice-grounding.test.ts) (9 tests repointed to classifier.js mock); [tests/quality-check/coverage.test.ts](tests/quality-check/coverage.test.ts) (added classifier.js mock) | [src/quality-check/checks-llm.ts](src/quality-check/checks-llm.ts) — replaced `groqChat` call with `classifierChat`; same verdict mapping (grounded → pass; mentioned/absent → soft_fail); same `CLASSIFIER_TIMEOUT_MS` / `CLASSIFIER_MAX_TOKENS`. `groqChat` import retained for the eight other LLM checks. | `19bd351` |
+
+**Suite delta:** 729 → 735 tests passing (+5 classifier wrapper tests, +6 llmTriage Batch G tests, −5 net from existing tests repointed without count change). Typecheck + lint clean at every commit boundary.
+
+**Cost & latency impact:**
+- `llmTriage`: ~$0.0001 per turn (was ~$0.00004 on Groq Llama free). Latency p50 ~400ms / p99 ~1200ms (was ~250ms / ~700ms). Net per-turn p99 budget: still well under the 6s ceiling — `llmTriage` is sequential before assembly + primary LLM, so the +500ms p99 worst-case lands within the §5.1 PRD budget headroom.
+- `check17PracticeGrounding`: ~$0.0004 per turn (was ~$0.00012 on Groq). Latency unchanged at the wall-clock level — still parallel with the other LLM checks via `Promise.all`.
+
+**Reliability impact:** removes Groq 503s as a cause of intent mis-routing (which manifested as crisis-tier-B mis-routing, the original audit-risk concern). Crisis fast-path (`fastPathTriage`) is unchanged and still synchronous; only the indirect-cue classifier moved providers.
+
+**Deferred from Batch G (named):**
+- Migrating the eight Groq-backed LLM-judged QC checks (3/4/7/8/10/12/13/15) via `runClassifier`. Same one-line swap pattern; deferred until 503s manifest there too.
+- Migrating the chat fallback path off Groq. Currently `chat.ts` is `Anthropic primary → Groq fallback → safe template`. Replacing the Groq fallback would require designing a new fallback strategy (Anthropic with smaller model? template-only?). Out of scope for a reliability hotfix.
+- Smoke-running real Haiku 4.5 traffic against the Tier-B indirect-crisis fixtures to validate recall parity with Groq Llama 70B. CI keeps the structural mock; live verification is a Bucket-3 voice-smoke entry.

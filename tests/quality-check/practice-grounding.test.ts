@@ -18,15 +18,15 @@ import type { AppConfig } from '../../src/shared/secrets/config.js';
  *     LLM call and auto-set verdict to soft_fail
  */
 
-vi.mock('../../src/shared/llm/groq.js', () => ({
-  groqChat: vi.fn(),
+vi.mock('../../src/shared/llm/classifier.js', () => ({
+  classifierChat: vi.fn(),
 }));
 
 const cfg = {} as unknown as AppConfig;
 
 beforeEach(async () => {
-  const groqMod = await import('../../src/shared/llm/groq.js');
-  vi.mocked(groqMod.groqChat).mockReset();
+  const classifierMod = await import('../../src/shared/llm/classifier.js');
+  vi.mocked(classifierMod.classifierChat).mockReset();
 });
 
 afterEach(() => {
@@ -35,9 +35,9 @@ afterEach(() => {
 
 describe('Batch P Piece 3 — check17 practice grounding', () => {
   describe('deterministic precheck (no LLM call)', () => {
-    it('candidate without the practice word → soft_fail, Groq NOT called', async () => {
-      const groqMod = await import('../../src/shared/llm/groq.js');
-      const groqSpy = vi.mocked(groqMod.groqChat);
+    it('candidate without the practice word → soft_fail, classifier NOT called', async () => {
+      const classifierMod = await import('../../src/shared/llm/classifier.js');
+      const classifierSpy = vi.mocked(classifierMod.classifierChat);
 
       const result = await check17PracticeGrounding(
         cfg,
@@ -52,13 +52,13 @@ describe('Batch P Piece 3 — check17 practice grounding', () => {
         expect(result.outcome.reason).toContain('not present');
         expect(result.outcome.reason).toContain('integrity');
       }
-      expect(groqSpy).not.toHaveBeenCalled();
+      expect(classifierSpy).not.toHaveBeenCalled();
     });
 
-    it('candidate WITH the practice word → Groq IS called', async () => {
-      const groqMod = await import('../../src/shared/llm/groq.js');
-      const groqSpy = vi.mocked(groqMod.groqChat);
-      groqSpy.mockResolvedValue({
+    it('candidate WITH the practice word → classifier IS called', async () => {
+      const classifierMod = await import('../../src/shared/llm/classifier.js');
+      const classifierSpy = vi.mocked(classifierMod.classifierChat);
+      classifierSpy.mockResolvedValue({
         text: JSON.stringify({ verdict: 'grounded', evidence_quote: 'integrity working' }),
         inputTokens: 500,
         outputTokens: 30,
@@ -72,14 +72,14 @@ describe('Batch P Piece 3 — check17 practice grounding', () => {
       );
 
       expect(result.outcome.status).toBe('pass');
-      expect(groqSpy).toHaveBeenCalledTimes(1);
+      expect(classifierSpy).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('verdict mapping', () => {
     it("verdict 'grounded' → pass", async () => {
-      const groqMod = await import('../../src/shared/llm/groq.js');
-      vi.mocked(groqMod.groqChat).mockResolvedValue({
+      const classifierMod = await import('../../src/shared/llm/classifier.js');
+      vi.mocked(classifierMod.classifierChat).mockResolvedValue({
         text: JSON.stringify({ verdict: 'grounded', evidence_quote: 'q' }),
         inputTokens: 500,
         outputTokens: 30,
@@ -89,8 +89,8 @@ describe('Batch P Piece 3 — check17 practice grounding', () => {
     });
 
     it("verdict 'mentioned' → soft_fail (drift)", async () => {
-      const groqMod = await import('../../src/shared/llm/groq.js');
-      vi.mocked(groqMod.groqChat).mockResolvedValue({
+      const classifierMod = await import('../../src/shared/llm/classifier.js');
+      vi.mocked(classifierMod.classifierChat).mockResolvedValue({
         text: JSON.stringify({
           verdict: 'mentioned',
           evidence_quote: 'word appears once at the end',
@@ -111,8 +111,8 @@ describe('Batch P Piece 3 — check17 practice grounding', () => {
     });
 
     it("verdict 'absent' → soft_fail", async () => {
-      const groqMod = await import('../../src/shared/llm/groq.js');
-      vi.mocked(groqMod.groqChat).mockResolvedValue({
+      const classifierMod = await import('../../src/shared/llm/classifier.js');
+      vi.mocked(classifierMod.classifierChat).mockResolvedValue({
         text: JSON.stringify({ verdict: 'absent', evidence_quote: '' }),
         inputTokens: 500,
         outputTokens: 30,
@@ -131,9 +131,11 @@ describe('Batch P Piece 3 — check17 practice grounding', () => {
   });
 
   describe('error handling', () => {
-    it('Groq timeout → service_unavailable (fail-closed)', async () => {
-      const groqMod = await import('../../src/shared/llm/groq.js');
-      vi.mocked(groqMod.groqChat).mockRejectedValue(new LlmTimeoutError('groq', 4000));
+    it('classifier timeout → service_unavailable (fail-closed)', async () => {
+      const classifierMod = await import('../../src/shared/llm/classifier.js');
+      vi.mocked(classifierMod.classifierChat).mockRejectedValue(
+        new LlmTimeoutError('anthropic', 4000),
+      );
 
       const r = await check17PracticeGrounding(cfg, 'msg', 'integrity is mentioned', 'integrity');
 
@@ -141,8 +143,8 @@ describe('Batch P Piece 3 — check17 practice grounding', () => {
     });
 
     it('invalid JSON → service_unavailable', async () => {
-      const groqMod = await import('../../src/shared/llm/groq.js');
-      vi.mocked(groqMod.groqChat).mockResolvedValue({
+      const classifierMod = await import('../../src/shared/llm/classifier.js');
+      vi.mocked(classifierMod.classifierChat).mockResolvedValue({
         text: 'not json at all',
         inputTokens: 500,
         outputTokens: 30,
@@ -154,8 +156,8 @@ describe('Batch P Piece 3 — check17 practice grounding', () => {
     });
 
     it('verdict outside the enum → service_unavailable', async () => {
-      const groqMod = await import('../../src/shared/llm/groq.js');
-      vi.mocked(groqMod.groqChat).mockResolvedValue({
+      const classifierMod = await import('../../src/shared/llm/classifier.js');
+      vi.mocked(classifierMod.classifierChat).mockResolvedValue({
         text: JSON.stringify({ verdict: 'whatever', evidence_quote: '' }),
         inputTokens: 500,
         outputTokens: 30,
@@ -168,14 +170,14 @@ describe('Batch P Piece 3 — check17 practice grounding', () => {
   });
 
   describe('skip semantics', () => {
-    it('practiceTag undefined → not_required, Groq not called', async () => {
-      const groqMod = await import('../../src/shared/llm/groq.js');
-      const groqSpy = vi.mocked(groqMod.groqChat);
+    it('practiceTag undefined → not_required, classifier not called', async () => {
+      const classifierMod = await import('../../src/shared/llm/classifier.js');
+      const classifierSpy = vi.mocked(classifierMod.classifierChat);
 
       const r = await check17PracticeGrounding(cfg, 'msg', 'response', undefined);
 
       expect(r.outcome.status).toBe('not_required');
-      expect(groqSpy).not.toHaveBeenCalled();
+      expect(classifierSpy).not.toHaveBeenCalled();
     });
   });
 });
