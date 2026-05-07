@@ -1,4 +1,5 @@
 import type { ResolvedLibraries } from '../libraries/index.js';
+import { debugWarn } from '../shared/observability/debug-log.js';
 import { reportIncident } from '../shared/observability/incidents.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import {
@@ -230,6 +231,63 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
   }
 }
 
+type CheckTelemetry = {
+  checkId: string;
+  status: string;
+  latencyMs: number;
+  reason?: string;
+};
+
+const telemetry: WeakMap<CheckResult, CheckTelemetry> = new WeakMap();
+
+function parseReason(reason: string): { errName: string; errMessage: string } {
+  const i = reason.indexOf(': ');
+  return i > 0
+    ? { errName: reason.slice(0, i), errMessage: reason.slice(i + 2) }
+    : { errName: '', errMessage: reason };
+}
+
+async function instrumentCheck(
+  checkId: string,
+  fn: () => Promise<CheckResult>,
+): Promise<CheckResult> {
+  debugWarn('QC-CHECK', `${checkId} start`, { checkId });
+  const t0 = Date.now();
+  const result = await fn();
+  const latencyMs = Date.now() - t0;
+  const status = result.outcome.status;
+  if (result.outcome.status === 'service_unavailable') {
+    const reason = result.outcome.reason;
+    const { errName, errMessage } = parseReason(reason);
+    debugWarn('QC-CHECK', `${checkId} done`, {
+      checkId,
+      status,
+      latencyMs,
+      errName,
+      errMessage,
+      reason,
+    });
+    telemetry.set(result, { checkId, status, latencyMs, reason });
+  } else {
+    debugWarn('QC-CHECK', `${checkId} done`, { checkId, status, latencyMs });
+    telemetry.set(result, { checkId, status, latencyMs });
+  }
+  return result;
+}
+
+function instrumentCheckSync(checkId: string, fn: () => CheckResult): CheckResult {
+  debugWarn('QC-CHECK', `${checkId} start`, { checkId });
+  const t0 = Date.now();
+  const result = fn();
+  const latencyMs = Date.now() - t0;
+  debugWarn('QC-CHECK', `${checkId} done`, {
+    checkId,
+    status: result.outcome.status,
+    latencyMs,
+  });
+  return result;
+}
+
 /**
  * Run all 13 checks against the current candidate. Rule-based checks run
  * synchronously; LLM checks fan out in parallel for latency.
@@ -256,22 +314,72 @@ async function runAllChecks(
     check5HeroToGuide(deps.libraries.voiceRules.payload, candidate),
     check6UsefulToSociety(deps.libraries.voiceRules.payload, candidate, input.predictedLevelTag),
     check9Length(candidate, input.responseMode),
-    checkFormattingDiscipline(candidate),
+    instrumentCheckSync('check_11_formatting_discipline', () =>
+      checkFormattingDiscipline(candidate),
+    ),
     checkIntentLengthAsCheckResult(candidate, input.intent),
     // Batch P Piece 2 — deterministic level-fidelity (off-level density signal).
-    check16LevelFidelity(candidate, input.predictedLevelTag, input.responseMode),
+    instrumentCheckSync('check_16_level_fidelity', () =>
+      check16LevelFidelity(candidate, input.predictedLevelTag, input.responseMode),
+    ),
   ];
   const llm = await Promise.all([
-    check3SignatureStructure(deps.config, candidate),
-    check4AssetBased(deps.config, candidate),
-    check7Tone(deps.config, candidate),
-    check8SafetyCrisis(deps.config, input.userMessage, candidate),
-    checkLivedExperienceDiscipline(deps.config, candidate),
-    checkTangibleAction(deps.config, candidate),
-    checkVoiceConsistency(deps.config, candidate),
-    checkUsefulToSocietyAnchor(deps.config, candidate),
+    instrumentCheck('check_03_signature_structure', () =>
+      check3SignatureStructure(deps.config, candidate),
+    ),
+    instrumentCheck('check_04_asset_based', () => check4AssetBased(deps.config, candidate)),
+    instrumentCheck('check_07_tone', () => check7Tone(deps.config, candidate)),
+    instrumentCheck('check_08_safety_crisis', () =>
+      check8SafetyCrisis(deps.config, input.userMessage, candidate),
+    ),
+    instrumentCheck('check_10_lived_experience', () =>
+      checkLivedExperienceDiscipline(deps.config, candidate),
+    ),
+    instrumentCheck('check_12_tangible_action', () => checkTangibleAction(deps.config, candidate)),
+    instrumentCheck('check_13_voice_consistency', () =>
+      checkVoiceConsistency(deps.config, candidate),
+    ),
+    instrumentCheck('check_15_useful_to_society_anchor', () =>
+      checkUsefulToSocietyAnchor(deps.config, candidate),
+    ),
     // Batch P Piece 3 — LLM-judged practice grounding (parallel batch).
-    check17PracticeGrounding(deps.config, input.userMessage, candidate, input.predictedPracticeTag),
+    instrumentCheck('check_17_practice_grounding', () =>
+      check17PracticeGrounding(deps.config, input.userMessage, candidate, input.predictedPracticeTag),
+    ),
   ]);
+
+  let passCount = 0;
+  let softFailCount = 0;
+  let hardFailCount = 0;
+  let serviceUnavailableCount = 0;
+  let slowestCheck: { id: string; latencyMs: number } = { id: '', latencyMs: -1 };
+  let slowestErrorCheck: { id: string; err: string; latencyMs: number } | null = null;
+  for (const r of llm) {
+    const t = telemetry.get(r);
+    if (t === undefined) continue;
+    if (t.status === 'pass') passCount += 1;
+    else if (t.status === 'soft_fail') softFailCount += 1;
+    else if (t.status === 'hard_fail') hardFailCount += 1;
+    else if (t.status === 'service_unavailable') serviceUnavailableCount += 1;
+    if (t.latencyMs > slowestCheck.latencyMs) {
+      slowestCheck = { id: t.checkId, latencyMs: t.latencyMs };
+    }
+    if (t.status === 'service_unavailable') {
+      if (slowestErrorCheck === null || t.latencyMs > slowestErrorCheck.latencyMs) {
+        slowestErrorCheck = { id: t.checkId, err: t.reason ?? '', latencyMs: t.latencyMs };
+      }
+    }
+  }
+  debugWarn('QC-CHECK', 'parallel batch summary', {
+    scope: 'parallel',
+    totalChecks: llm.length,
+    passCount,
+    softFailCount,
+    hardFailCount,
+    serviceUnavailableCount,
+    slowestCheck,
+    slowestErrorCheck,
+  });
+
   return [...sync, ...llm];
 }
