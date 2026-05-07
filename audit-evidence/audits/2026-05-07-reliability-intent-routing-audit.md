@@ -123,3 +123,28 @@ Branch: `fix/batch-c-latency-budget-enforcement`. 2 source commits + 1 docs comm
 **Strategy 2 (multi-point R-06 checks)** remains DEFERRED. If telemetry post-Batch-C shows late-turn aborts (i.e., the orchestrator routinely runs over budget by the time the deadline check fires), follow up with checks at each step boundary. For now the single check is sufficient.
 
 **`finalizeAsServiceUnavailable` helper** now has FOUR matching call sites (Step 8 R-04, Step 9 R-04 cousin, Step 11 R-06, R-07's E6 path). The dedup refactor candidate is increasingly justified but remains DEFERRED for a future cleanup batch.
+
+## Batch P closure status (2026-05-07)
+
+**Out-of-audit-register batch.** Batch P is not from the audit's risk register — it addresses a foundational gap surfaced during voice-smoke harness design: the system grades response polish via Voice Rules but did not grade whether the response actually grounds in the tagged practice as an organizing frame. Branch: `feat/batch-p-practice-grounding`. 4 source commits + 1 docs commit, suite at 724 passed / 3 todo / 0 failed.
+
+| Piece | Status | Test file | Source change | Commit |
+|---|---|---|---|---|
+| 1 — Prompt directives | PASS | [tests/prompt-assembly/practice-and-level-directives.test.ts](tests/prompt-assembly/practice-and-level-directives.test.ts) (17 tests + snapshot) | [src/prompt-assembly/assembler.ts](src/prompt-assembly/assembler.ts) — new `LEVEL_GUIDANCE` per-level scope-descriptor constant + `buildDirectivesBlock` helper; `canonicalAssemble` injects the directives block between level framing and voice rules; `_internal` test seam. [src/prompt-assembly/types.ts](src/prompt-assembly/types.ts) — `PromptUnderConstruction.directivesBlockText: string`. | `fd3af31` |
+| 2 — Level fidelity check | PASS | [tests/quality-check/level-fidelity.test.ts](tests/quality-check/level-fidelity.test.ts) (14 tests) | [src/quality-check/checks-rule-based.ts](src/quality-check/checks-rule-based.ts) — new `check16LevelFidelity` with `ON_LEVEL_PHRASES` / `OFF_LEVEL_PHRASES` per level, off-level density signal (≥2 hits AND >2× on-level density triggers soft_fail). [src/quality-check/types.ts](src/quality-check/types.ts) — `'check_16_level_fidelity'` added to `CheckId`. [src/quality-check/orchestrator.ts](src/quality-check/orchestrator.ts) — registered in synchronous block of `runAllChecks`. | `d3e9ebf` |
+| 3 — Practice grounding check | PASS | [tests/quality-check/practice-grounding.test.ts](tests/quality-check/practice-grounding.test.ts) (9 tests) | [src/quality-check/checks-llm.ts](src/quality-check/checks-llm.ts) — new `check17PracticeGrounding` modeled on `check8SafetyCrisis` (groqChat, JSON mode, 4s timeout, fail-closed). Deterministic precheck skips Groq when practice tag absent from response. Verdict mapping: grounded→pass, mentioned/absent→soft_fail. [src/quality-check/types.ts](src/quality-check/types.ts) — `'check_17_practice_grounding'` added to `CheckId`. [src/quality-check/orchestrator.ts](src/quality-check/orchestrator.ts) — registered in `Promise.all` LLM batch (parallel with check8 et al; no incremental wall-clock latency). | `8a54044` |
+| 4 — Trace integration | PASS | [tests/coaching/trace-practice-grounding.test.ts](tests/coaching/trace-practice-grounding.test.ts) (4 tests) | [src/shared/trace/index.ts](src/shared/trace/index.ts) — `TurnTrace` gains optional `practiceGroundingVerdict` + `levelFidelityVerdict`. [src/coaching/orchestrator.ts](src/coaching/orchestrator.ts) — extracts verdicts from `qc.checks` at the existing `emitTurnTrace` call; spreads conditionally so short-circuit traces stay clean (verdicts undefined). | `65ec18f` |
+
+**Cost line item (Piece 3):** ~$0.0004 per coaching turn → ~$445 per million turns. Latency p50 ~400ms / p99 ~1500ms, parallel with the existing 8 LLM checks — zero incremental wall-clock latency on the QC pass.
+
+**No BPMN updates required.** Verified during planning: BPMN uses generic gateway names; CheckId strings are pure code concern. Adding `check_16` and `check_17` is a TypeScript enum extension only.
+
+**Engineering territory locked:** the Piece 1 LEVEL_GUIDANCE clauses and Piece 2 ON/OFF_LEVEL_PHRASES live in code, NOT under `src/libraries/seed/` or `src/coaching/libraries/`. Hamse-owned voice content is unchanged.
+
+**Deferred from Batch P (named):**
+- Hamse calibration of the LLM-judge prompt for Piece 3 (engineering shipped v1; Hamse refines after seeing real verdicts on real responses).
+- Sponsor-portal cohort-level reporting on practice-grounding rates (uses the new TurnTrace fields; gated on `requireSegmentSize`; separate batch).
+- Grading UI from the wireframe (Phase 2, dedicated team).
+- R-14 broader trace work (`qaFailedChecks: CheckId[]` for ALL failed checks) — Batch D scope; Piece 4 is a focused two-field addition that does not preempt R-14.
+- `finalizeAsServiceUnavailable` helper extraction (still deferred from Batch B).
+- Refactor unifying LEVEL_GUIDANCE + ON/OFF_LEVEL_PHRASES into a `src/coaching/levels.ts` module (cleaner long-term but YAGNI).

@@ -6,6 +6,7 @@ import {
   check4AssetBased,
   check7Tone,
   check8SafetyCrisis,
+  check17PracticeGrounding,
   checkLivedExperienceDiscipline,
   checkTangibleAction,
   checkUsefulToSocietyAnchor,
@@ -16,6 +17,7 @@ import {
   check5HeroToGuide,
   check6UsefulToSociety,
   check9Length,
+  check16LevelFidelity,
   checkFormattingDiscipline,
 } from './checks-rule-based.js';
 import { checkIntentLengthAsCheckResult } from './intent-length-bands.js';
@@ -256,6 +258,8 @@ async function runAllChecks(
     check9Length(candidate, input.responseMode),
     checkFormattingDiscipline(candidate),
     checkIntentLengthAsCheckResult(candidate, input.intent),
+    // Batch P Piece 2 — deterministic level-fidelity (off-level density signal).
+    check16LevelFidelity(candidate, input.predictedLevelTag, input.responseMode),
   ];
   const llm = await Promise.all([
     check3SignatureStructure(deps.config, candidate),
@@ -266,6 +270,8 @@ async function runAllChecks(
     checkTangibleAction(deps.config, candidate),
     checkVoiceConsistency(deps.config, candidate),
     checkUsefulToSocietyAnchor(deps.config, candidate),
+    // Batch P Piece 3 — LLM-judged practice grounding (parallel batch).
+    check17PracticeGrounding(deps.config, input.userMessage, candidate, input.predictedPracticeTag),
   ]);
   return [...sync, ...llm];
 }

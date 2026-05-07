@@ -27,6 +27,13 @@ export interface TurnTrace {
     | 'crisis'
     | 'service-unavailable'
     | 'skipped';
+  /** Batch P Piece 4 — verdict from check_17 (LLM-judged practice grounding).
+   *  Optional: undefined for non-coaching response modes (Greeting,
+   *  Affirmation, Meta, ProfileUpdate) which never reach QC. */
+  practiceGroundingVerdict?: 'grounded' | 'mentioned' | 'absent' | 'service_unavailable';
+  /** Batch P Piece 4 — verdict from check_16 (deterministic level fidelity).
+   *  Optional: undefined for non-coaching modes; 'pass' or 'drift' otherwise. */
+  levelFidelityVerdict?: 'pass' | 'drift';
   degradationFlags: DegradationFlags;
   libraryVersions: LibraryVersionSet;
   determinismHash: string | null;

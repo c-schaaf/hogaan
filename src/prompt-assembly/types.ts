@@ -57,6 +57,12 @@ export interface PromptUnderConstruction {
   systemTemplateText: string;
   practiceFramingText: string;
   levelFramingText: string;
+  /** Batch P Piece 1 — structural directive instructing the LLM to ground in
+   *  the tagged practice as the organizing frame and anchor at the tagged
+   *  level. Empty string for response modes that are untagged
+   *  (ClarifyingQuestion, MetaResponse) — this engineering block does NOT
+   *  fire when there's no practice/level to ground in. */
+  directivesBlockText: string;
   voiceRulesText: string;
   /** Null when not applicable per Step 7 DMN, OR when degraded out by Step 12. */
   culturalFramingText: string | null;

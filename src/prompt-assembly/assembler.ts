@@ -7,7 +7,13 @@ import {
 import type { Database } from '../shared/db/client.js';
 import { reportIncident } from '../shared/observability/incidents.js';
 import type { AppConfig } from '../shared/secrets/config.js';
-import { noDegradation, type LibraryVersionSet, type ResponseMode } from '../shared/types/index.js';
+import {
+  noDegradation,
+  type LevelTag,
+  type LibraryVersionSet,
+  type PracticeTag,
+  type ResponseMode,
+} from '../shared/types/index.js';
 import {
   buildMemoryBlock,
   buildSessionContext,
@@ -92,6 +98,14 @@ export async function assemblePrompt(
       ? buildLevelFraming(libs.promptTemplates.payload, validated.levelTag)
       : '';
 
+  // Batch P Piece 1 — structural directives. Tells the LLM to use the
+  // tagged practice as the organizing frame and anchor at the tagged
+  // level. Empty when either tag is missing (untagged response modes).
+  const directivesBlockText = buildDirectivesBlock(
+    tagsRequired ? (validated.practiceTag ?? null) : null,
+    tagsRequired ? (validated.levelTag ?? null) : null,
+  );
+
   // Step 6: voice rules
   const voiceRulesText = buildVoiceRules(libs.voiceRules.payload);
 
@@ -112,6 +126,7 @@ export async function assemblePrompt(
     systemTemplateText: template.systemText,
     practiceFramingText,
     levelFramingText,
+    directivesBlockText,
     voiceRulesText,
     culturalFramingText: cultural?.text ?? null,
     culturalFramingConcept: cultural?.concept ?? null,
@@ -217,6 +232,9 @@ function canonicalAssemble(p: PromptUnderConstruction): string {
   if (p.levelFramingText.length > 0) {
     parts.push(p.levelFramingText);
   }
+  if (p.directivesBlockText.length > 0) {
+    parts.push(p.directivesBlockText);
+  }
   parts.push(p.voiceRulesText);
   if (p.culturalFramingText !== null && p.culturalFramingText.length > 0) {
     parts.push(p.culturalFramingText);
@@ -227,3 +245,35 @@ function canonicalAssemble(p: PromptUnderConstruction): string {
   parts.push(p.userMessageText);
   return parts.join('\n\n');
 }
+
+/**
+ * Batch P Piece 1 — engineering-authored structural framing per level.
+ * NOT Hamse-owned voice content (those live in src/libraries/seed/). These
+ * are scope descriptors that tell the LLM where to anchor a response.
+ */
+const LEVEL_GUIDANCE: Record<LevelTag, string> = {
+  self: "anchor on the leader's interior — what they feel, see, decide, learn — not on the people around them.",
+  team: 'anchor on the dynamics, trust, and direct relationships within their team — not on their personal feelings or organizational structure.',
+  organization:
+    'anchor on structural, cultural, or cross-functional patterns at the org level — not on individual interpersonal moments.',
+  community:
+    'anchor on civic, sectoral, or community stakes — not on private organizational decisions.',
+};
+
+/**
+ * Build the structural directives block. Returns empty string when either
+ * tag is missing, so the canonical assembler can omit the block for
+ * untagged response modes (ClarifyingQuestion, MetaResponse).
+ */
+function buildDirectivesBlock(practiceTag: PracticeTag | null, levelTag: LevelTag | null): string {
+  if (practiceTag === null || levelTag === null) {
+    return '';
+  }
+  return [
+    '## Required directives',
+    `Your response must use **${practiceTag}** as the organizing frame of the answer, not just as a vocabulary word. Anchor at **${levelTag}-level**: ${LEVEL_GUIDANCE[levelTag]}`,
+  ].join('\n');
+}
+
+/** Test seam — exposes the directives block builder + level guidance for audit. */
+export const _internal = { LEVEL_GUIDANCE, buildDirectivesBlock };
