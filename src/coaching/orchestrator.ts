@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { handoff as crisisHandoff } from '../crisis-handoff/index.js';
 import { reportP1 } from '../incident-handling/index.js';
 import { getActiveLibraryVersions } from '../libraries/index.js';
-import { assemblePrompt } from '../prompt-assembly/index.js';
+import { assemblePrompt, PromptAssemblyError } from '../prompt-assembly/index.js';
 import { runQualityCheck } from '../quality-check/index.js';
+import { fallbackDegraded } from '../quality-check/fallbacks.js';
 import { runScenarioTurn } from '../scenario-learning/index.js';
 import { resolveSession } from '../session-lifecycle/index.js';
 import type { Database } from '../shared/db/client.js';
@@ -186,7 +187,9 @@ export async function runCoachingTurn(
       'ProfileUpdate',
     );
   }
-  if (intent === 'Greeting') {
+  // R-01 — only fire on a genuinely new session. Mid-session courtesy
+  // beats classified as Greeting fall through to the coaching path.
+  if (intent === 'Greeting' && session.isNew) {
     return await runTemplatedResponse(
       deps,
       inbound,
@@ -198,7 +201,10 @@ export async function runCoachingTurn(
       'Greeting',
     );
   }
-  if (intent === 'Affirmation') {
+  // R-01 — only fire when there's a prior turn to acknowledge. New
+  // sessions classified as Affirmation are still openings, not closings;
+  // fall through to the coaching path.
+  if (intent === 'Affirmation' && !session.isNew && session.turnCount > 0) {
     return await runTemplatedResponse(
       deps,
       inbound,
@@ -229,20 +235,43 @@ export async function runCoachingTurn(
   // ---- Step 7: clarification decision (v1: skip — always advance) ----
 
   // ---- Step 8: prompt assembly ---------------------------------------
-  const promptBundle = await assemblePrompt(deps.config, deps.db, {
-    userId: inbound.userId,
-    sessionId: session.sessionId,
-    responseMode: 'FullCoachingResponse',
-    practiceTag: tags.practiceTag,
-    levelTag: tags.levelTag,
-    secondaryPracticeTag: tags.secondaryPracticeTag,
-    secondaryLevelTag: tags.secondaryLevelTag,
-    taggerConfidence: tags.confidence,
-    userMessage: inbound.body,
-    userProfile: ctx.profile,
-    retrievedMemories: ctx.memories,
-    sessionTurns: ctx.sessionTurns,
-  });
+  // R-04 — wrap in try/catch. PromptAssemblyError must finalize as
+  // E11_ServiceUnavailable + dispatch FALLBACK_DEGRADED so the user
+  // receives a response instead of the queue-processor dead-lettering
+  // a silent failure. Unknown errors rethrow (preserve bug-report semantics).
+  let promptBundle;
+  try {
+    promptBundle = await assemblePrompt(deps.config, deps.db, {
+      userId: inbound.userId,
+      sessionId: session.sessionId,
+      responseMode: 'FullCoachingResponse',
+      practiceTag: tags.practiceTag,
+      levelTag: tags.levelTag,
+      secondaryPracticeTag: tags.secondaryPracticeTag,
+      secondaryLevelTag: tags.secondaryLevelTag,
+      taggerConfidence: tags.confidence,
+      userMessage: inbound.body,
+      userProfile: ctx.profile,
+      retrievedMemories: ctx.memories,
+      sessionTurns: ctx.sessionTurns,
+    });
+  } catch (err) {
+    if (err instanceof PromptAssemblyError) {
+      const body = fallbackDegraded();
+      await sendBody(deps, inbound, body, 'prompt-assembly-failure');
+      return finalize(deps, inbound, {
+        endEvent: 'E11_ServiceUnavailable',
+        responseText: body,
+        practiceTag: tags.practiceTag,
+        levelTag: tags.levelTag,
+        latencyMs: Date.now() - t0,
+        reason: `prompt-assembly: ${err.endEvent}`,
+        sessionId: session.sessionId,
+        turnId: null,
+      });
+    }
+    throw err;
+  }
 
   // ---- Step 9: primary LLM call --------------------------------------
   let chatResp;

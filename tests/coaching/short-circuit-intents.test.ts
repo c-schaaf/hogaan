@@ -111,10 +111,19 @@ beforeEach(async () => {
 describe('Phase 11 R16 — Greeting + Affirmation short-circuit', () => {
   it('Greeting → GREETING_RESPONSE template; LLM never invoked', async () => {
     const triageMod = await import('../../src/coaching/triage.js');
+    const sessionMod = await import('../../src/session-lifecycle/index.js');
     vi.mocked(triageMod.triage).mockResolvedValue({
       status: 'valid',
       reason: 'classifier passed',
       intent: 'Greeting',
+    });
+    // R-01 — greeting only fires on a genuinely new session.
+    vi.mocked(sessionMod.resolveSession).mockResolvedValue({
+      sessionId: TEST_SESSION_ID,
+      isNew: true,
+      turnCount: 0,
+      lastTurnAt: new Date('2026-05-06T12:00:00Z'),
+      metadata: null,
     });
 
     const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
@@ -161,10 +170,19 @@ describe('Phase 11 R16 — Greeting + Affirmation short-circuit', () => {
 
   it('short-circuit latency: greeting completes well under the 6s p99 budget', async () => {
     const triageMod = await import('../../src/coaching/triage.js');
+    const sessionMod = await import('../../src/session-lifecycle/index.js');
     vi.mocked(triageMod.triage).mockResolvedValue({
       status: 'valid',
       reason: 'classifier passed',
       intent: 'Greeting',
+    });
+    // R-01 — greeting only fires on a genuinely new session.
+    vi.mocked(sessionMod.resolveSession).mockResolvedValue({
+      sessionId: TEST_SESSION_ID,
+      isNew: true,
+      turnCount: 0,
+      lastTurnAt: new Date('2026-05-06T12:00:00Z'),
+      metadata: null,
     });
 
     const t0 = Date.now();
