@@ -31,9 +31,9 @@ export interface TurnTrace {
    *  Optional: undefined for non-coaching response modes (Greeting,
    *  Affirmation, Meta, ProfileUpdate) which never reach QC. */
   practiceGroundingVerdict?: 'grounded' | 'mentioned' | 'absent' | 'service_unavailable';
-  /** Batch P Piece 4 — verdict from check_16 (deterministic level fidelity).
-   *  Optional: undefined for non-coaching modes; 'pass' or 'drift' otherwise. */
-  levelFidelityVerdict?: 'pass' | 'drift';
+  // 2026-05-08 audit: levelFidelityVerdict (from check_16) removed alongside
+  // check_13 (voice_consistency) — both graded rules absent from the primary
+  // system prompt. Implementations preserved for potential future telemetry.
   degradationFlags: DegradationFlags;
   libraryVersions: LibraryVersionSet;
   determinismHash: string | null;

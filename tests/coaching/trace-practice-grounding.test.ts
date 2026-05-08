@@ -14,11 +14,13 @@ import { fakeConfig, fakeRateLimiters, fakeRedis } from '../phase-10/helpers/fak
 import type { TraceEmitter, TurnTrace } from '../../src/shared/trace/index.js';
 
 /**
- * Batch P Piece 4 — TurnTrace integration. The two new optional verdict
- * fields (practiceGroundingVerdict, levelFidelityVerdict) must be emitted
- * for coaching turns that run QC. Short-circuit modes (Greeting,
- * Affirmation, Meta, ProfileUpdate) bypass QC entirely so the verdicts
- * stay undefined for those traces.
+ * Batch P Piece 4 — TurnTrace integration. The practiceGroundingVerdict
+ * field must be emitted for coaching turns that run QC. Short-circuit
+ * modes (Greeting, Affirmation, Meta, ProfileUpdate) bypass QC entirely
+ * so the verdict stays undefined for those traces.
+ *
+ * 2026-05-08 audit: levelFidelityVerdict (from check_16) removed alongside
+ * check_13. Tests below were updated to drop level-fidelity assertions.
  */
 
 vi.mock('../../src/coaching/triage.js', () => ({
@@ -187,7 +189,7 @@ beforeEach(async () => {
 });
 
 describe('Batch P Piece 4 — TurnTrace verdicts', () => {
-  it('coaching turn trace includes both verdict fields when checks ran', async () => {
+  it('coaching turn trace includes practice-grounding verdict when check ran', async () => {
     const triageMod = await import('../../src/coaching/triage.js');
     const qcMod = await import('../../src/quality-check/index.js');
 
@@ -196,7 +198,6 @@ describe('Batch P Piece 4 — TurnTrace verdicts', () => {
       reason: 'classifier passed',
       intent: 'Coaching',
     });
-    // QC returns an approved result with both new checks present.
     vi.mocked(qcMod.runQualityCheck).mockResolvedValue({
       endEvent: 'E1_ApprovedFirstAttempt',
       responseText: 'Coaching response.',
@@ -204,10 +205,6 @@ describe('Batch P Piece 4 — TurnTrace verdicts', () => {
       retryCount: 0,
       degraded: false,
       checks: [
-        {
-          checkId: 'check_16_level_fidelity',
-          outcome: { status: 'pass' },
-        },
         {
           checkId: 'check_17_practice_grounding',
           outcome: { status: 'pass' },
@@ -222,10 +219,9 @@ describe('Batch P Piece 4 — TurnTrace verdicts', () => {
     expect(emitter.captured).toHaveLength(1);
     const trace = emitter.captured[0]!;
     expect(trace.practiceGroundingVerdict).toBe('grounded');
-    expect(trace.levelFidelityVerdict).toBe('pass');
   });
 
-  it('soft_fail outcomes map to drift / mentioned in the trace', async () => {
+  it('soft_fail grounding outcome maps to mentioned in the trace', async () => {
     const triageMod = await import('../../src/coaching/triage.js');
     const qcMod = await import('../../src/quality-check/index.js');
 
@@ -242,10 +238,6 @@ describe('Batch P Piece 4 — TurnTrace verdicts', () => {
       degraded: false,
       checks: [
         {
-          checkId: 'check_16_level_fidelity',
-          outcome: { status: 'soft_fail', reason: 'level drift: 3 off-level vs 1 on-level' },
-        },
-        {
           checkId: 'check_17_practice_grounding',
           outcome: { status: 'soft_fail', reason: 'practice mentioned: q' },
         },
@@ -258,7 +250,6 @@ describe('Batch P Piece 4 — TurnTrace verdicts', () => {
 
     const trace = emitter.captured[0]!;
     expect(trace.practiceGroundingVerdict).toBe('mentioned');
-    expect(trace.levelFidelityVerdict).toBe('drift');
   });
 
   it('reason containing "absent" maps to absent verdict', async () => {
@@ -316,6 +307,5 @@ describe('Batch P Piece 4 — TurnTrace verdicts', () => {
     expect(emitter.captured.length).toBeGreaterThanOrEqual(1);
     const trace = emitter.captured[emitter.captured.length - 1]!;
     expect(trace.practiceGroundingVerdict).toBeUndefined();
-    expect(trace.levelFidelityVerdict).toBeUndefined();
   });
 });
