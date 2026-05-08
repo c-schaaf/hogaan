@@ -36,17 +36,43 @@ export interface CorrectiveOptions {
  * once PRIMARY_TIMEOUT_DEFAULT_MS rose to 12000ms (commit 6db2967): regen on
  * the 3700-token coaching prompt cannot complete in 3s, so every regen-firing
  * turn timed out → E6_ServiceUnavailable → fallback. With LATENCY_BUDGET_MS
- * now 15000ms and the elapsed-time skip guard in QC orchestrator (also R-07)
- * gating regen on remaining budget, 10s fits the worst case.
+ * now 15000ms and the predictive budget gate in QC orchestrator (also R-07)
+ * refusing to start a regen that cannot fit in remaining budget, 10s fits the
+ * worst case.
  *
  * Hogaan timeout hierarchy (must be reviewed together):
  * - LATENCY_BUDGET_MS = 15000 (total turn cap, src/coaching/orchestrator.ts)
  * - PRIMARY_TIMEOUT_DEFAULT_MS = 12000 (primary LLM call, src/shared/llm/chat.ts)
  * - REGEN_TIMEOUT_MS = 10000 (regenerate call, this file)
- * Any change to one requires audit of all three.
+ * - REGEN_BUDGET_HEADROOM_MS = 12000 (predictive regen-skip gate, this file)
+ * Any change to one requires audit of all four. Notably:
+ *   REGEN_BUDGET_HEADROOM_MS must cover REGEN_TIMEOUT_MS + final QC pass +
+ *   delivery, NOT just REGEN_TIMEOUT_MS — otherwise the regen completes but
+ *   the final pass + delivery push past LATENCY_BUDGET_MS, and the user
+ *   receives FALLBACK_DEGRADED via the R-06 budget gate at
+ *   src/coaching/orchestrator.ts (the symptom we're solving here).
  */
 const REGEN_TIMEOUT_MS = 10_000;
 const REGEN_MAX_TOKENS = 1024;
+
+/**
+ * Predictive regen-skip headroom — minimum remaining budget required at the
+ * R-07 gate before permitting a regen attempt. Sized to cover the full
+ * post-regen tail:
+ *   - regen call: up to REGEN_TIMEOUT_MS = 10000ms
+ *   - final QC pass on the regenerated candidate: ~1500ms p95
+ *   - delivery to Twilio: ~500ms p95
+ * Total: ~12000ms.
+ *
+ * Calibrated 2026-05-08 against the smoke-test trace
+ * (waMessageId SM64e518d1c30d37188b68601ede72d5e6) which observed:
+ *   regen 7648ms + QC pass 2 ~1000-1500ms + delivery ~250ms ≈ 9.4s envelope.
+ * 12000ms gives ~2.5s safety margin.
+ *
+ * If LATENCY_BUDGET_MS, REGEN_TIMEOUT_MS, or QC parallel-batch latency
+ * shifts materially, re-derive this from observation rather than guessing.
+ */
+const REGEN_BUDGET_HEADROOM_MS = 12_000;
 
 export function buildCorrectivePrompt(opts: CorrectiveOptions): string {
   const relevant = opts.failedChecks.filter(
@@ -118,4 +144,6 @@ export async function regenerate(
 }
 
 /** Test seam — exposes the regen timing constants for direct assertion. */
-export const _internal = { REGEN_TIMEOUT_MS, REGEN_MAX_TOKENS };
+export const _internal = { REGEN_TIMEOUT_MS, REGEN_MAX_TOKENS, REGEN_BUDGET_HEADROOM_MS };
+
+export { REGEN_BUDGET_HEADROOM_MS };
