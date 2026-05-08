@@ -76,12 +76,18 @@ export interface QcResult {
   crisisDetected: boolean;
   /** Number of regeneration attempts made (0 = first attempt approved or non-regeneration outcome). */
   retryCount: number;
-  /** True for E6 — caller should treat the response as a degraded variant. */
+  /** True for E6 + E8 — caller should treat the response as a degraded variant. */
   degraded: boolean;
   /** Per-check outcomes from the FINAL pass — useful for trace + Phase 7.15 audit. */
   checks: CheckResult[];
   /** History of corrective prompts issued, for replay/debug. */
   correctivePromptHistory: string[];
+  /**
+   * Populated only on E8_ShipDegradedCandidate (R-07 gate fires + only
+   * soft_fails). Lists the soft_failed check IDs so callers can emit
+   * targeted quality telemetry. Undefined on every other endEvent.
+   */
+  softFailedCheckIds?: CheckId[];
 }
 
 export class QcError extends Error {
