@@ -586,12 +586,14 @@ export async function runCoachingTurn(
       ? 'E2_TurnCompletedSessionClosed'
       : 'E1_TurnCompleted';
 
-  // Batch P Piece 4 — extract verdicts from check_16 / check_17 outcomes
-  // for the trace. Both fields stay undefined when the corresponding
-  // check returned 'not_required' (which it should never on a coaching
-  // turn, but defensive). Service-unavailable flows through for visibility.
+  // Batch P Piece 4 — extract verdict from check_17 outcome for the trace.
+  // Field stays undefined when the corresponding check returned 'not_required'
+  // (which it should never on a coaching turn, but defensive).
+  // Service-unavailable flows through for visibility.
+  // 2026-05-08 audit: levelFidelityVerdict (from check_16) removed — the
+  // off-level density check graded a rule absent from the primary system
+  // prompt, so was removed from runAllChecks alongside check_13.
   const groundingCheck = qc.checks.find((c) => c.checkId === 'check_17_practice_grounding');
-  const levelCheck = qc.checks.find((c) => c.checkId === 'check_16_level_fidelity');
   let practiceGroundingVerdict:
     | 'grounded'
     | 'mentioned'
@@ -606,15 +608,6 @@ export async function runCoachingTurn(
       practiceGroundingVerdict = o.reason.includes('absent') ? 'absent' : 'mentioned';
     } else if (o.status === 'service_unavailable') {
       practiceGroundingVerdict = 'service_unavailable';
-    }
-  }
-  let levelFidelityVerdict: 'pass' | 'drift' | undefined;
-  if (levelCheck !== undefined) {
-    const o = levelCheck.outcome;
-    if (o.status === 'pass') {
-      levelFidelityVerdict = 'pass';
-    } else if (o.status === 'soft_fail') {
-      levelFidelityVerdict = 'drift';
     }
   }
 
@@ -636,7 +629,6 @@ export async function runCoachingTurn(
             ? 'service-unavailable'
             : 'skipped',
     ...(practiceGroundingVerdict !== undefined ? { practiceGroundingVerdict } : {}),
-    ...(levelFidelityVerdict !== undefined ? { levelFidelityVerdict } : {}),
     degradationFlags: {
       memoryTruncated: promptBundle.degradationFlags.memoryTruncated,
       sessionTruncated: promptBundle.degradationFlags.sessionTruncated,

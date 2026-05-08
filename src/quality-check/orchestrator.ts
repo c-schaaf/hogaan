@@ -18,11 +18,15 @@ import {
   check5HeroToGuide,
   check6UsefulToSociety,
   check9Length,
-  check16LevelFidelity,
   checkFormattingDiscipline,
 } from './checks-rule-based.js';
 import { checkIntentLengthAsCheckResult } from './intent-length-bands.js';
-import { checkVoiceConsistency } from './voice-consistency.js';
+// Check 13 (voice_consistency) and Check 16 (level_fidelity) are intentionally
+// NOT imported here — see 2026-05-08 audit: both grade rules absent from the
+// primary system prompt (embedding cosine vs unstated centroid; off-level
+// phrase density formula). Implementations in voice-consistency.ts and
+// checks-rule-based.ts (check16LevelFidelity) are preserved for unit tests
+// and potential future revival as telemetry-only signals.
 import { regenerate, REGEN_BUDGET_HEADROOM_MS } from './corrective.js';
 import { fallbackDegraded, fallbackMaxRetries } from './fallbacks.js';
 import type { CheckResult, QcInput, QcResult } from './types.js';
@@ -308,15 +312,13 @@ function instrumentCheckSync(checkId: string, fn: () => CheckResult): CheckResul
 }
 
 /**
- * Run all 13 checks against the current candidate. Rule-based checks run
+ * Run all active checks against the current candidate. Rule-based checks run
  * synchronously; LLM checks fan out in parallel for latency.
  *
- * Latency expectation: 6 LLM checks (check_03/04/07/08/10/12) + 1 voyage
- * embedding pair (check_13) all run in parallel. Each LLM call has a 4s
- * budget; voyage centroid is memoized after first call so check_13 reduces
- * to a single embed-query (~300ms) on subsequent runs. Wall-clock for the
- * full QC pass stays in the ~1s p99 envelope, fitting within the 6s p99
- * total turn budget per CLAUDE.md hard rule #2.
+ * Active set after 2026-05-08 audit removal of check_13 (voice_consistency)
+ * and check_16 (level_fidelity): 7 sync checks (1, 2, 5, 6, 9, 11, 14) + 8
+ * parallel LLM checks (3, 4, 7, 8, 10, 12, 15, 17). Each LLM call has a 4s
+ * budget; wall-clock for the full QC pass stays in the ~1.5s p95 envelope.
  *
  * Note: even though Check 8 is the most consequential, we still run all checks
  * concurrently so we get the full failure picture in one round-trip — Check 8
@@ -337,10 +339,6 @@ async function runAllChecks(
       checkFormattingDiscipline(candidate),
     ),
     checkIntentLengthAsCheckResult(candidate, input.intent),
-    // Batch P Piece 2 — deterministic level-fidelity (off-level density signal).
-    instrumentCheckSync('check_16_level_fidelity', () =>
-      check16LevelFidelity(candidate, input.predictedLevelTag, input.responseMode),
-    ),
   ];
   const llm = await Promise.all([
     instrumentCheck('check_03_signature_structure', () =>
@@ -355,9 +353,6 @@ async function runAllChecks(
       checkLivedExperienceDiscipline(deps.config, candidate),
     ),
     instrumentCheck('check_12_tangible_action', () => checkTangibleAction(deps.config, candidate)),
-    instrumentCheck('check_13_voice_consistency', () =>
-      checkVoiceConsistency(deps.config, candidate),
-    ),
     instrumentCheck('check_15_useful_to_society_anchor', () =>
       checkUsefulToSocietyAnchor(deps.config, candidate),
     ),
