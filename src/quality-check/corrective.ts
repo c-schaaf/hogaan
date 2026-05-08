@@ -45,12 +45,19 @@ export interface CorrectiveOptions {
  * - PRIMARY_TIMEOUT_DEFAULT_MS = 12000 (primary LLM call, src/shared/llm/chat.ts)
  * - REGEN_TIMEOUT_MS = 10000 (regenerate call, this file)
  * - REGEN_BUDGET_HEADROOM_MS = 12000 (predictive regen-skip gate, this file)
- * Any change to one requires audit of all four. Notably:
+ * - BREAKER_ANTHROPIC_TIMEOUT_MS = 14000 (must be > PRIMARY_TIMEOUT_DEFAULT_MS
+ *     to avoid double-counting in the circuit breaker; src/shared/llm/breaker.ts)
+ * Any change to one requires audit of all five. Notably:
  *   REGEN_BUDGET_HEADROOM_MS must cover REGEN_TIMEOUT_MS + final QC pass +
  *   delivery, NOT just REGEN_TIMEOUT_MS — otherwise the regen completes but
  *   the final pass + delivery push past LATENCY_BUDGET_MS, and the user
  *   receives FALLBACK_DEGRADED via the R-06 budget gate at
  *   src/coaching/orchestrator.ts (the symptom we're solving here).
+ *   BREAKER_ANTHROPIC_TIMEOUT_MS must be > PRIMARY_TIMEOUT_DEFAULT_MS — see
+ *   audit F-02 (2026-05-08): Opossum's per-call timeout otherwise fires
+ *   before the LLM timeout, counting healthy-but-slow Anthropic calls as
+ *   breaker failures and risking circuit-open at the volume threshold.
+ *   tests/shared/llm/breaker.test.ts asserts this invariant programmatically.
  */
 const REGEN_TIMEOUT_MS = 10_000;
 const REGEN_MAX_TOKENS = 1024;
