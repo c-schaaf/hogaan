@@ -7,7 +7,6 @@ import {
   check7Tone,
   check8SafetyCrisis,
   check17PracticeGrounding,
-  checkLivedExperienceDiscipline,
   checkTangibleAction,
   checkUsefulToSocietyAnchor,
 } from './checks-llm.js';
@@ -17,15 +16,21 @@ import {
   check5HeroToGuide,
   check6UsefulToSociety,
   check9Length,
-  checkFormattingDiscipline,
 } from './checks-rule-based.js';
 import { checkIntentLengthAsCheckResult } from './intent-length-bands.js';
-// Check 13 (voice_consistency) and Check 16 (level_fidelity) are intentionally
-// NOT imported here — see 2026-05-08 audit: both grade rules absent from the
-// primary system prompt (embedding cosine vs unstated centroid; off-level
-// phrase density formula). Implementations in voice-consistency.ts and
-// checks-rule-based.ts (check16LevelFidelity) are preserved for unit tests
-// and potential future revival as telemetry-only signals.
+// Check 10 (lived_experience), Check 11 (formatting_discipline), Check 13
+// (voice_consistency), and Check 16 (level_fidelity) are intentionally NOT
+// imported here. Check 13 and Check 16 were removed by the 2026-05-08 audit
+// (graded hidden rules absent from the primary prompt). Check 10 and Check
+// 11 were deactivated for the trusted-user pilot on 2026-05-08 — both are
+// pure quality-shaping checks with no safety implication, and the same
+// smoke trace that surfaced the Check 8 classifier JSON-trailer bug also
+// surfaced an LLM-grader recalibration need on Check 10 and a
+// regex-cleanliness need on Check 11. See
+// audit-evidence/audits/2026-05-08-pre-launch-quality-check-deactivation.md
+// for the deactivation record and reactivation criteria. Implementations
+// (checkLivedExperienceDiscipline, checkFormattingDiscipline) are
+// preserved for unit tests and future revival.
 import { regenerate, REGEN_BUDGET_HEADROOM_MS } from './corrective.js';
 import { fallbackDegraded, fallbackMaxRetries } from './fallbacks.js';
 import type { CheckResult, QcInput, QcResult } from './types.js';
@@ -257,10 +262,11 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
  * Run all active checks against the current candidate. Rule-based checks run
  * synchronously; LLM checks fan out in parallel for latency.
  *
- * Active set after 2026-05-08 audit removal of check_13 (voice_consistency)
- * and check_16 (level_fidelity): 7 sync checks (1, 2, 5, 6, 9, 11, 14) + 8
- * parallel LLM checks (3, 4, 7, 8, 10, 12, 15, 17). Each LLM call has a 4s
- * budget; wall-clock for the full QC pass stays in the ~1.5s p95 envelope.
+ * Active set after the 2026-05-08 pre-launch deactivations (check_10 and
+ * check_11) layered on top of the earlier 2026-05-08 audit removal of
+ * check_13 / check_16: 6 sync checks (1, 2, 5, 6, 9, 14) + 7 parallel LLM
+ * checks (3, 4, 7, 8, 12, 15, 17). Each LLM call has a 4s budget; wall-clock
+ * for the full QC pass stays in the ~1.5s p95 envelope.
  *
  * Note: even though Check 8 is the most consequential, we still run all checks
  * concurrently so we get the full failure picture in one round-trip — Check 8
@@ -277,7 +283,6 @@ async function runAllChecks(
     check5HeroToGuide(deps.libraries.voiceRules.payload, candidate),
     check6UsefulToSociety(deps.libraries.voiceRules.payload, candidate, input.predictedLevelTag),
     check9Length(candidate, input.responseMode),
-    checkFormattingDiscipline(candidate),
     checkIntentLengthAsCheckResult(candidate, input.intent),
   ];
   const llm = await Promise.all([
@@ -285,7 +290,6 @@ async function runAllChecks(
     check4AssetBased(deps.config, candidate),
     check7Tone(deps.config, candidate),
     check8SafetyCrisis(deps.config, input.userMessage, candidate),
-    checkLivedExperienceDiscipline(deps.config, candidate),
     checkTangibleAction(deps.config, candidate),
     checkUsefulToSocietyAnchor(deps.config, candidate),
     // Batch P Piece 3 — LLM-judged practice grounding (parallel batch).

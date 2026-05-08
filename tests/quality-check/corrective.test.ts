@@ -116,10 +116,16 @@ const cfg: AppConfig = {
   sponsorPortalBaseUrl: undefined,
 };
 
-// Candidate with a `## markdown header` triggers Check 11 formatting-discipline
-// soft_fail, which forces the regen path (where the R-07 guard fires).
+// Candidate is well below the FullCoachingResponse 120-word minimum, so
+// check_09 length deterministically soft_fails and forces the regen path
+// (where the R-07 guard fires). The historic shape included a `## markdown
+// header` that also tripped Check 11 formatting-discipline; Check 11 was
+// deactivated 2026-05-08 (pre-launch pilot, see audit-evidence/audits/
+// 2026-05-08-pre-launch-quality-check-deactivation.md), so the trigger now
+// rests on length alone — the candidate stays short enough for that to
+// fire.
 const SOFT_FAILING_CANDIDATE =
-  '## A markdown header that violates Voice Rule 11\n\nSome body text that would otherwise look fine, but the header here triggers checkFormattingDiscipline to soft_fail and route through the regen loop. We use this to exercise the R-07 deadline guard deterministically without mocking individual checks.';
+  'A short candidate that violates the 120-word floor for FullCoachingResponse mode and therefore drives check_09 length to soft_fail. We use it to exercise the R-07 deadline guard deterministically without mocking individual checks.';
 
 afterEach(() => {
   vi.clearAllMocks();

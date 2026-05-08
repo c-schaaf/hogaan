@@ -62,8 +62,8 @@ const ALL_CHECK_IDS: readonly CheckId[] = [
   'check_07_tone',
   'check_08_safety_crisis',
   'check_09_length',
-  'check_10_lived_experience',
-  'check_11_formatting_discipline',
+  // check_10_lived_experience deactivated 2026-05-08 (pre-launch trusted-user pilot) — LLM grader needs recalibration; reactivation pending.
+  // check_11_formatting_discipline deactivated 2026-05-08 (pre-launch trusted-user pilot) — regex needs cleanliness re-test; reactivation pending.
   'check_12_tangible_action',
   // check_13_voice_consistency removed 2026-05-08 — graded a hidden centroid threshold.
   'check_14_intent_length',
@@ -114,8 +114,8 @@ const cfg: AppConfig = {
   sponsorPortalBaseUrl: undefined,
 };
 
-describe('Phase 12 R1 — runAllChecks produces every CheckId in the catalog', () => {
-  it('runs all 13 checks in a single pass', async () => {
+describe('Phase 12 R1 — runAllChecks produces every active CheckId in the catalog', () => {
+  it('runs all active checks in a single pass', async () => {
     const result = await runQualityCheck(
       {
         config: cfg,
