@@ -118,8 +118,8 @@ afterEach(() => {
 });
 
 describe('R-07 regen timeout cap', () => {
-  it('REGEN_TIMEOUT_MS is now 3000ms (down from 15000ms)', () => {
-    expect(correctiveInternal.REGEN_TIMEOUT_MS).toBe(3_000);
+  it('REGEN_TIMEOUT_MS is 10000ms (raised from 3000ms after PRIMARY_TIMEOUT_DEFAULT_MS rose to 12000ms)', () => {
+    expect(correctiveInternal.REGEN_TIMEOUT_MS).toBe(10_000);
   });
 });
 
