@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runQualityCheck } from '../../src/quality-check/orchestrator.js';
 import { _internal as correctiveInternal } from '../../src/quality-check/corrective.js';
 import { FALLBACK_DEGRADED } from '../../src/quality-check/fallbacks.js';
+import { LlmServiceUnavailableError } from '../../src/shared/llm/errors.js';
 import type * as CorrectiveModule from '../../src/quality-check/corrective.js';
 import type { ResolvedLibraries } from '../../src/libraries/index.js';
 import type { AppConfig } from '../../src/shared/secrets/config.js';
@@ -146,8 +147,8 @@ describe('R-07 regen timing constants', () => {
   });
 });
 
-describe('R-07 predictive regen-skip gate', () => {
-  it('regen is skipped when deadlineAt is already in the past (degenerate case; remaining < 0 < headroom)', async () => {
+describe('R-07 predictive regen-skip gate — Option B three-case dispatch', () => {
+  it('Case 3 (NEW): gate fires + only soft_fails (past deadline) → E8 ships the candidate with degraded:true and softFailedCheckIds populated', async () => {
     const correctiveMod = await import('../../src/quality-check/corrective.js');
     const regenSpy = vi.mocked(correctiveMod.regenerate);
     regenSpy.mockClear();
@@ -163,28 +164,32 @@ describe('R-07 predictive regen-skip gate', () => {
         userMessage: 'I had a hard week',
         responseMode: 'FullCoachingResponse',
         intent: 'Coaching',
-        // Deadline already in the past — regen must be skipped.
+        // Deadline already in the past — predictive gate fires; only
+        // check_09 length soft_fails on this candidate, no Check 8
+        // unavailability, no hard_fails. Option B: ship the candidate.
         deadlineAt: Date.now() - 100,
       },
     );
 
-    expect(result.endEvent).toBe('E6_ServiceUnavailable');
-    expect(result.responseText).toBe(FALLBACK_DEGRADED);
+    expect(result.endEvent).toBe('E8_ShipDegradedCandidate');
+    expect(result.responseText).toBe(SOFT_FAILING_CANDIDATE);
+    expect(result.responseText).not.toBe(FALLBACK_DEGRADED);
     expect(result.degraded).toBe(true);
+    expect(result.softFailedCheckIds).toBeDefined();
+    expect(result.softFailedCheckIds).toContain('check_09_length');
     expect(regenSpy).not.toHaveBeenCalled();
   });
 
-  it('regen is skipped predictively when remainingMs < REGEN_BUDGET_HEADROOM_MS even though the deadline has not yet passed (the load-bearing case for the 2026-05-08 RCA)', async () => {
+  it('Case 3 (NEW): gate fires predictively (remainingMs < headroom) + only soft_fails → E8 ships the candidate (load-bearing case for the 2026-05-08 RCA)', async () => {
     const correctiveMod = await import('../../src/quality-check/corrective.js');
     const regenSpy = vi.mocked(correctiveMod.regenerate);
     regenSpy.mockClear();
 
-    // Deadline is 5s in the future — under the OLD reactive gate this
-    // would have permitted regen (deadline not yet past). Under the
-    // predictive gate, 5s < 12s headroom, so regen MUST be skipped.
-    // This is the smoke-trace shape: at the regen-decision point the
-    // turn had ~4-5s of remaining budget; old gate let regen run, regen
-    // took ~7.6s, total turn hit 19s, R-06 fallback dispatched.
+    // Deadline is 5s in the future. Under the predictive gate, 5s < 12s
+    // headroom, so regen is skipped. With only soft_fails present, Option
+    // B ships the candidate instead of FALLBACK_DEGRADED — this is the
+    // exact shape of the production trace SMa2580445d1c57f6fee4c430be2b13a39
+    // (2026-05-08 12:13) that prompted the fix.
     const result = await runQualityCheck(
       {
         config: cfg,
@@ -200,10 +205,143 @@ describe('R-07 predictive regen-skip gate', () => {
       },
     );
 
-    expect(result.endEvent).toBe('E6_ServiceUnavailable');
-    expect(result.responseText).toBe(FALLBACK_DEGRADED);
+    expect(result.endEvent).toBe('E8_ShipDegradedCandidate');
+    expect(result.responseText).toBe(SOFT_FAILING_CANDIDATE);
+    expect(result.responseText).not.toBe(FALLBACK_DEGRADED);
     expect(result.degraded).toBe(true);
+    expect(result.softFailedCheckIds).toBeDefined();
     expect(regenSpy).not.toHaveBeenCalled();
+  });
+
+  it('Case 1 (REGRESSION LOCK): Check 8 service_unavailable + tight deadline → E6 + FALLBACK_DEGRADED — safety fail-closed survives Option B (CLAUDE.md hard rule #1)', async () => {
+    const classifierMod = await import('../../src/shared/llm/classifier.js');
+    const correctiveMod = await import('../../src/quality-check/corrective.js');
+    const regenSpy = vi.mocked(correctiveMod.regenerate);
+    regenSpy.mockClear();
+
+    // Override the global classifierChat mock so Check 8 throws a
+    // service-unavailable error (every other LLM check still passes).
+    // Check 8's outer try/catch maps any LlmError → service_unavailable
+    // CheckResult, which the orchestrator routes to E6 + fallbackDegraded()
+    // via the early branch at orchestrator.ts:114-138 — BEFORE the R-07
+    // gate. The behavioral assertion: a Check 8 unavailability fail-closes
+    // regardless of budget pressure or Option B's new soft-fail path.
+    const originalImpl = vi.mocked(classifierMod.classifierChat).getMockImplementation();
+    vi.mocked(classifierMod.classifierChat).mockImplementation((_cfg, req) => {
+      if (req.systemPrompt.includes('safety + crisis classifier')) {
+        return Promise.reject(new LlmServiceUnavailableError('anthropic', 'haiku 503'));
+      }
+      // Other checks: pass-through to the existing global mock.
+      return Promise.resolve({
+        text: JSON.stringify({
+          verdict: 'grounded',
+          evidence_quote: 'q',
+          pass: true,
+          status: 'pass',
+          score: 0,
+          reason: 'ok',
+        }),
+        inputTokens: 100,
+        outputTokens: 20,
+      });
+    });
+
+    try {
+      const result = await runQualityCheck(
+        {
+          config: cfg,
+          libraries: fakeLibraries,
+          originalSystemPrompt: 'system prompt',
+        },
+        {
+          candidateResponseText: SOFT_FAILING_CANDIDATE,
+          userMessage: 'I had a hard week',
+          responseMode: 'FullCoachingResponse',
+          intent: 'Coaching',
+          deadlineAt: Date.now() - 100,
+        },
+      );
+
+      expect(result.endEvent).toBe('E6_ServiceUnavailable');
+      expect(result.responseText).toBe(FALLBACK_DEGRADED);
+      expect(result.degraded).toBe(true);
+      // E8's signature field MUST NOT appear on the safety fail-closed path.
+      expect(result.softFailedCheckIds).toBeUndefined();
+      expect(regenSpy).not.toHaveBeenCalled();
+    } finally {
+      // Restore the global mock so subsequent tests are unaffected.
+      if (originalImpl !== undefined) {
+        vi.mocked(classifierMod.classifierChat).mockImplementation(originalImpl);
+      }
+    }
+  });
+
+  it('Case 2 (REGRESSION LOCK): Check 8 hard_fail + tight deadline → E5_SafetyHardFailure (early branch, no candidate shipped) — hard-fail unshippability survives Option B', async () => {
+    const classifierMod = await import('../../src/shared/llm/classifier.js');
+    const correctiveMod = await import('../../src/quality-check/corrective.js');
+    const regenSpy = vi.mocked(correctiveMod.regenerate);
+    regenSpy.mockClear();
+
+    // Override classifierChat so Check 8 returns hard_fail. The
+    // orchestrator's early branch at orchestrator.ts:102-112 catches
+    // Check 8 hard_fail and returns E5 + responseText=''. This is a
+    // stricter fail-closed than E6 — the candidate is UNSHIPPABLE,
+    // which is the correct behavior for a safety-flagged response. The
+    // R-07 gate's defensive hasHardFail branch (which would route to
+    // E6) is unreachable in this scenario; both are fail-closed. The
+    // assertion: Option B does not let a hard_fail-flagged candidate
+    // ship under any circumstance.
+    const originalImpl = vi.mocked(classifierMod.classifierChat).getMockImplementation();
+    vi.mocked(classifierMod.classifierChat).mockImplementation((_cfg, req) => {
+      if (req.systemPrompt.includes('safety + crisis classifier')) {
+        return Promise.resolve({
+          text: JSON.stringify({ status: 'hard_fail', reason: 'unsafe content' }),
+          inputTokens: 100,
+          outputTokens: 20,
+        });
+      }
+      return Promise.resolve({
+        text: JSON.stringify({
+          verdict: 'grounded',
+          evidence_quote: 'q',
+          pass: true,
+          status: 'pass',
+          score: 0,
+          reason: 'ok',
+        }),
+        inputTokens: 100,
+        outputTokens: 20,
+      });
+    });
+
+    try {
+      const result = await runQualityCheck(
+        {
+          config: cfg,
+          libraries: fakeLibraries,
+          originalSystemPrompt: 'system prompt',
+        },
+        {
+          candidateResponseText: SOFT_FAILING_CANDIDATE,
+          userMessage: 'I had a hard week',
+          responseMode: 'FullCoachingResponse',
+          intent: 'Coaching',
+          deadlineAt: Date.now() - 100,
+        },
+      );
+
+      expect(result.endEvent).toBe('E5_SafetyHardFailure');
+      // E5 ships an empty body (caller routes to E11 with no outbound),
+      // NEVER the candidate.
+      expect(result.responseText).toBe('');
+      expect(result.responseText).not.toBe(SOFT_FAILING_CANDIDATE);
+      expect(result.softFailedCheckIds).toBeUndefined();
+      expect(regenSpy).not.toHaveBeenCalled();
+    } finally {
+      if (originalImpl !== undefined) {
+        vi.mocked(classifierMod.classifierChat).mockImplementation(originalImpl);
+      }
+    }
   });
 
   it('regen IS called when remainingMs >= REGEN_BUDGET_HEADROOM_MS (regression — not disabled entirely)', async () => {

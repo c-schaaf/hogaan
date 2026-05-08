@@ -26,6 +26,14 @@ export interface TurnTrace {
     | 'approved-regenerated'
     | 'crisis'
     | 'service-unavailable'
+    /**
+     * E8_ShipDegradedCandidate — the R-07 budget gate fired and only
+     * soft_fails were present. The Haiku candidate was delivered to the
+     * user with a quality flag instead of being replaced with the
+     * fallback template. softFailedCheckIds in the QcResult lists which
+     * graders disagreed.
+     */
+    | 'shipped-degraded'
     | 'skipped';
   /** Batch P Piece 4 — verdict from check_17 (LLM-judged practice grounding).
    *  Optional: undefined for non-coaching response modes (Greeting,

@@ -481,8 +481,14 @@ export async function runCoachingTurn(
   }
 
   const responseText = qc.responseText;
+  // E8_ShipDegradedCandidate ships the actual Haiku candidate (not a
+  // fallback template) but carries a quality flag. isDegraded stays true
+  // so the coaching-layer trace records E3_DegradedQuality and the
+  // qaOutcome distinguishes 'shipped-degraded' from 'service-unavailable'.
   const isDegraded =
-    qc.endEvent === 'E3_MaxRetriesExceeded' || qc.endEvent === 'E6_ServiceUnavailable';
+    qc.endEvent === 'E3_MaxRetriesExceeded' ||
+    qc.endEvent === 'E6_ServiceUnavailable' ||
+    qc.endEvent === 'E8_ShipDegradedCandidate';
 
   // R-06 — soft deadline check. Exceeding the budget by the time we're
   // ready to ship is a service-unavailability for the user; route to
@@ -627,7 +633,9 @@ export async function runCoachingTurn(
           ? 'approved-regenerated'
           : qc.endEvent === 'E6_ServiceUnavailable'
             ? 'service-unavailable'
-            : 'skipped',
+            : qc.endEvent === 'E8_ShipDegradedCandidate'
+              ? 'shipped-degraded'
+              : 'skipped',
     ...(practiceGroundingVerdict !== undefined ? { practiceGroundingVerdict } : {}),
     degradationFlags: {
       memoryTruncated: promptBundle.degradationFlags.memoryTruncated,

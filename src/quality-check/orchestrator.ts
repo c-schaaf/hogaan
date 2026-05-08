@@ -197,26 +197,80 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
     // the user from the dead-budget wait, AND avoids spending compute on
     // a regen that cannot be delivered. See
     // audit-evidence/phase-12/2026-05-08 RCA for the trace evidence.
+    //
+    // Option B (2026-05-08): when the gate fires, dispatch is conditional
+    // on the failure profile of `failingChecks`:
+    //   - Check 8 service_unavailable in this batch: would have been caught
+    //     by the early E6 fail-closed branch above (line ~115). Cannot be
+    //     reached here; preserved as a defensive guard for future check
+    //     additions.
+    //   - any hard_fail present: E6 + fallbackDegraded(). Hard-failed
+    //     responses are unshippable by definition.
+    //   - only soft_fails: E8_ShipDegradedCandidate with the actual
+    //     candidate as responseText + degraded:true + softFailedCheckIds
+    //     populated. The user receives real coaching with a quality flag
+    //     in the trace instead of the apology template — a single grader
+    //     disagreement no longer replaces the response when the budget is
+    //     exhausted. Safety semantics unchanged: Check 8 fail-closed and
+    //     hard_fail E6 dispatch are both preserved.
     if (input.deadlineAt !== undefined) {
       const remainingMs = input.deadlineAt - Date.now();
       if (remainingMs < REGEN_BUDGET_HEADROOM_MS) {
-        reportIncident('P2', 'QC regen skipped — remaining budget below regen headroom', {
+        const hasHardFail = failingChecks.some((c) => c.outcome.status === 'hard_fail');
+        const hasCheck8Unavailable = checks.some(
+          (c) =>
+            c.checkId === 'check_08_safety_crisis' && c.outcome.status === 'service_unavailable',
+        );
+
+        if (hasCheck8Unavailable || hasHardFail) {
+          reportIncident('P2', 'QC regen skipped — remaining budget below regen headroom', {
+            source: 'Process_10.RegenSkipBudget',
+            extra: {
+              retryCount,
+              remainingMs,
+              headroomMs: REGEN_BUDGET_HEADROOM_MS,
+              failedChecks: failingChecks.map((c) => c.checkId),
+              dispatch: 'E6_fallbackDegraded',
+              reason: hasCheck8Unavailable ? 'check_08_unavailable' : 'hard_fail_present',
+            },
+          });
+          return {
+            endEvent: 'E6_ServiceUnavailable',
+            responseText: fallbackDegraded(),
+            crisisDetected: false,
+            retryCount,
+            degraded: true,
+            checks,
+            correctivePromptHistory,
+          };
+        }
+
+        // Only soft_fails — ship the candidate with a quality flag. This
+        // is the Option B path: a likely-good response is no longer
+        // replaced with an apology because the budget couldn't fit a
+        // regen we probably didn't need.
+        const softFailedCheckIds = failingChecks
+          .filter((c) => c.outcome.status === 'soft_fail')
+          .map((c) => c.checkId);
+        reportIncident('P2', 'QC regen skipped — shipping candidate with quality flag (E8)', {
           source: 'Process_10.RegenSkipBudget',
           extra: {
             retryCount,
             remainingMs,
             headroomMs: REGEN_BUDGET_HEADROOM_MS,
-            failedChecks: failingChecks.map((c) => c.checkId),
+            softFailedCheckIds,
+            dispatch: 'E8_shipDegradedCandidate',
           },
         });
         return {
-          endEvent: 'E6_ServiceUnavailable',
-          responseText: fallbackDegraded(),
+          endEvent: 'E8_ShipDegradedCandidate',
+          responseText: candidate,
           crisisDetected: false,
           retryCount,
           degraded: true,
           checks,
           correctivePromptHistory,
+          softFailedCheckIds,
         };
       }
     }
