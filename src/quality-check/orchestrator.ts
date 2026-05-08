@@ -23,7 +23,7 @@ import {
 } from './checks-rule-based.js';
 import { checkIntentLengthAsCheckResult } from './intent-length-bands.js';
 import { checkVoiceConsistency } from './voice-consistency.js';
-import { regenerate } from './corrective.js';
+import { regenerate, REGEN_BUDGET_HEADROOM_MS } from './corrective.js';
 import { fallbackDegraded, fallbackMaxRetries } from './fallbacks.js';
 import type { CheckResult, QcInput, QcResult } from './types.js';
 import { QcError } from './types.js';
@@ -171,26 +171,45 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
       };
     }
 
-    // R-07 — skip regen if the turn budget is already exhausted. A regen
-    // attempt past the deadline can only push the total turn well past
-    // LATENCY_BUDGET_MS (Process #2); degrade gracefully instead.
-    if (input.deadlineAt !== undefined && Date.now() >= input.deadlineAt) {
-      reportIncident('P2', 'QC regen skipped — turn budget already exhausted', {
-        source: 'Process_10.RegenSkipBudget',
-        extra: {
+    // R-07 — predictive budget gate. Skip regen if the remaining budget is
+    // smaller than REGEN_BUDGET_HEADROOM_MS, i.e. we cannot guarantee the
+    // regen + final QC pass + delivery will fit before LATENCY_BUDGET_MS.
+    //
+    // The previous implementation used a reactive predicate (skip if the
+    // deadline was already past) and fired AFTER the budget was already
+    // gone. A regen permitted with only a few seconds of remaining budget
+    // is allowed to take up to REGEN_TIMEOUT_MS (10s), then the final QC
+    // pass adds ~1.5s, then delivery adds ~0.5s — pushing the total turn
+    // well past LATENCY_BUDGET_MS. The R-06 gate in the coaching
+    // orchestrator then dispatches FALLBACK_DEGRADED at ~19s elapsed, and
+    // the user waits 19s only to receive a degraded response.
+    //
+    // The predictive form ships fallback at ~10s elapsed instead, freeing
+    // the user from the dead-budget wait, AND avoids spending compute on
+    // a regen that cannot be delivered. See
+    // audit-evidence/phase-12/2026-05-08 RCA for the trace evidence.
+    if (input.deadlineAt !== undefined) {
+      const remainingMs = input.deadlineAt - Date.now();
+      if (remainingMs < REGEN_BUDGET_HEADROOM_MS) {
+        reportIncident('P2', 'QC regen skipped — remaining budget below regen headroom', {
+          source: 'Process_10.RegenSkipBudget',
+          extra: {
+            retryCount,
+            remainingMs,
+            headroomMs: REGEN_BUDGET_HEADROOM_MS,
+            failedChecks: failingChecks.map((c) => c.checkId),
+          },
+        });
+        return {
+          endEvent: 'E6_ServiceUnavailable',
+          responseText: fallbackDegraded(),
+          crisisDetected: false,
           retryCount,
-          failedChecks: failingChecks.map((c) => c.checkId),
-        },
-      });
-      return {
-        endEvent: 'E6_ServiceUnavailable',
-        responseText: fallbackDegraded(),
-        crisisDetected: false,
-        retryCount,
-        degraded: true,
-        checks,
-        correctivePromptHistory,
-      };
+          degraded: true,
+          checks,
+          correctivePromptHistory,
+        };
+      }
     }
 
     // 6. Build corrective prompt and regenerate.

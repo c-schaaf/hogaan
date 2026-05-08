@@ -7,17 +7,25 @@ import type { ResolvedLibraries } from '../../src/libraries/index.js';
 import type { AppConfig } from '../../src/shared/secrets/config.js';
 
 /**
- * R-07 (HIGH audit risk) — regen timeout reduction + elapsed-time skip
- * guard. Pre-fix: REGEN_TIMEOUT_MS was 15_000 (2.5× the total budget) and
- * the QC orchestrator had no deadline awareness, so a single regen could
- * blow PRD §5.1's 6000ms cap unconditionally.
+ * R-07 (HIGH audit risk) — predictive regen-skip budget gate. The gate
+ * has evolved through three iterations against production evidence:
  *
- * Post-fix: timeout reduced to 3_000, AND QcInput accepts an optional
- * `deadlineAt: number` (caller passes `t0 + LATENCY_BUDGET_MS`). When
- * Date.now() >= deadlineAt at the regen check point, regen is skipped
- * and the orchestrator returns E6_ServiceUnavailable + FALLBACK_DEGRADED.
+ *   1. Original: REGEN_TIMEOUT_MS = 15_000, no deadline awareness.
+ *      A single regen could blow PRD §5.1's 6000ms cap unconditionally.
+ *   2. 2026-05-07: timeout reduced to 3_000, QcInput gained `deadlineAt`,
+ *      and the orchestrator skipped regen reactively when
+ *      Date.now() >= deadlineAt. This shipped fallbacks AFTER the budget
+ *      was gone (~19s elapsed), so the user waited the full budget for
+ *      a degraded answer.
+ *   3. 2026-05-08 (this file's current contract): timeout raised to
+ *      10_000 to fit the post-Batch-H 3700-token regen prompt, AND the
+ *      gate became PREDICTIVE — it skips when remaining budget is below
+ *      REGEN_BUDGET_HEADROOM_MS (12_000ms, sized to cover regen + final
+ *      QC pass + delivery). Fallbacks now ship at ~10s elapsed instead
+ *      of waiting out the full budget.
  *
- * See audit-evidence/audits/2026-05-07-reliability-intent-routing-audit.md.
+ * See the 2026-05-08 RCA (smoke trace SM64e518d1c30d37188b68601ede72d5e6)
+ * and audit-evidence/audits/2026-05-07-reliability-intent-routing-audit.md.
  */
 
 vi.mock('../../src/shared/llm/groq.js', () => ({
@@ -117,14 +125,23 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('R-07 regen timeout cap', () => {
+describe('R-07 regen timing constants', () => {
   it('REGEN_TIMEOUT_MS is 10000ms (raised from 3000ms after PRIMARY_TIMEOUT_DEFAULT_MS rose to 12000ms)', () => {
     expect(correctiveInternal.REGEN_TIMEOUT_MS).toBe(10_000);
   });
+
+  it('REGEN_BUDGET_HEADROOM_MS is 12000ms (covers regen + final QC pass + delivery, not just regen alone)', () => {
+    // The headroom MUST be ≥ REGEN_TIMEOUT_MS — otherwise we permit a
+    // regen we cannot guarantee to complete within budget.
+    expect(correctiveInternal.REGEN_BUDGET_HEADROOM_MS).toBeGreaterThanOrEqual(
+      correctiveInternal.REGEN_TIMEOUT_MS,
+    );
+    expect(correctiveInternal.REGEN_BUDGET_HEADROOM_MS).toBe(12_000);
+  });
 });
 
-describe('R-07 regen elapsed-time guard', () => {
-  it('regen is skipped when deadlineAt is already in the past; returns E6 + FALLBACK_DEGRADED', async () => {
+describe('R-07 predictive regen-skip gate', () => {
+  it('regen is skipped when deadlineAt is already in the past (degenerate case; remaining < 0 < headroom)', async () => {
     const correctiveMod = await import('../../src/quality-check/corrective.js');
     const regenSpy = vi.mocked(correctiveMod.regenerate);
     regenSpy.mockClear();
@@ -151,7 +168,39 @@ describe('R-07 regen elapsed-time guard', () => {
     expect(regenSpy).not.toHaveBeenCalled();
   });
 
-  it('regen IS called when deadlineAt has slack (regression — not disabled entirely)', async () => {
+  it('regen is skipped predictively when remainingMs < REGEN_BUDGET_HEADROOM_MS even though the deadline has not yet passed (the load-bearing case for the 2026-05-08 RCA)', async () => {
+    const correctiveMod = await import('../../src/quality-check/corrective.js');
+    const regenSpy = vi.mocked(correctiveMod.regenerate);
+    regenSpy.mockClear();
+
+    // Deadline is 5s in the future — under the OLD reactive gate this
+    // would have permitted regen (deadline not yet past). Under the
+    // predictive gate, 5s < 12s headroom, so regen MUST be skipped.
+    // This is the smoke-trace shape: at the regen-decision point the
+    // turn had ~4-5s of remaining budget; old gate let regen run, regen
+    // took ~7.6s, total turn hit 19s, R-06 fallback dispatched.
+    const result = await runQualityCheck(
+      {
+        config: cfg,
+        libraries: fakeLibraries,
+        originalSystemPrompt: 'system prompt',
+      },
+      {
+        candidateResponseText: SOFT_FAILING_CANDIDATE,
+        userMessage: 'I had a hard week',
+        responseMode: 'FullCoachingResponse',
+        intent: 'Coaching',
+        deadlineAt: Date.now() + 5_000,
+      },
+    );
+
+    expect(result.endEvent).toBe('E6_ServiceUnavailable');
+    expect(result.responseText).toBe(FALLBACK_DEGRADED);
+    expect(result.degraded).toBe(true);
+    expect(regenSpy).not.toHaveBeenCalled();
+  });
+
+  it('regen IS called when remainingMs >= REGEN_BUDGET_HEADROOM_MS (regression — not disabled entirely)', async () => {
     const correctiveMod = await import('../../src/quality-check/corrective.js');
     const regenSpy = vi.mocked(correctiveMod.regenerate);
     regenSpy.mockClear();
@@ -167,7 +216,7 @@ describe('R-07 regen elapsed-time guard', () => {
         userMessage: 'I had a hard week',
         responseMode: 'FullCoachingResponse',
         intent: 'Coaching',
-        // Plenty of slack — regen should run.
+        // 60s of slack — well above the 12s headroom; regen should run.
         deadlineAt: Date.now() + 60_000,
       },
     );
