@@ -174,3 +174,7 @@ export function resetChatBreakersForTests(): void {
   primaryBreaker = undefined;
   fallbackBreaker = undefined;
 }
+
+/** Test seam — exposes the per-call timeout constants for invariant assertion
+ *  against the circuit-breaker defaults in src/shared/llm/breaker.ts. */
+export const _internal = { PRIMARY_TIMEOUT_DEFAULT_MS, FALLBACK_TIMEOUT_DEFAULT_MS };
