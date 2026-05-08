@@ -40,6 +40,17 @@ export interface CorrectiveOptions {
  * refusing to start a regen that cannot fit in remaining budget, 10s fits the
  * worst case.
  *
+ * Option B (2026-05-08) — when the predictive gate fires due to insufficient
+ * budget AND only soft_fails are present (no Check 8 service_unavailable, no
+ * hard_fails), the candidate ships with degraded:true and softFailedCheckIds
+ * telemetry instead of fallbackDegraded(). Safety semantics preserved — Check 8
+ * fail-closed (early E6 branch at orchestrator.ts:114-138) and Check 8
+ * hard_fail handling (early E5 branch at orchestrator.ts:102-112) are
+ * unchanged. The R-07 gate's hasCheck8Unavailable / hasHardFail guards are
+ * defensive code for future check additions, and trip into E6 +
+ * fallbackDegraded() if either becomes reachable. See
+ * tests/quality-check/corrective.test.ts for the four-case regression lock.
+ *
  * Hogaan timeout hierarchy (must be reviewed together):
  * - LATENCY_BUDGET_MS = 15000 (total turn cap, src/coaching/orchestrator.ts)
  * - PRIMARY_TIMEOUT_DEFAULT_MS = 12000 (primary LLM call, src/shared/llm/chat.ts)
