@@ -65,10 +65,10 @@ const ALL_CHECK_IDS: readonly CheckId[] = [
   'check_10_lived_experience',
   'check_11_formatting_discipline',
   'check_12_tangible_action',
-  'check_13_voice_consistency',
+  // check_13_voice_consistency removed 2026-05-08 — graded a hidden centroid threshold.
   'check_14_intent_length',
   'check_15_useful_to_society_anchor',
-  'check_16_level_fidelity',
+  // check_16_level_fidelity removed 2026-05-08 — graded an unstated phrase-density rule.
   'check_17_practice_grounding',
 ];
 
