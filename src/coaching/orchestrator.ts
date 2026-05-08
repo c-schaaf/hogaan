@@ -20,13 +20,10 @@ import type { AppConfig } from '../shared/secrets/config.js';
 import { BRAND_FRAMEWORK_ATTRIBUTION } from '../shared/brand/constants.js';
 import { hashPhone } from '../shared/db/encryption.js';
 import { emitTurnTrace, type TraceEmitter } from '../shared/trace/index.js';
-import {
-  asCorrelationId,
-  type LevelTag,
-  type PracticeTag,
-  type TurnId,
-} from '../shared/types/index.js';
+import { type LevelTag, type PracticeTag, type TurnId } from '../shared/types/index.js';
 import { sendOutbound } from '../whatsapp-delivery/orchestrator.js';
+import { sendChunkedBody } from '../whatsapp-delivery/chunk.js';
+import type { OutboundRequest } from '../whatsapp-delivery/types.js';
 import { fetchCoachingContext } from './context-fetch.js';
 import { decideContinuation } from './continuation.js';
 import type { CoachingEndEvent } from './end-events.js';
@@ -696,41 +693,54 @@ async function sendBody(
   body: string,
   callerSubId: string,
 ): Promise<{ failed: boolean; waMessageId?: string; reason?: string }> {
-  const correlationId = asCorrelationId(
-    `coach-${inbound.userId.slice(0, 8)}-${callerSubId}-${randomUUID().slice(0, 6)}`,
-  );
-  const r = await sendOutbound(
+  const correlationIdPrefix = `coach-${inbound.userId.slice(0, 8)}-${callerSubId}-${randomUUID().slice(0, 6)}`;
+  const dispatcher = (request: OutboundRequest) =>
+    sendOutbound(
+      {
+        config: deps.config,
+        db: deps.db,
+        redis: deps.redis,
+        rateLimiters: deps.rateLimiters,
+        ownerId: 'coaching',
+      },
+      request,
+    );
+
+  const r = await sendChunkedBody(
+    dispatcher,
     {
-      config: deps.config,
-      db: deps.db,
-      redis: deps.redis,
-      rateLimiters: deps.rateLimiters,
-      ownerId: 'coaching',
-    },
-    {
-      correlationId,
       callerProcessId: `coaching:${callerSubId}`,
       phoneE164: inbound.phoneE164,
       userId: inbound.userId,
       messageType: 'FreeForm',
       priority: 'High',
-      body,
     },
+    body,
+    correlationIdPrefix,
   );
-  if (r.endEvent === 'E1_MessageDispatched' || r.endEvent === 'E2_MessageDispatchedAfterRetry') {
+
+  // Aggregate result: succeeded iff at least one chunk reached the user.
+  // Per-chunk failures are logged inside sendChunkedBody (P2 incident +
+  // structured stdout), so the caller sees a single OK/FAIL outcome here.
+  // 2026-05-08 chunking fix: a 1734-char coaching response was being
+  // silently dropped by the Twilio sandbox; chunking into <=1500-char
+  // segments restores delivery. See src/whatsapp-delivery/chunk.ts.
+  if (r.successCount > 0) {
     return {
       failed: false,
-      ...(r.waMessageId !== undefined ? { waMessageId: r.waMessageId } : {}),
+      ...(r.firstSuccessWaMessageId !== undefined
+        ? { waMessageId: r.firstSuccessWaMessageId }
+        : {}),
     };
   }
-  // Duplicate is ok (already-sent); same waMessageId is returned.
-  if (r.endEvent === 'E5_DuplicateRequest') {
-    return {
-      failed: false,
-      ...(r.waMessageId !== undefined ? { waMessageId: r.waMessageId } : {}),
-    };
-  }
-  return { failed: true, reason: `${r.endEvent}: ${r.reason ?? 'unknown'}` };
+  // All chunks failed — surface the first chunk's failure reason for the
+  // upstream trace.
+  const first = r.perChunkResults[0];
+  const reason =
+    first !== undefined
+      ? `${first.endEvent}: ${first.reason ?? 'unknown'}`
+      : 'chunked send produced no results';
+  return { failed: true, reason };
 }
 
 export const _internal = {
