@@ -18,6 +18,20 @@ import type { AppConfig } from '../secrets/config.js';
  * Defensive: if Haiku ignores the prefill and returns text already
  * starting with `{`, return as-is.
  *
+ * Tolerant extraction: at temperature 0 with longer prompts (notably
+ * Check 8's two-axis safety classifier) Haiku reliably emits a complete
+ * JSON object followed by trailing content — a second `{...}` block, a
+ * markdown trailer, or prose. The reconstructed text is run through
+ * `extractFirstJsonObject` so callers receive only the first balanced
+ * `{...}`. If no balanced object is found the raw text is returned
+ * unchanged so the caller's `JSON.parse` still throws and the existing
+ * fail-closed paths (notably Process #10 Check 8 → E6) still fire.
+ * Brace-matching ignores `{` / `}` inside string literals (with `\"`
+ * escape support) so an object whose value contains a `}` is not
+ * truncated mid-field. RCA: 2026-05-08 production trace where every
+ * turn degraded to E6 because Haiku appended a second JSON object after
+ * the verdict block and strict `JSON.parse` rejected the trailing text.
+ *
  * Errors propagate via the existing LlmError hierarchy (anthropicChat
  * already maps Anthropic API errors). Callers' `catch (err)` blocks for
  * `LlmError`/`LlmServiceUnavailableError` etc. continue to work
@@ -48,6 +62,50 @@ export interface ClassifierChatResponse {
 
 const PREFILL = '{';
 
+/**
+ * Return the substring spanning the first balanced `{...}` JSON object in
+ * `text`, or `text` itself if no balanced object exists. Brace counting
+ * skips characters inside string literals (`"..."`, with `\\` escape
+ * handling) so that a `}` appearing inside a string value does not close
+ * the object early.
+ *
+ * If `text` does not start with `{`, it is returned unchanged — the
+ * caller's strict `JSON.parse` will then throw, preserving fail-closed
+ * semantics for Check 8 + every other classifier consumer.
+ */
+function extractFirstJsonObject(text: string): string {
+  if (text.length === 0 || text[0] !== '{') return text;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escape) {
+        escape = false;
+      } else if (ch === '\\') {
+        escape = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return text.slice(0, i + 1);
+      }
+    }
+  }
+  return text;
+}
+
 export async function classifierChat(
   config: AppConfig,
   req: ClassifierChatRequest,
@@ -64,7 +122,8 @@ export async function classifierChat(
     timeoutMs: req.timeoutMs ?? DEFAULT_TIMEOUT_MS,
   });
 
-  const text = res.text.startsWith(PREFILL) ? res.text : PREFILL + res.text;
+  const reconstructed = res.text.startsWith(PREFILL) ? res.text : PREFILL + res.text;
+  const text = extractFirstJsonObject(reconstructed);
 
   return {
     text,
@@ -78,4 +137,5 @@ export const _internal = {
   DEFAULT_TIMEOUT_MS,
   DEFAULT_TEMPERATURE,
   PREFILL,
+  extractFirstJsonObject,
 };

@@ -120,4 +120,76 @@ describe('Batch G — classifierChat', () => {
       classifierChat(cfg, { systemPrompt: 's', userPrompt: 'u' }),
     ).rejects.toBeInstanceOf(LlmServiceUnavailableError);
   });
+
+  it('extractFirstJsonObject — clean JSON passes through unchanged', async () => {
+    const mod = await import('../../../src/shared/llm/anthropic.js');
+    vi.mocked(mod.anthropicChat).mockResolvedValue({
+      text: '"status":"pass","reason":"ok"}',
+      inputTokens: 100,
+      outputTokens: 30,
+      stopReason: 'end_turn',
+    });
+
+    const r = await classifierChat(cfg, { systemPrompt: 's', userPrompt: 'u' });
+    expect(r.text).toBe('{"status":"pass","reason":"ok"}');
+    expect(JSON.parse(r.text)).toEqual({ status: 'pass', reason: 'ok' });
+  });
+
+  it('extractFirstJsonObject — strips trailing prose after a complete JSON object (RCA: 2026-05-08 Check 8 trailer)', async () => {
+    const mod = await import('../../../src/shared/llm/anthropic.js');
+    vi.mocked(mod.anthropicChat).mockResolvedValue({
+      text: '"status":"pass","reason":"ok"}\n\nNote: candidate looked fine to me.',
+      inputTokens: 100,
+      outputTokens: 30,
+      stopReason: 'end_turn',
+    });
+
+    const r = await classifierChat(cfg, { systemPrompt: 's', userPrompt: 'u' });
+    expect(r.text).toBe('{"status":"pass","reason":"ok"}');
+    expect(JSON.parse(r.text)).toEqual({ status: 'pass', reason: 'ok' });
+  });
+
+  it('extractFirstJsonObject — strips a trailing second JSON object (the production failure shape)', async () => {
+    const mod = await import('../../../src/shared/llm/anthropic.js');
+    vi.mocked(mod.anthropicChat).mockResolvedValue({
+      text: '"status":"pass","reason":"ok"}\n{"status":"soft_fail","reason":"second guess"}',
+      inputTokens: 100,
+      outputTokens: 30,
+      stopReason: 'end_turn',
+    });
+
+    const r = await classifierChat(cfg, { systemPrompt: 's', userPrompt: 'u' });
+    expect(r.text).toBe('{"status":"pass","reason":"ok"}');
+    expect(JSON.parse(r.text)).toEqual({ status: 'pass', reason: 'ok' });
+  });
+
+  it('extractFirstJsonObject — does NOT close early on `}` inside a string literal', async () => {
+    const mod = await import('../../../src/shared/llm/anthropic.js');
+    // The reason field contains `}` and `"` characters inside a string.
+    // A naive depth counter would close the object after the first `}`
+    // inside the reason and JSON.parse would then fail on what remained.
+    vi.mocked(mod.anthropicChat).mockResolvedValue({
+      text: '"status":"soft_fail","reason":"closing brace } and quote \\" in value"}',
+      inputTokens: 100,
+      outputTokens: 30,
+      stopReason: 'end_turn',
+    });
+
+    const r = await classifierChat(cfg, { systemPrompt: 's', userPrompt: 'u' });
+    expect(JSON.parse(r.text)).toEqual({
+      status: 'soft_fail',
+      reason: 'closing brace } and quote " in value',
+    });
+  });
+
+  it('extractFirstJsonObject — pure prose passthrough still throws on parse (fail-closed preserved)', () => {
+    // No `{` at all — extractor returns the input unchanged so the
+    // caller's strict JSON.parse still throws. This is the load-bearing
+    // safety property for Check 8 fail-closed → E6_ServiceUnavailable.
+    const out = _internal.extractFirstJsonObject('Sorry, I cannot help with that.');
+    expect(out).toBe('Sorry, I cannot help with that.');
+    expect(() => {
+      JSON.parse(out);
+    }).toThrow();
+  });
 });
