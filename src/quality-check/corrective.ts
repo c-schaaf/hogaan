@@ -31,16 +31,21 @@ export interface CorrectiveOptions {
 }
 
 /**
- * R-07 — regen timeout reduced from 15s to 3s. Original 15s pre-dated the
- * R-06 total-budget check; with PRD §5.1's 6000ms total cap enforced
- * before delivery, a single regen round was already capable of blowing
- * the total budget by 2.5×. The elapsed-time skip guard in QC
- * orchestrator (also R-07) ensures regen only runs when there's slack;
- * this cap ensures even the allowed regens fit within the remaining
- * budget. Cross-region Anthropic 4–5s now times out — accepted
- * trade-off: regen quality < total latency budget.
+ * R-07 / 2026-05-08 — regen timeout raised from 3s to 10s. The original 3s cap
+ * (set against PRD §5.1's old 6000ms total budget) became the active bottleneck
+ * once PRIMARY_TIMEOUT_DEFAULT_MS rose to 12000ms (commit 6db2967): regen on
+ * the 3700-token coaching prompt cannot complete in 3s, so every regen-firing
+ * turn timed out → E6_ServiceUnavailable → fallback. With LATENCY_BUDGET_MS
+ * now 15000ms and the elapsed-time skip guard in QC orchestrator (also R-07)
+ * gating regen on remaining budget, 10s fits the worst case.
+ *
+ * Hogaan timeout hierarchy (must be reviewed together):
+ * - LATENCY_BUDGET_MS = 15000 (total turn cap, src/coaching/orchestrator.ts)
+ * - PRIMARY_TIMEOUT_DEFAULT_MS = 12000 (primary LLM call, src/shared/llm/chat.ts)
+ * - REGEN_TIMEOUT_MS = 10000 (regenerate call, this file)
+ * Any change to one requires audit of all three.
  */
-const REGEN_TIMEOUT_MS = 3_000;
+const REGEN_TIMEOUT_MS = 10_000;
 const REGEN_MAX_TOKENS = 1024;
 
 export function buildCorrectivePrompt(opts: CorrectiveOptions): string {
