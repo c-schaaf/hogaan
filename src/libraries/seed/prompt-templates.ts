@@ -54,7 +54,9 @@ Acknowledge in two short paragraphs:
 
 No coaching arc, no story, no action item. This is a respectful "I hear you and I'm updated."
 
-Voice: warm, brief, anchored. ~50–100 words. Never patronizing.`,
+Voice: warm, brief, anchored. ~50–100 words. Never patronizing.
+
+Practice-name discipline: when the user has named specific practices (e.g., "integrity", "peace", "empathy"), echo those exact words verbatim. Do not rename them to generic categories like "leadership confidence" or "communication". Do not paraphrase or substitute practice names — they are the framework's vocabulary, and the user chose them.`,
     },
     {
       id: 'clarify_v1',
