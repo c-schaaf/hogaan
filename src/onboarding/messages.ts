@@ -9,16 +9,16 @@
 
 import { BRAND_FRAMEWORK_ATTRIBUTION, BRAND_TAGLINE } from '../shared/brand/constants.js';
 
+// Customer-feedback PR1 — trimmed from the older 380-char version. Drops
+// the sponsor-code line (surfaced separately if no code redemption fires)
+// to remove dead weight from the post-sandbox "what do I do?" moment.
 export const WELCOME_MESSAGE = `Welcome to Hogaan — *${BRAND_TAGLINE}*.
 
-I'm a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION}. I show up here to be useful to you, useful to the people you lead, and useful to the work in front of you.
+I'm a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION} — here to be useful to you and the people you lead.`;
 
-If you have a sponsor code, send it now (it'll look like *kobciye-3742*). Otherwise just say hi and we'll get started.`;
-
-// Phase 12 R16 — rewritten as flowing prose. The previous version had 3
-// numbered bullets with 3 separate bolds per item — Voice Rule 11
-// formatting-discipline violations. Now: one bold ("aggregate"), zero
-// headers, no bullets. Same content, same disclosures.
+// Phase 12 R16 — flowing prose, one bold ("aggregate"), zero headers/bullets.
+// Customer-feedback PR1 — final line is now a CTA on its own line so the
+// "Reply yes to begin" instruction is visually dominant after the disclosures.
 export const CONSENT_PROMPT = `Three quick checks before we begin.
 
 I'm an AI built around Hamse's voice and framework — not a therapist, doctor, or lawyer. For mental health crises, I'll point you to specific resources rather than try to handle it myself.
@@ -27,7 +27,7 @@ Your phone number is hashed for identity. Your messages stay between us — spon
 
 I'll send daily prompts on this number. Reply STOP at any time to opt out, completely.
 
-Are you good with these three? Reply yes / sow to continue, or anything else if not.`;
+Reply yes / sow to begin — or anything else if you'd rather not.`;
 
 export const CONSENT_DECLINED_MESSAGE = `Understood. I'll stop here. If you change your mind, message again — we can pick up where we left off.`;
 
@@ -113,11 +113,24 @@ export function formatPracticeAcknowledgment(practices: string[]): string {
 // Advocate added to the role taxonomy. The bold role names are
 // structural enumeration (the picker), audit-accepted same exception
 // as GOAL_PROMPT.
+//
+// Customer-feedback PR4 — superseded by EXPERIENCE_PROMPT. ROLE_PROMPT
+// retained for any code paths that still reference it; new onboarding
+// dispatches the experience-band prompt instead.
 export const ROLE_PROMPT = `Where are you leading from right now?
 
 Reply with what fits — Student, Professional, Leader, Community leader, or Advocate. Pick the closest; you can change it later.`;
 
 export const ROLE_RETRY_PROMPT = `Pick the closest — Student, Professional, Leader, Community leader, or Advocate.`;
+
+// Customer-feedback PR4 — replace role with years-of-leadership-experience.
+// Customer: "everyone is a leader. Maybe sector or years of experience —
+// 1-5, 5-10, 10+." Friendly prose: "Less than 5 / 5 to 10 / Over 10".
+export const EXPERIENCE_PROMPT = `How many years have you been leading?
+
+Reply with what fits — Less than 5, 5 to 10, or Over 10. Pick the closest; you can update later.`;
+
+export const EXPERIENCE_RETRY_PROMPT = `Pick the closest — Less than 5, 5 to 10, or Over 10 years.`;
 
 export const LOCATION_PROMPT = `Where are you reaching me from? City and country is enough — or just reply *skip* to keep it private.
 

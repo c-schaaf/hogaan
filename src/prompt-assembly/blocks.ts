@@ -61,7 +61,12 @@ export function buildSessionContext(sessionTurns: InputPayload['sessionTurns']):
  */
 export function buildUserProfileBlock(profile: InputPayload['userProfile']): string {
   const lines: string[] = ['## User profile'];
-  if (profile.role !== undefined) {
+  // Customer-feedback PR4 — prefer experienceBand over role. When the user
+  // has been re-onboarded under the new flow they have a band; legacy users
+  // still have role only.
+  if (profile.experienceBand !== undefined) {
+    lines.push(`Experience: ${formatExperienceBand(profile.experienceBand)}`);
+  } else if (profile.role !== undefined) {
     lines.push(`Role: ${profile.role}`);
   }
   if (profile.location !== undefined) {
@@ -96,6 +101,25 @@ export function buildUserMessageBlock(userMessage: string): string {
 
 function oneLine(s: string): string {
   return s.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Customer-feedback PR4 — render the canonical experience-band token as
+ * friendly prose for the prompt block: '<5' → 'Less than 5 years',
+ * '5-10' → '5-10 years', '10+' → 'Over 10 years'. Unknown values pass
+ * through unchanged so legacy data doesn't break.
+ */
+function formatExperienceBand(band: string): string {
+  if (band === '<5') {
+    return 'Less than 5 years';
+  }
+  if (band === '5-10') {
+    return '5-10 years';
+  }
+  if (band === '10+') {
+    return 'Over 10 years';
+  }
+  return band;
 }
 
 /** Step 12 helpers — half-truncate memory, last-1-or-2-only session, drop framing. */
