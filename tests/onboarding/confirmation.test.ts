@@ -91,10 +91,10 @@ describe('customer-feedback PR2 — practiceNamesEchoed guard', () => {
 
   it('returns false when the LLM substitutes generic categories', () => {
     expect(
-      practiceNamesEchoed(
-        'You are focused on leadership confidence and communication.',
-        ['integrity', 'peace'],
-      ),
+      practiceNamesEchoed('You are focused on leadership confidence and communication.', [
+        'integrity',
+        'peace',
+      ]),
     ).toBe(false);
   });
 

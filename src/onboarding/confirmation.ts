@@ -34,11 +34,7 @@ export interface ConfirmationResult {
   /** True when LLM/QC failed and we returned a templated fallback. */
   fallbackUsed: boolean;
   /** Diagnostic — where the fallback was triggered, when applicable. */
-  fallbackReason?:
-    | 'llm_error'
-    | 'qc_not_approved'
-    | 'no_active_library'
-    | 'practice_name_dropped';
+  fallbackReason?: 'llm_error' | 'qc_not_approved' | 'no_active_library' | 'practice_name_dropped';
 }
 
 export async function generateConfirmation(opts: ConfirmationOptions): Promise<ConfirmationResult> {
