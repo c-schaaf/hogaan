@@ -369,7 +369,10 @@ export function parseExperienceBand(text: string): ExperienceBand | 'invalid' {
   }
 
   // Unbounded forms first — "10+", "15+", "over 10", "more than 10".
-  if (/\b(over|more than|above)\b/.test(norm) && /(10|ten|11|12|13|14|15|20|fifteen|twenty)/.test(norm)) {
+  if (
+    /\b(over|more than|above)\b/.test(norm) &&
+    /(10|ten|11|12|13|14|15|20|fifteen|twenty)/.test(norm)
+  ) {
     return '10+';
   }
   if (/\b\d+\s*\+/.test(norm)) {
