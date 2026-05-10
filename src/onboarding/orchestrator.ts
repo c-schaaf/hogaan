@@ -22,9 +22,9 @@ import { isOptOutMessage, recordOptOut } from './opt-out.js';
 import {
   applyDataUpdate,
   handleConsentReply,
+  handleExperienceReply,
   handleGoalReply,
   handleLocationReply,
-  handleRoleReply,
   type StepResult,
 } from './step-handlers.js';
 import type { LastCompletedStep, OnboardingInboundEvent, OnboardingResult } from './types.js';
@@ -235,23 +235,28 @@ async function runStep04Goal(
   };
 }
 
+// Customer-feedback PR4 — Step 5 now captures experience band, not role.
+// `roleAttempts` flag key kept for continuity with any in-flight users
+// mid-onboarding when the migration ships.
 async function runStep05Role(
   deps: OrchestratorDeps,
   event: OnboardingInboundEvent,
   _isResumed: boolean,
   flags: Record<string, unknown>,
 ): Promise<OnboardingResult> {
-  const roleAttempts = (flags['roleAttempts'] as number | undefined) ?? 0;
-  const r = handleRoleReply(event.body, roleAttempts + 1);
-  await persistAttempt(deps.db, event.userId, flags, 'roleAttempts', roleAttempts + 1, r);
+  const attempts = (flags['roleAttempts'] as number | undefined) ?? 0;
+  const r = handleExperienceReply(event.body, attempts + 1);
+  await persistAttempt(deps.db, event.userId, flags, 'roleAttempts', attempts + 1, r);
   if (r.outboundBody !== null) {
-    await dispatch(deps, event, r.outboundBody, 'role-reply');
+    await dispatch(deps, event, r.outboundBody, 'experience-reply');
   }
   return {
     endEvent: 'IN_PROGRESS',
     newLastCompletedStep: r.newStep,
     needsProfileReview: r.defaultsApplied,
-    reason: r.defaultsApplied ? 'role defaults applied; flagged for review' : 'role captured',
+    reason: r.defaultsApplied
+      ? 'experience-band defaults applied; flagged for review'
+      : 'experience band captured',
   };
 }
 

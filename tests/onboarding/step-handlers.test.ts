@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   handleConsentReply,
+  handleExperienceReply,
   handleGoalReply,
   handleLocationReply,
-  handleRoleReply,
 } from '../../src/onboarding/step-handlers.js';
 
 describe('handleConsentReply', () => {
@@ -49,20 +49,34 @@ describe('handleGoalReply with retry budget (Phase 12 R14 — 12-practice picker
   });
 });
 
-describe('handleRoleReply with retry budget', () => {
-  it('advances to step 5 on a clean parse', () => {
-    const r = handleRoleReply('manager', 1);
+// Customer-feedback PR4 — replace role with experience band.
+describe('handleExperienceReply with retry budget', () => {
+  it('advances to step 5 on a clean prose parse', () => {
+    const r = handleExperienceReply('5 to 10', 1);
     expect(r.newStep).toBe(5);
     expect(r.defaultsApplied).toBe(false);
-    expect(r.dataUpdate?.role).toBe('Leader');
+    expect(r.dataUpdate?.experienceBand).toBe('5-10');
   });
 
-  it('applies Professional default after 3 invalid attempts', () => {
-    const r = handleRoleReply('purple', 3);
+  it('advances to step 5 on a digit parse', () => {
+    const r = handleExperienceReply('12', 1);
+    expect(r.newStep).toBe(5);
+    expect(r.dataUpdate?.experienceBand).toBe('10+');
+  });
+
+  it('applies <5 default after 3 invalid attempts', () => {
+    const r = handleExperienceReply('purple', 3);
     expect(r.newStep).toBe(5);
     expect(r.defaultsApplied).toBe(true);
-    expect(r.dataUpdate?.role).toBe('Professional');
+    expect(r.dataUpdate?.experienceBand).toBe('<5');
     expect(r.dataUpdate?.needsProfileReview).toBe(true);
+  });
+
+  it('re-asks on attempt 1 when input is invalid', () => {
+    const r = handleExperienceReply('purple', 1);
+    expect(r.newStep).toBe(4);
+    expect(r.defaultsApplied).toBe(false);
+    expect(r.outboundBody).not.toBeNull();
   });
 });
 

@@ -105,6 +105,7 @@ async function fetchProfile(db: Database, userId: UserId): Promise<CoachingConte
   const rows = await db
     .select({
       role: users.role,
+      experienceBand: users.experienceBand,
       location: users.location,
       isDiaspora: users.isDiaspora,
       timezone: users.timezone,
@@ -120,6 +121,7 @@ async function fetchProfile(db: Database, userId: UserId): Promise<CoachingConte
   }
   return {
     ...(typeof row.role === 'string' ? { role: row.role } : {}),
+    ...(typeof row.experienceBand === 'string' ? { experienceBand: row.experienceBand } : {}),
     ...(typeof row.location === 'string' ? { location: row.location } : {}),
     ...(typeof row.isDiaspora === 'boolean' ? { isDiaspora: row.isDiaspora } : {}),
     ...(typeof row.timezone === 'string' ? { timezone: row.timezone } : {}),

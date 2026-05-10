@@ -113,11 +113,24 @@ export function formatPracticeAcknowledgment(practices: string[]): string {
 // Advocate added to the role taxonomy. The bold role names are
 // structural enumeration (the picker), audit-accepted same exception
 // as GOAL_PROMPT.
+//
+// Customer-feedback PR4 — superseded by EXPERIENCE_PROMPT. ROLE_PROMPT
+// retained for any code paths that still reference it; new onboarding
+// dispatches the experience-band prompt instead.
 export const ROLE_PROMPT = `Where are you leading from right now?
 
 Reply with what fits — Student, Professional, Leader, Community leader, or Advocate. Pick the closest; you can change it later.`;
 
 export const ROLE_RETRY_PROMPT = `Pick the closest — Student, Professional, Leader, Community leader, or Advocate.`;
+
+// Customer-feedback PR4 — replace role with years-of-leadership-experience.
+// Customer: "everyone is a leader. Maybe sector or years of experience —
+// 1-5, 5-10, 10+." Friendly prose: "Less than 5 / 5 to 10 / Over 10".
+export const EXPERIENCE_PROMPT = `How many years have you been leading?
+
+Reply with what fits — Less than 5, 5 to 10, or Over 10. Pick the closest; you can update later.`;
+
+export const EXPERIENCE_RETRY_PROMPT = `Pick the closest — Less than 5, 5 to 10, or Over 10 years.`;
 
 export const LOCATION_PROMPT = `Where are you reaching me from? City and country is enough — or just reply *skip* to keep it private.
 

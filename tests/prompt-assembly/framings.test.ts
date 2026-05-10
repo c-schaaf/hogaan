@@ -138,3 +138,34 @@ describe('selectCulturalFraming', () => {
     expect(voiceRulesV1.usefulToSocietyPatterns.length).toBeGreaterThan(0);
   });
 });
+
+// Customer-feedback PR4 — user-profile block prefers experienceBand over role.
+import { buildUserProfileBlock } from '../../src/prompt-assembly/blocks.js';
+
+describe('customer-feedback PR4 — buildUserProfileBlock prefers experienceBand', () => {
+  it('emits Experience and omits Role when experienceBand is present', () => {
+    const block = buildUserProfileBlock({
+      role: 'Leader',
+      experienceBand: '5-10',
+      isDiaspora: false,
+    });
+    expect(block).toContain('Experience: 5-10 years');
+    expect(block).not.toContain('Role: Leader');
+  });
+
+  it('falls back to Role when no experienceBand is present', () => {
+    const block = buildUserProfileBlock({ role: 'Leader', isDiaspora: false });
+    expect(block).toContain('Role: Leader');
+    expect(block).not.toContain('Experience:');
+  });
+
+  it('renders <5 band as "Less than 5 years" prose form', () => {
+    const block = buildUserProfileBlock({ experienceBand: '<5', isDiaspora: false });
+    expect(block).toContain('Experience: Less than 5 years');
+  });
+
+  it('renders 10+ band as "Over 10 years" prose form', () => {
+    const block = buildUserProfileBlock({ experienceBand: '10+', isDiaspora: false });
+    expect(block).toContain('Experience: Over 10 years');
+  });
+});
