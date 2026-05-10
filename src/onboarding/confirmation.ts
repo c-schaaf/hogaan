@@ -34,7 +34,11 @@ export interface ConfirmationResult {
   /** True when LLM/QC failed and we returned a templated fallback. */
   fallbackUsed: boolean;
   /** Diagnostic — where the fallback was triggered, when applicable. */
-  fallbackReason?: 'llm_error' | 'qc_not_approved' | 'no_active_library';
+  fallbackReason?:
+    | 'llm_error'
+    | 'qc_not_approved'
+    | 'no_active_library'
+    | 'practice_name_dropped';
 }
 
 export async function generateConfirmation(opts: ConfirmationOptions): Promise<ConfirmationResult> {
@@ -144,6 +148,18 @@ export async function generateConfirmation(opts: ConfirmationOptions): Promise<C
   );
 
   if (qc.endEvent === 'E1_ApprovedFirstAttempt' || qc.endEvent === 'E2_ApprovedRegenerated') {
+    // Customer-feedback PR2 — even when QC approved the LLM output, fall
+    // back to templated copy if the LLM dropped the user's selected practice
+    // names. The user picked these explicitly; substituting "leadership
+    // confidence" for "integrity" breaks the framework promise.
+    const goals = Array.isArray(profile.goals) ? (profile.goals as string[]) : undefined;
+    if (!practiceNamesEchoed(qc.responseText, goals)) {
+      return {
+        text: templatedFallback(profile),
+        fallbackUsed: true,
+        fallbackReason: 'practice_name_dropped',
+      };
+    }
     return { text: qc.responseText, fallbackUsed: false };
   }
 
@@ -156,15 +172,48 @@ export async function generateConfirmation(opts: ConfirmationOptions): Promise<C
 
 // ---------------------------------------------------------------------------
 
-function synthesizeProfileSummary(p: {
+/**
+ * Customer-feedback PR2 — surface practice names as quoted tokens with an
+ * explicit verbatim instruction. Older form ("focused on integrity, peace")
+ * gave the LLM permission to paraphrase; quoting + the exact-terms phrasing
+ * pins the names down. This pairs with the post-QC `practiceNamesEchoed`
+ * guard as belt-and-suspenders.
+ */
+export function synthesizeProfileSummary(p: {
   role: string | null;
   goals: unknown;
   location: string | null;
 }): string {
-  const goals = Array.isArray(p.goals) ? (p.goals as string[]).join(', ') : 'leadership growth';
   const role = p.role ?? 'a professional';
   const loc = p.location ?? 'the place you reach me from';
-  return `Profile complete. I'm a ${role} focused on ${goals}, based in ${loc}. Acknowledge what you heard and name how you'll show up for me. Two short paragraphs, brand-aligned, no coaching arc.`;
+  if (Array.isArray(p.goals) && p.goals.length > 0) {
+    const quoted = (p.goals as string[]).map((g) => `"${g}"`).join(', ');
+    return `Profile complete. Practices in focus: ${quoted}. Role: ${role}. Location: ${loc}. Acknowledge what you heard using these exact terms — do not rename or paraphrase the practice names. Two short paragraphs, brand-aligned, no coaching arc.`;
+  }
+  return `Profile complete. I'm a ${role} focused on leadership growth, based in ${loc}. Acknowledge what you heard and name how you'll show up for me. Two short paragraphs, brand-aligned, no coaching arc.`;
+}
+
+/**
+ * Customer-feedback PR2 — deterministic guard that returns true when at
+ * least one user-selected practice name appears (case-insensitive,
+ * word-boundary) in the candidate text. When goals is empty/undefined,
+ * there's nothing to enforce → returns true.
+ */
+export function practiceNamesEchoed(
+  candidate: string,
+  goals: readonly string[] | undefined,
+): boolean {
+  if (goals === undefined || goals.length === 0) {
+    return true;
+  }
+  const lower = candidate.toLowerCase();
+  for (const g of goals) {
+    const re = new RegExp(`\\b${g.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
+    if (re.test(lower)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function pickPrimaryPractice(
@@ -205,7 +254,7 @@ function pickPrimaryPractice(
   return 'integrity';
 }
 
-function templatedFallback(
+export function templatedFallback(
   profile: { role: string | null; goals: unknown; location: string | null } | null,
 ): string {
   if (profile === null) {
