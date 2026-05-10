@@ -63,7 +63,11 @@ describe('Phase 12 R16 — CONSENT_PROMPT specifically', () => {
 describe('customer-feedback PR1 — welcome CTA + sponsor-line removal', () => {
   it('combined welcome+consent ends with a CTA on its own visually dominant last line', () => {
     const combined = `${messages.WELCOME_MESSAGE}\n\n${messages.CONSENT_PROMPT}`;
-    const lastLine = combined.split('\n').filter((l) => l.trim().length > 0).at(-1) ?? '';
+    const lastLine =
+      combined
+        .split('\n')
+        .filter((l) => l.trim().length > 0)
+        .at(-1) ?? '';
     // Last line must START with "Reply" (CTA on its own line, not buried mid-paragraph).
     expect(lastLine).toMatch(/^reply\s+\*?yes\*?/i);
     // Last line must be short — a CTA, not another disclosure.
@@ -76,7 +80,9 @@ describe('customer-feedback PR1 — welcome CTA + sponsor-line removal', () => {
 
   it('WELCOME_MESSAGE retains brand tagline and framework attribution', () => {
     expect(messages.WELCOME_MESSAGE).toContain('Transforming Leadership for Impact');
-    expect(messages.WELCOME_MESSAGE).toContain("Hamse Warfa's 12 Practices of Transformational Leadership");
+    expect(messages.WELCOME_MESSAGE).toContain(
+      "Hamse Warfa's 12 Practices of Transformational Leadership",
+    );
   });
 
   it('WELCOME_MESSAGE no longer mentions the sponsor code', () => {
