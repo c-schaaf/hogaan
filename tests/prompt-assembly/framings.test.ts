@@ -38,7 +38,9 @@ describe('customer-feedback PR3 — coaching_main substantive-first directive', 
     const t = coachingMain!.systemText.toLowerCase();
     expect(t).toContain('clarifying question');
     // Either explicitly says never-only-clarifier OR requires insight+action together.
-    expect(t).toMatch(/never respond with a clarifying question alone|always include insight and action/);
+    expect(t).toMatch(
+      /never respond with a clarifying question alone|always include insight and action/,
+    );
   });
 
   it('still requires Insight and Action on broad input', () => {
