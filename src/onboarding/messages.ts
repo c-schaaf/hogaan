@@ -9,16 +9,16 @@
 
 import { BRAND_FRAMEWORK_ATTRIBUTION, BRAND_TAGLINE } from '../shared/brand/constants.js';
 
+// Customer-feedback PR1 — trimmed from the older 380-char version. Drops
+// the sponsor-code line (surfaced separately if no code redemption fires)
+// to remove dead weight from the post-sandbox "what do I do?" moment.
 export const WELCOME_MESSAGE = `Welcome to Hogaan — *${BRAND_TAGLINE}*.
 
-I'm a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION}. I show up here to be useful to you, useful to the people you lead, and useful to the work in front of you.
+I'm a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION} — here to be useful to you and the people you lead.`;
 
-If you have a sponsor code, send it now (it'll look like *kobciye-3742*). Otherwise just say hi and we'll get started.`;
-
-// Phase 12 R16 — rewritten as flowing prose. The previous version had 3
-// numbered bullets with 3 separate bolds per item — Voice Rule 11
-// formatting-discipline violations. Now: one bold ("aggregate"), zero
-// headers, no bullets. Same content, same disclosures.
+// Phase 12 R16 — flowing prose, one bold ("aggregate"), zero headers/bullets.
+// Customer-feedback PR1 — final line is now a CTA on its own line so the
+// "Reply yes to begin" instruction is visually dominant after the disclosures.
 export const CONSENT_PROMPT = `Three quick checks before we begin.
 
 I'm an AI built around Hamse's voice and framework — not a therapist, doctor, or lawyer. For mental health crises, I'll point you to specific resources rather than try to handle it myself.
@@ -27,7 +27,7 @@ Your phone number is hashed for identity. Your messages stay between us — spon
 
 I'll send daily prompts on this number. Reply STOP at any time to opt out, completely.
 
-Are you good with these three? Reply yes / sow to continue, or anything else if not.`;
+Reply yes / sow to begin — or anything else if you'd rather not.`;
 
 export const CONSENT_DECLINED_MESSAGE = `Understood. I'll stop here. If you change your mind, message again — we can pick up where we left off.`;
 
