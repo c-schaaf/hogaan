@@ -4,9 +4,11 @@ export {
   type OnboardingEndEvent,
 } from './end-events.js';
 export {
+  EXPERIENCE_BANDS,
   GOAL_OPTIONS,
   ROLE_OPTIONS,
   OnboardingError,
+  type ExperienceBand,
   type GoalOption,
   type LastCompletedStep,
   type OnboardingInboundEvent,
@@ -18,6 +20,7 @@ export { dispatchOnboardingNudges, type NudgeRunResult } from './nudges.js';
 export { isOptOutMessage, recordOptOut } from './opt-out.js';
 export {
   parseConsent,
+  parseExperienceBand,
   parseGoals,
   parseRole,
   parseLocation,

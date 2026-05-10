@@ -49,6 +49,8 @@ export interface CoachingContext {
   memories: { content: string; createdAt: Date }[];
   profile: {
     role?: string;
+    /** Customer-feedback PR4 — leadership experience band: '<5' | '5-10' | '10+'. */
+    experienceBand?: string;
     location?: string;
     isDiaspora?: boolean;
     timezone?: string;

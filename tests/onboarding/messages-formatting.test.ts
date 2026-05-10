@@ -37,6 +37,20 @@ describe('Phase 12 R16 — onboarding messages pass Voice Rule 11', () => {
   }
 });
 
+// Customer-feedback PR4 — EXPERIENCE_PROMPT replaces ROLE_PROMPT.
+describe('customer-feedback PR4 — EXPERIENCE_PROMPT', () => {
+  it('contains all three friendly-prose band labels', () => {
+    expect(messages.EXPERIENCE_PROMPT).toContain('Less than 5');
+    expect(messages.EXPERIENCE_PROMPT).toContain('5 to 10');
+    expect(messages.EXPERIENCE_PROMPT).toContain('Over 10');
+  });
+
+  it('frames the question around years of leadership experience', () => {
+    expect(messages.EXPERIENCE_PROMPT.toLowerCase()).toMatch(/years/);
+    expect(messages.EXPERIENCE_PROMPT.toLowerCase()).toMatch(/lead/);
+  });
+});
+
 describe('Phase 12 R16 — CONSENT_PROMPT specifically', () => {
   it('has exactly one bold (aggregate) and zero headers/bullets', () => {
     const r = checkFormattingDiscipline(messages.CONSENT_PROMPT);

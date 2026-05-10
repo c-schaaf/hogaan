@@ -23,8 +23,15 @@ export const users = pgTable('users', {
   needsProfileReview: boolean('needs_profile_review').notNull().default(false),
   /** Self-reported leadership goals (PRD onboarding step 4). */
   goals: jsonb('goals'),
-  /** Student | Professional | Leader. */
+  /** Student | Professional | Leader. Kept nullable for backwards compatibility;
+   *  superseded by experience_band per customer-feedback PR4. */
   role: text('role'),
+  /**
+   * Years of leadership experience: '<5' | '5-10' | '10+'. Customer-feedback
+   * PR4 — replaces role as the primary segmentation in prompt assembly.
+   * Nullable; existing rows are unaffected.
+   */
+  experienceBand: text('experience_band'),
   /** Free-text city/region. */
   location: text('location'),
   timezone: text('timezone').default('Africa/Mogadishu'),

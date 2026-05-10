@@ -1,15 +1,21 @@
 import { eq } from 'drizzle-orm';
-import { type GoalOption, type LastCompletedStep, type RoleOption } from './types.js';
+import { type ExperienceBand, type GoalOption, type LastCompletedStep } from './types.js';
 import {
   CONSENT_DECLINED_MESSAGE,
   CONSENT_PROMPT,
+  EXPERIENCE_PROMPT,
+  EXPERIENCE_RETRY_PROMPT,
   GOAL_PROMPT,
   GOAL_RETRY_PROMPT,
   LOCATION_PROMPT,
-  ROLE_PROMPT,
-  ROLE_RETRY_PROMPT,
 } from './messages.js';
-import { goalsToPractices, parseConsent, parseGoals, parseLocation, parseRole } from './parsers.js';
+import {
+  goalsToPractices,
+  parseConsent,
+  parseExperienceBand,
+  parseGoals,
+  parseLocation,
+} from './parsers.js';
 import type { Database } from '../shared/db/client.js';
 import { users } from '../shared/db/schema/users.js';
 import type { UserId } from '../shared/types/index.js';
@@ -28,6 +34,7 @@ export interface StepResult {
   /** Profile fields to update on the user record. */
   dataUpdate?: Partial<{
     role: string;
+    experienceBand: ExperienceBand;
     location: string;
     timezone: string;
     isDiaspora: boolean;
@@ -72,7 +79,7 @@ export function handleGoalReply(
       // R14 default: integrity (foundational practice). Was 'Leadership confidence'.
       const goals: GoalOption[] = ['integrity'];
       return {
-        outboundBody: ROLE_PROMPT,
+        outboundBody: EXPERIENCE_PROMPT,
         newStep: 4,
         defaultsApplied: true,
         dataUpdate: {
@@ -85,7 +92,7 @@ export function handleGoalReply(
     return { outboundBody: GOAL_RETRY_PROMPT, newStep: 3, defaultsApplied: false };
   }
   return {
-    outboundBody: ROLE_PROMPT,
+    outboundBody: EXPERIENCE_PROMPT,
     newStep: 4,
     defaultsApplied: false,
     dataUpdate: {
@@ -95,27 +102,31 @@ export function handleGoalReply(
   };
 }
 
-// --- Step 5: Role -----------------------------------------------------------
+// --- Step 5: Experience band ------------------------------------------------
 
-export function handleRoleReply(text: string, attemptNumber: number): StepResult {
-  const role = parseRole(text);
-  if (role === 'invalid') {
+// Customer-feedback PR4 — replaces the role-picker. Customer reported the
+// 5-option role list ("everyone is a leader") didn't discriminate; years of
+// leadership experience does. Default on retry-limit is '<5' (the most
+// common cohort and the one most likely to want foundational coaching).
+export function handleExperienceReply(text: string, attemptNumber: number): StepResult {
+  const band = parseExperienceBand(text);
+  if (band === 'invalid') {
     if (attemptNumber >= PARSE_RETRY_LIMIT) {
-      const fallback: RoleOption = 'Professional';
+      const fallback: ExperienceBand = '<5';
       return {
         outboundBody: LOCATION_PROMPT,
         newStep: 5,
         defaultsApplied: true,
-        dataUpdate: { role: fallback, needsProfileReview: true },
+        dataUpdate: { experienceBand: fallback, needsProfileReview: true },
       };
     }
-    return { outboundBody: ROLE_RETRY_PROMPT, newStep: 4, defaultsApplied: false };
+    return { outboundBody: EXPERIENCE_RETRY_PROMPT, newStep: 4, defaultsApplied: false };
   }
   return {
     outboundBody: LOCATION_PROMPT,
     newStep: 5,
     defaultsApplied: false,
-    dataUpdate: { role },
+    dataUpdate: { experienceBand: band },
   };
 }
 
@@ -175,6 +186,9 @@ export async function applyDataUpdate(
 
   if (dataUpdate?.role !== undefined) {
     update['role'] = dataUpdate.role;
+  }
+  if (dataUpdate?.experienceBand !== undefined) {
+    update['experienceBand'] = dataUpdate.experienceBand;
   }
   if (dataUpdate?.location !== undefined) {
     update['location'] = dataUpdate.location;

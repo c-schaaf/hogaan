@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   goalsToPractices,
   parseConsent,
+  parseExperienceBand,
   parseGoals,
   parseLocation,
   parseRole,
@@ -100,6 +101,53 @@ describe('parseRole', () => {
   });
   it('rejects nonsense', () => {
     expect(parseRole('purple')).toBe('invalid');
+  });
+});
+
+// Customer-feedback PR4 — replace role with experience band.
+// Customer: "everyone is a leader. Maybe sector or years of experience —
+// 1-5, 5-10, 10+." Friendly-prose labels: "Less than 5 / 5 to 10 / Over 10".
+// Boundary value 5 deterministically maps to '5-10'.
+describe('parseExperienceBand', () => {
+  it('accepts the prose labels verbatim', () => {
+    expect(parseExperienceBand('Less than 5')).toBe('<5');
+    expect(parseExperienceBand('less than 5')).toBe('<5');
+    expect(parseExperienceBand('5 to 10')).toBe('5-10');
+    expect(parseExperienceBand('Over 10')).toBe('10+');
+    expect(parseExperienceBand('over 10')).toBe('10+');
+  });
+  it('accepts range-style strings', () => {
+    expect(parseExperienceBand('1-5')).toBe('<5');
+    expect(parseExperienceBand('5-10')).toBe('5-10');
+    expect(parseExperienceBand('10+')).toBe('10+');
+  });
+  it('accepts plain digit input', () => {
+    expect(parseExperienceBand('1')).toBe('<5');
+    expect(parseExperienceBand('3')).toBe('<5');
+    expect(parseExperienceBand('4')).toBe('<5');
+    expect(parseExperienceBand('5')).toBe('5-10');
+    expect(parseExperienceBand('7')).toBe('5-10');
+    expect(parseExperienceBand('10')).toBe('5-10');
+    expect(parseExperienceBand('11')).toBe('10+');
+    expect(parseExperienceBand('15')).toBe('10+');
+  });
+  it('accepts word-numbers', () => {
+    expect(parseExperienceBand('three')).toBe('<5');
+    expect(parseExperienceBand('seven')).toBe('5-10');
+    expect(parseExperienceBand('twelve')).toBe('10+');
+  });
+  it('accepts unbounded forms', () => {
+    expect(parseExperienceBand('more than 10')).toBe('10+');
+    expect(parseExperienceBand('over ten')).toBe('10+');
+    expect(parseExperienceBand('15+')).toBe('10+');
+  });
+  it('rejects nonsense', () => {
+    expect(parseExperienceBand('purple')).toBe('invalid');
+    expect(parseExperienceBand('')).toBe('invalid');
+    expect(parseExperienceBand('hello world')).toBe('invalid');
+  });
+  it('rejects ambiguous "none"', () => {
+    expect(parseExperienceBand('none')).toBe('invalid');
   });
 });
 

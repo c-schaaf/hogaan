@@ -36,6 +36,11 @@ export interface InputPayload {
   userProfile: {
     firstName?: string;
     role?: string;
+    /**
+     * Customer-feedback PR4 — leadership experience band: '<5' | '5-10' | '10+'.
+     * When present, prompt assembly emits an Experience line and omits Role.
+     */
+    experienceBand?: string;
     location?: string;
     isDiaspora?: boolean;
     timezone?: string;

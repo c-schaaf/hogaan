@@ -1,4 +1,4 @@
-import type { RoleOption } from './types.js';
+import type { ExperienceBand, RoleOption } from './types.js';
 import { ROLE_OPTIONS } from './types.js';
 import type { PracticeTag } from '../shared/types/index.js';
 
@@ -312,6 +312,103 @@ export function parseRole(text: string): RoleOption | 'invalid' {
     const keywords = ROLE_KEYWORDS[r];
     if (keywords.some((k) => norm.includes(k))) {
       return r;
+    }
+  }
+
+  return 'invalid';
+}
+
+/**
+ * Customer-feedback PR4 — leadership experience band parser. Accepts:
+ *   - Friendly prose: "Less than 5", "5 to 10", "Over 10"
+ *   - Range strings: "1-5", "5-10", "10+", "15+"
+ *   - Plain digits: "1" / "5" / "12" — boundary 5 → '5-10'
+ *   - Word-numbers: "three", "seven", "twelve" (1..20)
+ *   - Unbounded: "more than 10", "over ten"
+ *
+ * Returns 'invalid' on garbage. The retry budget in step-handlers.ts
+ * applies a default after 3 failed attempts.
+ */
+const WORD_TO_NUMBER: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  thirteen: 13,
+  fourteen: 14,
+  fifteen: 15,
+  sixteen: 16,
+  seventeen: 17,
+  eighteen: 18,
+  nineteen: 19,
+  twenty: 20,
+};
+
+function bandForYears(years: number): ExperienceBand {
+  if (years < 5) {
+    return '<5';
+  }
+  if (years <= 10) {
+    return '5-10';
+  }
+  return '10+';
+}
+
+export function parseExperienceBand(text: string): ExperienceBand | 'invalid' {
+  const norm = normalize(text);
+  if (norm.length === 0) {
+    return 'invalid';
+  }
+
+  // Unbounded forms first — "10+", "15+", "over 10", "more than 10".
+  if (/\b(over|more than|above)\b/.test(norm) && /(10|ten|11|12|13|14|15|20|fifteen|twenty)/.test(norm)) {
+    return '10+';
+  }
+  if (/\b\d+\s*\+/.test(norm)) {
+    return '10+';
+  }
+
+  // Friendly prose: "less than 5", "less than five".
+  if (/\bless than\b/.test(norm)) {
+    return '<5';
+  }
+
+  // "5 to 10" / "5-10" range, and "1-5" / "1 to 5".
+  const rangeMatch = norm.match(/\b(\d{1,2})\s*(?:-|to|–)\s*(\d{1,2})\b/);
+  if (rangeMatch !== null) {
+    const high = Number.parseInt(rangeMatch[2]!, 10);
+    if (high <= 5) {
+      return '<5';
+    }
+    if (high <= 10) {
+      return '5-10';
+    }
+    return '10+';
+  }
+
+  // Plain digit anywhere in the string.
+  const digitMatch = norm.match(/\b(\d{1,2})\b/);
+  if (digitMatch !== null) {
+    const n = Number.parseInt(digitMatch[1]!, 10);
+    return bandForYears(n);
+  }
+
+  // Word-number — but only if the text is short and number-shaped (not "no
+  // experience but I lead by example"). A single word from the dictionary
+  // is the cleanest signal.
+  const tokens = norm.split(/\s+/).filter(Boolean);
+  for (const t of tokens) {
+    const n = WORD_TO_NUMBER[t];
+    if (n !== undefined) {
+      return bandForYears(n);
     }
   }
 

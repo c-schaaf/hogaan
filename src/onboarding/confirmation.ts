@@ -42,6 +42,7 @@ export async function generateConfirmation(opts: ConfirmationOptions): Promise<C
   const rows = await opts.db
     .select({
       role: users.role,
+      experienceBand: users.experienceBand,
       goals: users.goals,
       location: users.location,
       timezone: users.timezone,
@@ -74,6 +75,9 @@ export async function generateConfirmation(opts: ConfirmationOptions): Promise<C
       userMessage: synthesized,
       userProfile: {
         ...(typeof profile.role === 'string' ? { role: profile.role } : {}),
+        ...(typeof profile.experienceBand === 'string'
+          ? { experienceBand: profile.experienceBand }
+          : {}),
         ...(typeof profile.location === 'string' ? { location: profile.location } : {}),
         ...(typeof profile.timezone === 'string' ? { timezone: profile.timezone } : {}),
         ...(typeof profile.isDiaspora === 'boolean' ? { isDiaspora: profile.isDiaspora } : {}),
