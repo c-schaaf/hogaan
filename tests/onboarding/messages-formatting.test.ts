@@ -55,3 +55,38 @@ describe('Phase 12 R16 — CONSENT_PROMPT specifically', () => {
     expect(t).toMatch(/stop|opt.out/);
   });
 });
+
+// Customer-feedback PR1 — first-message CTA + welcome trim.
+// Customer reported sandbox dead-air: after Twilio's "you are all set",
+// nothing prompts the user. Twilio sandbox cannot push unsolicited; once
+// the user texts in, our welcome must be short and end with a clear CTA.
+describe('customer-feedback PR1 — welcome CTA + sponsor-line removal', () => {
+  it('combined welcome+consent ends with a CTA on its own visually dominant last line', () => {
+    const combined = `${messages.WELCOME_MESSAGE}\n\n${messages.CONSENT_PROMPT}`;
+    const lastLine = combined.split('\n').filter((l) => l.trim().length > 0).at(-1) ?? '';
+    // Last line must START with "Reply" (CTA on its own line, not buried mid-paragraph).
+    expect(lastLine).toMatch(/^reply\s+\*?yes\*?/i);
+    // Last line must be short — a CTA, not another disclosure.
+    expect(lastLine.length).toBeLessThan(100);
+  });
+
+  it('WELCOME_MESSAGE alone fits inside one WhatsApp single-bubble preview (<320 chars)', () => {
+    expect(messages.WELCOME_MESSAGE.length).toBeLessThan(320);
+  });
+
+  it('WELCOME_MESSAGE retains brand tagline and framework attribution', () => {
+    expect(messages.WELCOME_MESSAGE).toContain('Transforming Leadership for Impact');
+    expect(messages.WELCOME_MESSAGE).toContain("Hamse Warfa's 12 Practices of Transformational Leadership");
+  });
+
+  it('WELCOME_MESSAGE no longer mentions the sponsor code', () => {
+    expect(messages.WELCOME_MESSAGE.toLowerCase()).not.toContain('sponsor code');
+    expect(messages.WELCOME_MESSAGE).not.toContain('kobciye-');
+  });
+
+  it('combined first message contains both STOP disclosure and the yes CTA', () => {
+    const combined = `${messages.WELCOME_MESSAGE}\n\n${messages.CONSENT_PROMPT}`;
+    expect(combined).toContain('STOP');
+    expect(combined).toMatch(/reply\s+\*?yes\*?/i);
+  });
+});
