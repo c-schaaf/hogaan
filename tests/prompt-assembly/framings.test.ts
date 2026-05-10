@@ -56,6 +56,38 @@ describe('customer-feedback PR3 — coaching_main substantive-first directive', 
   });
 });
 
+// Follow-up to PR4 — coaching_main reads the Experience band and calibrates
+// depth/tone per band. The buildUserProfileBlock already emits an Experience
+// line; this directive tells the LLM what to do with it.
+describe('coaching_main experience-band calibration', () => {
+  const coachingMain = promptTemplatesV1.templates.find(
+    (t) => t.responseMode === 'FullCoachingResponse',
+  );
+
+  it('references each of the three bands by their prose labels', () => {
+    const t = coachingMain!.systemText;
+    expect(t).toContain('Less than 5 years');
+    expect(t).toContain('5 to 10 years');
+    expect(t).toContain('Over 10 years');
+  });
+
+  it('tells the LLM how to calibrate depth per band', () => {
+    const t = coachingMain!.systemText.toLowerCase();
+    expect(t).toContain('experience-band calibration');
+    // Foundational/first-time signal for <5
+    expect(t).toMatch(/foundational|first.time|new manager/);
+    // Peer-tone signal for 5-10
+    expect(t).toMatch(/peer|manager.of.managers/);
+    // Exec signal for 10+
+    expect(t).toMatch(/executive|exec|founder/);
+  });
+
+  it('handles the missing-band fallback explicitly', () => {
+    const t = coachingMain!.systemText.toLowerCase();
+    expect(t).toMatch(/legacy|absent|fall back|fallback/);
+  });
+});
+
 describe('validateInputPayload', () => {
   it('accepts a well-formed FullCoachingResponse payload', () => {
     expect(() => validateInputPayload(baseFullCoaching)).not.toThrow();
