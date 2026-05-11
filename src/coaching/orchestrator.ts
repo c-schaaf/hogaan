@@ -43,7 +43,13 @@ interface CoachingDeps {
 const SAFE_TEMPLATE = `That topic isn't something I can help with from a coaching seat. If it's a leadership challenge underneath, tell me what's at stake for your team and I'll meet you there.`;
 const REJECT_TEMPLATE = `That message lands outside what I can help with. If you have a leadership challenge — a hard conversation, a stuck team, a decision under pressure — that's where I'm built to be useful.`;
 const META_TEMPLATE = `I'm Hogaan — a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION}. I'm an AI built around his voice, sponsor-funded for users in the Horn of Africa. I work text-only for now: send me a leadership challenge and I'll respond.`;
-const PROFILE_ACK_TEMPLATE = `Heard. I've noted that update — I'll show up with it in mind next time. Send a leadership question whenever you're ready.`;
+// Khadija UX Reframe (2026-05-11): prior template ("Heard. I've noted that
+// update — I'll show up with it in mind next time.") falsely implied a DB
+// write that never happens. Profile updates from conversation are not
+// persisted (separate follow-up scope). Reframe as a coaching invitation so
+// we stop lying AND don't dead-end users who were actually naming a
+// challenge (Khadija's "Me stepping up as mentor" was misclassified here).
+const PROFILE_ACK_TEMPLATE = `Heard — that sounds like a leadership shift worth talking through, not just a profile fact. What's the actual decision or challenge in front of you?`;
 const MEDIA_REJECT_TEMPLATE = `I work with text only for now. Type out what's on your mind and I'll respond.`;
 // R16 — short-circuit templates for low-content intents. Each ≤80 words,
 // no LLM, no prompt assembly, no QC. Cuts the per-turn cost on greetings

@@ -9,7 +9,6 @@ import type { AppConfig } from '../shared/secrets/config.js';
 import { asCorrelationId, asPhoneE164, type UserId } from '../shared/types/index.js';
 import { sendOutbound } from '../whatsapp-delivery/orchestrator.js';
 import { tryRedeemCode } from './code-redemption.js';
-import { generateConfirmation } from './confirmation.js';
 import {
   CONSENT_PROMPT,
   FIRST_COACHING_PROMPT,
@@ -22,9 +21,7 @@ import { isOptOutMessage, recordOptOut } from './opt-out.js';
 import {
   applyDataUpdate,
   handleConsentReply,
-  handleExperienceReply,
   handleGoalReply,
-  handleLocationReply,
   type StepResult,
 } from './step-handlers.js';
 import type { LastCompletedStep, OnboardingInboundEvent, OnboardingResult } from './types.js';
@@ -48,8 +45,11 @@ const CALLER = 'onboarding';
  * (Process #12 §4) holds the advisory lock when this is invoked downstream
  * from the inbound webhook, so two messages for the same user serialize.
  *
- * Resume router (BPMN §Step 1): the 6 entry points keyed on
- * `last_completed_step` are dispatched in `route()` below.
+ * Resume router (BPMN §Step 1): after the Khadija UX Reframe (2026-05-11)
+ * the flow collapsed from 6 to 3 entry points. Steps 4, 5, 6 are deleted —
+ * experience-band and location are no longer captured during onboarding
+ * (they default cleanly). Any user mid-old-flow on deploy gets routed
+ * through the stale-state catch-up branch.
  */
 export async function handleOnboardingMessage(
   deps: OrchestratorDeps,
@@ -132,18 +132,21 @@ export async function handleOnboardingMessage(
       return await runStep03Consent(deps, event, isResumed);
     }
     case 3:
+      // Step 3 → user has consented, awaiting practice pick. On success this
+      // handler marks the user onboarded and dispatches the inline-gloss ack
+      // + FIRST_COACHING_PROMPT in a single message (newStep=7).
       return await runStep04Goal(deps, event, isResumed, flags);
     case 4:
-      return await runStep05Role(deps, event, isResumed, flags);
     case 5:
-      return await runStep06Location(deps, event, isResumed, flags);
     case 6:
-      return await runStep07To09Confirmation(deps, event, isResumed, flags);
-    case 7: {
-      // Edge case: user has been provisioned with profile but no confirmation
-      // sent (e.g. crashed mid-Step 8). Re-run confirmation flow.
-      return await runStep07To09Confirmation(deps, event, isResumed, flags);
-    }
+    case 7:
+      // Stale-state catch-up: users who were mid-old-flow before the
+      // Khadija UX Reframe (or who crashed mid-onboarding) get fast-tracked
+      // to onboarded. They've already given consent + goals; experience and
+      // location default cleanly. We just dispatch FIRST_COACHING_PROMPT and
+      // mark them done. Their current inbound is dropped (the next one
+      // routes to the coaching orchestrator).
+      return await runStaleStateCatchUp(deps, event, isResumed);
   }
 }
 
@@ -218,7 +221,7 @@ async function runStep03Consent(
 async function runStep04Goal(
   deps: OrchestratorDeps,
   event: OnboardingInboundEvent,
-  _isResumed: boolean,
+  isResumed: boolean,
   flags: Record<string, unknown>,
 ): Promise<OnboardingResult> {
   const goalAttempts = (flags['goalAttempts'] as number | undefined) ?? 0;
@@ -227,97 +230,69 @@ async function runStep04Goal(
   if (r.outboundBody !== null) {
     await dispatch(deps, event, r.outboundBody, 'goal-reply');
   }
-  return {
-    endEvent: 'IN_PROGRESS',
-    newLastCompletedStep: r.newStep,
-    needsProfileReview: r.defaultsApplied,
-    reason: r.defaultsApplied ? 'goal defaults applied; flagged for review' : 'goal captured',
-  };
-}
 
-// Customer-feedback PR4 — Step 5 now captures experience band, not role.
-// `roleAttempts` flag key kept for continuity with any in-flight users
-// mid-onboarding when the migration ships.
-async function runStep05Role(
-  deps: OrchestratorDeps,
-  event: OnboardingInboundEvent,
-  _isResumed: boolean,
-  flags: Record<string, unknown>,
-): Promise<OnboardingResult> {
-  const attempts = (flags['roleAttempts'] as number | undefined) ?? 0;
-  const r = handleExperienceReply(event.body, attempts + 1);
-  await persistAttempt(deps.db, event.userId, flags, 'roleAttempts', attempts + 1, r);
-  if (r.outboundBody !== null) {
-    await dispatch(deps, event, r.outboundBody, 'experience-reply');
+  // Khadija UX Reframe: on success the goal handler returns newStep=7. That
+  // means we've delivered the inline-gloss ack + FIRST_COACHING_PROMPT in one
+  // message and the user is done with onboarding. Finalize state.
+  if (r.newStep === 7) {
+    await finalizeOnboarded(deps.db, event.userId);
+    const needsReview = r.defaultsApplied;
+    let endEvent: OnboardingEndEvent;
+    if (needsReview) {
+      endEvent = 'E7_ClarificationLoopExceeded';
+    } else if (isResumed) {
+      endEvent = 'E2_CompletedAfterResume';
+    } else {
+      endEvent = 'E1_CompletedFirstTry';
+    }
+    return {
+      endEvent,
+      newLastCompletedStep: 7,
+      needsProfileReview: needsReview,
+      reason: needsReview ? 'goal defaults applied; onboarded with review flag' : 'onboarded',
+    };
   }
+
+  // Retry path: handler returned newStep=3 (re-ask). Still in-progress.
   return {
     endEvent: 'IN_PROGRESS',
     newLastCompletedStep: r.newStep,
-    needsProfileReview: r.defaultsApplied,
-    reason: r.defaultsApplied
-      ? 'experience-band defaults applied; flagged for review'
-      : 'experience band captured',
+    needsProfileReview: false,
+    reason: 'goal re-ask',
   };
 }
 
-async function runStep06Location(
+/**
+ * Stale-state catch-up for users with lastCompletedStep ∈ {4, 5, 6, 7} but
+ * status != 'onboarded'. Pre-Khadija-UX-Reframe these meant "mid-old-flow"
+ * or "crashed during confirmation." Either way, fast-track to onboarded:
+ * they've given consent + goals, which is all we need. Their current
+ * inbound is consumed by this turn; the next inbound routes to coaching.
+ */
+async function runStaleStateCatchUp(
   deps: OrchestratorDeps,
   event: OnboardingInboundEvent,
   isResumed: boolean,
-  flags: Record<string, unknown>,
 ): Promise<OnboardingResult> {
-  const r = handleLocationReply(event.body);
-  await applyDataUpdate(deps.db, event.userId, 6, r.dataUpdate);
-  // Step 6 → 7-9 inline.
-  return await runStep07To09Confirmation(deps, event, isResumed, flags);
+  await dispatch(deps, event, FIRST_COACHING_PROMPT, 'stale-state-catch-up');
+  await finalizeOnboarded(deps.db, event.userId);
+  return {
+    endEvent: isResumed ? 'E2_CompletedAfterResume' : 'E1_CompletedFirstTry',
+    newLastCompletedStep: 7,
+    needsProfileReview: false,
+    reason: 'stale onboarding state caught up; user marked onboarded',
+  };
 }
 
-async function runStep07To09Confirmation(
-  deps: OrchestratorDeps,
-  event: OnboardingInboundEvent,
-  isResumed: boolean,
-  flags: Record<string, unknown>,
-): Promise<OnboardingResult> {
-  // Persistence (Step 7) is implicit — applyDataUpdate has already happened.
-  // Confirmation generation + send (Step 8).
-  const confirm = await generateConfirmation({
-    config: deps.config,
-    db: deps.db,
-    userId: event.userId,
-  });
-  await dispatch(deps, event, confirm.text, 'confirmation');
-
-  // First coaching prompt (Step 9).
-  await dispatch(deps, event, FIRST_COACHING_PROMPT, 'first-coaching-prompt');
-
-  // Mark onboarding complete + last completed step 7 (the BPMN's stable end).
-  await deps.db
+async function finalizeOnboarded(db: Database, userId: UserId): Promise<void> {
+  await db
     .update(users)
     .set({
       status: 'onboarded',
       lastCompletedStep: 7,
       onboardingCompletedAt: new Date(),
     })
-    .where(eq(users.id, event.userId));
-
-  const needsReview = (flags['needsProfileReview'] as boolean | undefined) === true;
-  let endEvent: OnboardingEndEvent;
-  if (needsReview) {
-    endEvent = 'E7_ClarificationLoopExceeded';
-  } else if (isResumed) {
-    endEvent = 'E2_CompletedAfterResume';
-  } else {
-    endEvent = 'E1_CompletedFirstTry';
-  }
-
-  return {
-    endEvent,
-    newLastCompletedStep: 7,
-    needsProfileReview: needsReview,
-    reason: confirm.fallbackUsed
-      ? `onboarding complete (confirmation used templated fallback: ${confirm.fallbackReason ?? 'unknown'})`
-      : 'onboarding complete',
-  };
+    .where(eq(users.id, userId));
 }
 
 // ---------------------------------------------------------------------------
