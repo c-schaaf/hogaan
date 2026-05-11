@@ -18,20 +18,55 @@ describe('handleConsentReply', () => {
     expect(r.terminalEvent).toBe('E3_ConsentDeclined');
   });
 
-  it('re-asks on ambiguous', () => {
-    const r = handleConsentReply('what is this?');
+  it('re-asks on truly ambiguous (non-FAQ) input', () => {
+    const r = handleConsentReply('asdfgh');
     expect(r.newStep).toBe(2);
     expect(r.outboundBody).not.toBeNull();
+    // Generic re-ask uses the canonical CONSENT_PROMPT — not a FAQ reply.
+    expect(r.outboundBody?.toLowerCase()).toContain('three quick checks');
   });
 });
 
-describe('handleGoalReply with retry budget (Phase 12 R14 — 12-practice picker)', () => {
-  it('advances to step 4 with the parsed practices on attempt 1', () => {
+// Khadija UX Reframe — pre-consent FAQ routes through handleConsentReply.
+describe('handleConsentReply — pre-consent FAQ', () => {
+  it('matches mentor pattern and replies with the FAQ text, staying on step 2', () => {
+    const r = handleConsentReply('I want a mentor, can i get a live mentor');
+    expect(r.newStep).toBe(2);
+    expect(r.outboundBody).toMatch(/mentor-matching service/i);
+    expect(r.outboundBody).toMatch(/yes\s*\/?\s*sow/i);
+  });
+
+  it('matches daily-prompts pattern', () => {
+    const r = handleConsentReply('What will the daily prompts be about');
+    expect(r.newStep).toBe(2);
+    expect(r.outboundBody).toMatch(/daily prompts? are/i);
+  });
+
+  it('matches scope pattern', () => {
+    const r = handleConsentReply('what is this?');
+    expect(r.newStep).toBe(2);
+    expect(r.outboundBody).toMatch(/leadership coach/i);
+  });
+});
+
+// Khadija UX Reframe — handleGoalReply now finalizes onboarding (newStep=7).
+// Single-message ack + FIRST_COACHING_PROMPT replaces the old experience-band
+// hand-off. Experience and location no longer asked during onboarding.
+describe('handleGoalReply with retry budget (Khadija UX Reframe — onboarding collapses at step 4)', () => {
+  it('advances to step 7 with the parsed practices on attempt 1', () => {
     const r = handleGoalReply('integrity, peace', 1);
-    expect(r.newStep).toBe(4);
+    expect(r.newStep).toBe(7);
     expect(r.defaultsApplied).toBe(false);
     expect(r.dataUpdate?.goals).toContain('integrity');
     expect(r.dataUpdate?.goals).toContain('peace');
+  });
+
+  it('dispatches inline-gloss ack + FIRST_COACHING_PROMPT in one message', () => {
+    const r = handleGoalReply('integrity, peace', 1);
+    expect(r.outboundBody).toMatch(/integrity/);
+    expect(r.outboundBody).toMatch(/peace/);
+    // FIRST_COACHING_PROMPT.
+    expect(r.outboundBody).toMatch(/leadership challenge/i);
   });
 
   it('re-asks on attempt 1 when input is invalid', () => {
@@ -40,12 +75,15 @@ describe('handleGoalReply with retry budget (Phase 12 R14 — 12-practice picker
     expect(r.defaultsApplied).toBe(false);
   });
 
-  it('applies integrity default on attempt 3 when still invalid (E7 path)', () => {
+  it('applies integrity default on attempt 3 and finalizes at step 7', () => {
     const r = handleGoalReply('???', 3);
-    expect(r.newStep).toBe(4);
+    expect(r.newStep).toBe(7);
     expect(r.defaultsApplied).toBe(true);
     expect(r.dataUpdate?.goals).toEqual(['integrity']);
     expect(r.dataUpdate?.needsProfileReview).toBe(true);
+    // Default path still produces ack + coaching prompt.
+    expect(r.outboundBody).toMatch(/integrity/);
+    expect(r.outboundBody).toMatch(/leadership challenge/i);
   });
 });
 

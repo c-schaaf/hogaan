@@ -68,6 +68,33 @@ describe('R-02 classifier disambiguation', () => {
   });
 });
 
+// Khadija UX Reframe (2026-05-11) — tighten ProfileUpdate + MetaQuestion
+// classifier guidance to stop hijacking coaching messages. Khadija's
+// "Me stepping up as mentor" was misrouted to ProfileUpdate; her
+// "What examples of leadership question?" was misrouted to MetaQuestion.
+describe('Khadija UX Reframe — classifier guidance prevents intent hijacking', () => {
+  it('ProfileUpdate guidance distinguishes past-tense facts from leadership challenges', () => {
+    const t = TRIAGE_SYSTEM_PROMPT;
+    // The new guidance mentions past tense / fact change as the signal.
+    expect(t.toLowerCase()).toMatch(/past tense|already happened|fact change/);
+    // Explicit counter-examples that route to Coaching, not ProfileUpdate.
+    expect(t).toContain('me stepping up as mentor');
+  });
+
+  it('MetaQuestion guidance excludes coaching-content questions', () => {
+    const t = TRIAGE_SYSTEM_PROMPT;
+    // Explicit counter-examples that route to Coaching, not MetaQuestion.
+    expect(t).toMatch(/what examples of leadership/i);
+    expect(t).toMatch(/i want a mentor/i);
+    // Still flags genuine meta cues.
+    expect(t).toMatch(/who are you|are you ai|are you hamse/i);
+  });
+
+  it('Coaching remains the default — explicit "when in doubt" guidance preserved', () => {
+    expect(TRIAGE_SYSTEM_PROMPT.toLowerCase()).toMatch(/when in doubt|if unsure/);
+  });
+});
+
 /**
  * Batch G — llmTriage migrated from Groq Llama to Anthropic Haiku 4.5
  * via the classifierChat wrapper. Tests assert the wrapper is invoked

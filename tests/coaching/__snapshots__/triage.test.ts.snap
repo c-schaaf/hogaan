@@ -11,10 +11,10 @@ status:
   - "pass"    ← anything else.
 
 intent:
-  - "Coaching"             — leadership question or context (DEFAULT).
+  - "Coaching"             — leadership question or context (DEFAULT). When in doubt, choose this.
   - "ScenarioRequest"      — explicitly asks for role-play / scenario practice.
-  - "ProfileUpdate"        — "I got promoted", "I switched roles", "I moved cities".
-  - "MetaQuestion"         — about Hogaan itself ("who are you", "are you AI", "what can you do").
+  - "ProfileUpdate"        — user is informing Hogaan of a profile FACT change in the past tense ("I got promoted to VP last week", "I moved to Nairobi", "I changed teams"). DO NOT confuse with leadership challenges that use role-shift language. Examples that route to Coaching, NOT ProfileUpdate: "me stepping up as mentor", "I need to lead a new team", "I'm thinking about becoming a manager", "I want to grow into an exec role". The test: is the user reporting a thing that already happened (ProfileUpdate), or naming a thing they're working on / wrestling with (Coaching)?
+  - "MetaQuestion"         — about Hogaan itself ("who are you", "are you AI", "are you Hamse", "are you a real person"). NOT about coaching content. Questions like "what examples of leadership questions", "what should I bring you", "what topics can we cover", "I want a mentor" are Coaching content requests, NOT meta questions about the bot.
   - "Greeting"             — bare "hi", "hello", "salaam", "good morning". Specifically NOT "how are you", "how was your day", "hope you're well", "what's up" — those are courtesy beats and route to Coaching. Even "hi" embedded in a longer message ("hi i feel sad") routes to Coaching, not Greeting.
   - "Affirmation"          — "thanks", "ok got it" (acknowledgment of a prior coaching turn, never the *opening* of a session).
   - "ClarificationResponse"— answering a clarifying question Hogaan just asked.

@@ -5,6 +5,8 @@ import {
   CONSENT_PROMPT,
   EXPERIENCE_PROMPT,
   EXPERIENCE_RETRY_PROMPT,
+  FIRST_COACHING_PROMPT,
+  formatPracticeAcknowledgment,
   GOAL_PROMPT,
   GOAL_RETRY_PROMPT,
   LOCATION_PROMPT,
@@ -16,6 +18,7 @@ import {
   parseGoals,
   parseLocation,
 } from './parsers.js';
+import { detectPreConsentFaq } from './pre-consent-faq.js';
 import type { Database } from '../shared/db/client.js';
 import { users } from '../shared/db/schema/users.js';
 import type { UserId } from '../shared/types/index.js';
@@ -63,11 +66,27 @@ export function handleConsentReply(text: string): StepResult {
       terminalEvent: 'E3_ConsentDeclined',
     };
   }
-  // Ambiguous — re-ask.
+  // Ambiguous — try the pre-consent FAQ handler before falling through to a
+  // generic re-ask. Khadija field test 2026-05-11: users asked sensible
+  // pre-consent questions ("can I get a mentor?", "what are daily prompts?")
+  // and the bot just re-sent the consent prompt verbatim. FAQ-detected
+  // inbounds now get a one-line answer + a nudge back to "yes / sow."
+  const faq = detectPreConsentFaq(text);
+  if (faq !== null) {
+    return { outboundBody: faq.reply, newStep: 2, defaultsApplied: false };
+  }
+  // Truly unrecognized — fall back to existing re-ask behavior.
   return { outboundBody: CONSENT_PROMPT, newStep: 2, defaultsApplied: false };
 }
 
-// --- Step 4: Goal -----------------------------------------------------------
+// --- Step 4: Goal → Onboarded ----------------------------------------------
+//
+// Khadija UX Reframe (2026-05-11): collapse the rest of onboarding. After
+// practice pick, deliver the inline-gloss acknowledgment + first-coaching
+// prompt in a SINGLE message, mark the user onboarded, advance to step 7.
+// Experience-band and location are no longer asked during onboarding — they
+// default cleanly (band='absent' → 5-to-10y calibration default; timezone
+// → Africa/Mogadishu default). Time-to-value drops from 6–7 turns to 3.
 
 export function handleGoalReply(
   text: string,
@@ -79,8 +98,8 @@ export function handleGoalReply(
       // R14 default: integrity (foundational practice). Was 'Leadership confidence'.
       const goals: GoalOption[] = ['integrity'];
       return {
-        outboundBody: EXPERIENCE_PROMPT,
-        newStep: 4,
+        outboundBody: formatGoalAckPlusCoachingPrompt(goals),
+        newStep: 7,
         defaultsApplied: true,
         dataUpdate: {
           goals,
@@ -92,14 +111,18 @@ export function handleGoalReply(
     return { outboundBody: GOAL_RETRY_PROMPT, newStep: 3, defaultsApplied: false };
   }
   return {
-    outboundBody: EXPERIENCE_PROMPT,
-    newStep: 4,
+    outboundBody: formatGoalAckPlusCoachingPrompt(parsed.goals),
+    newStep: 7,
     defaultsApplied: false,
     dataUpdate: {
       goals: parsed.goals,
       mappedPractices: goalsToPractices(parsed.goals),
     },
   };
+}
+
+function formatGoalAckPlusCoachingPrompt(practices: readonly string[]): string {
+  return `${formatPracticeAcknowledgment([...practices])}\n\n${FIRST_COACHING_PROMPT}`;
 }
 
 // --- Step 5: Experience band ------------------------------------------------

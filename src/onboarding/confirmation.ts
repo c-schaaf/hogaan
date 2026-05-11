@@ -264,7 +264,11 @@ export function templatedFallback(
     Array.isArray(profile.goals) && profile.goals.length > 0
       ? (profile.goals as string[]).join(', ')
       : 'leadership growth';
-  const role = profile.role ?? 'where you are';
+  // Khadija UX Reframe — defensive fallback. Post-PR4 (experience-band replaces
+  // role), new users have role=NULL and this fallback produced the embarrassing
+  // "working as where you are" string. Defensive even though the Khadija pass
+  // makes generateConfirmation unreachable for new users.
+  const role = profile.role ?? 'a leader';
   const where = profile.location !== null ? `, reaching me from ${profile.location}` : '';
   return `Got it. You're focused on ${goals}, working as ${role}${where}. I'll show up steady — message me when something is on your mind.`;
 }
