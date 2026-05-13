@@ -1,56 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BackChevron } from '../components/Primitives';
-import { COMM, DEPTHS, LIFE_STAGES, REASONS, YEARS, type CommOption, type DepthOption, type Reason } from './onboarding/data';
+import { YEARS } from './onboarding/data';
 import { Screen1Name } from './onboarding/Screen1Name';
-import { Screen2Stage } from './onboarding/Screen2Stage';
 import { Screen3Years } from './onboarding/Screen3Years';
-import { Screen4Reason } from './onboarding/Screen4Reason';
 import { Screen5Practices } from './onboarding/Screen5Practices';
-import { Screen6Comm } from './onboarding/Screen6Comm';
-import { Screen7Depth } from './onboarding/Screen7Depth';
 import { ScreenConsent } from './onboarding/ScreenConsent';
 import { ScreenDone } from './onboarding/ScreenDone';
 
 const STORAGE_KEY = 'hogaan_onboarding_v1';
 
-// FLOW: 7 questions + consent wrap-up + done celebration.
-// Daily-prompts step removed per the Khadija UX reframe deferred edits.
-const FLOW = [
-  'name',
-  'stage',
-  'years',
-  'reason',
-  'practices',
-  'comm',
-  'depth',
-  'consent',
-  'done',
-] as const;
+// FLOW: 3 questions + consent wrap-up + done celebration.
+const FLOW = ['name', 'years', 'practices', 'consent', 'done'] as const;
 type Step = (typeof FLOW)[number];
 
-const TOTAL_QUESTIONS = 7; // counter denominator; consent is wrap-up, not a question
+const TOTAL_QUESTIONS = 3; // counter denominator; consent is wrap-up, not a question
 
 export interface OnboardingAnswers {
   name: string;
-  stage: string | null;
   years: string | null;
-  reason: string | null;
-  reasonBranch: Reason['branch'] | null;
   practices: string[];
-  comm: CommOption['id'] | null;
-  depth: DepthOption['id'];
   consent: boolean;
 }
 
 const initialAnswers: OnboardingAnswers = {
   name: '',
-  stage: null,
   years: null,
-  reason: null,
-  reasonBranch: null,
   practices: [],
-  comm: null,
-  depth: 'standard',
   consent: false,
 };
 
@@ -110,7 +85,7 @@ export function Onboarding({ initialName, onComplete }: Props) {
 
   const current = FLOW[stepIdx];
 
-  // Progress counter: "Step N of 7" only counts the 7 questions.
+  // Progress counter: "Step N of 3" only counts the 3 questions.
   // Consent shows "Almost there" instead of a number.
   const displayStep = current === 'consent' || current === 'done' ? null : stepIdx + 1;
   const progressPct = Math.min(
@@ -217,34 +192,9 @@ export function Onboarding({ initialName, onComplete }: Props) {
   });
 
   function handleNumericPick(step: Step, index: number) {
-    switch (step) {
-      case 'stage': {
-        const v = LIFE_STAGES[index];
-        if (v) autoAdvance(index, { stage: v });
-        break;
-      }
-      case 'years': {
-        const v = YEARS[index];
-        if (v) autoAdvance(index, { years: v });
-        break;
-      }
-      case 'reason': {
-        const r = REASONS[index];
-        if (r) autoAdvance(index, { reason: r.label, reasonBranch: r.branch });
-        break;
-      }
-      case 'comm': {
-        const c = COMM[index];
-        if (c) autoAdvance(index, { comm: c.id });
-        break;
-      }
-      case 'depth': {
-        const d = DEPTHS[index];
-        if (d) autoAdvance(index, { depth: d.id });
-        break;
-      }
-      default:
-        break;
+    if (step === 'years') {
+      const v = YEARS[index];
+      if (v) autoAdvance(index, { years: v });
     }
   }
 
@@ -258,15 +208,6 @@ export function Onboarding({ initialName, onComplete }: Props) {
             onContinue={goNext}
           />
         );
-      case 'stage':
-        return (
-          <Screen2Stage
-            value={answers.stage}
-            onPick={(i, v) => autoAdvance(i, { stage: v })}
-            confirming={confirming?.step === 'stage'}
-            confirmingIndex={confirming?.index ?? null}
-          />
-        );
       case 'years':
         return (
           <Screen3Years
@@ -276,36 +217,9 @@ export function Onboarding({ initialName, onComplete }: Props) {
             confirmingIndex={confirming?.index ?? null}
           />
         );
-      case 'reason':
-        return (
-          <Screen4Reason
-            value={answers.reason}
-            onPick={(i, r) => autoAdvance(i, { reason: r.label, reasonBranch: r.branch })}
-            confirming={confirming?.step === 'reason'}
-            confirmingIndex={confirming?.index ?? null}
-          />
-        );
       case 'practices':
         return (
           <Screen5Practices values={answers.practices} onToggle={togglePractice} onContinue={goNext} />
-        );
-      case 'comm':
-        return (
-          <Screen6Comm
-            value={answers.comm}
-            onPick={(i, id) => autoAdvance(i, { comm: id })}
-            confirming={confirming?.step === 'comm'}
-            confirmingIndex={confirming?.index ?? null}
-          />
-        );
-      case 'depth':
-        return (
-          <Screen7Depth
-            value={answers.depth}
-            onPick={(i, id) => autoAdvance(i, { depth: id })}
-            confirming={confirming?.step === 'depth'}
-            confirmingIndex={confirming?.index ?? null}
-          />
         );
       case 'consent':
         return (
@@ -385,34 +299,14 @@ function pickValue(step: Step, a: OnboardingAnswers): unknown {
   switch (step) {
     case 'name':
       return a.name;
-    case 'stage':
-      return a.stage;
     case 'years':
       return a.years;
-    case 'reason':
-      return a.reason;
-    case 'comm':
-      return a.comm;
-    case 'depth':
-      return a.depth;
     default:
       return null;
   }
 }
 
 function optionsFor(step: Step): readonly unknown[] | null {
-  switch (step) {
-    case 'stage':
-      return LIFE_STAGES;
-    case 'years':
-      return YEARS;
-    case 'reason':
-      return REASONS;
-    case 'comm':
-      return COMM;
-    case 'depth':
-      return DEPTHS;
-    default:
-      return null;
-  }
+  if (step === 'years') return YEARS;
+  return null;
 }

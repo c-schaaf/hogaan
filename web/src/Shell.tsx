@@ -162,8 +162,6 @@ export function Shell() {
       await api.profile.patch({
         fullName: answers.name || me?.fullName || '',
         mappedPractices: answers.practices,
-        ...(answers.comm ? { commStyle: answers.comm } : {}),
-        ...(answers.depth ? { responseDepth: answers.depth } : {}),
         finishOnboarding: true,
       });
     } catch (err) {

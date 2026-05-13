@@ -11,7 +11,7 @@ interface Props {
 export function Screen3Years({ value, onPick, confirming, confirmingIndex }: Props) {
   return (
     <>
-      <Eyebrow n={3} total={7} />
+      <Eyebrow n={2} total={3} />
       <h1 className="q-headline">How long have you been leading other people?</h1>
       <p className="q-helper">Formally or informally — a team, a project, a group you organize.</p>
       <div className="option-list">

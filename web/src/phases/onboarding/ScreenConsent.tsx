@@ -13,7 +13,7 @@ export function ScreenConsent({ checked, onToggle, onStart, starting }: Props) {
       <div className="q-eyebrow">
         <span>Almost there</span>
       </div>
-      <h1 className="q-headline">Three quick things before we start.</h1>
+      <h1 className="q-headline">Two quick things before we start.</h1>
 
       <div style={{ marginTop: 8 }}>
         <div className="disclosure">
@@ -30,27 +30,6 @@ export function ScreenConsent({ checked, onToggle, onStart, starting }: Props) {
             <div className="disclosure-title">I'm an AI, not a therapist.</div>
             <p className="disclosure-body">
               For crises, I'll point you to specific resources — quickly, not gently.
-            </p>
-          </div>
-        </div>
-
-        <div className="disclosure">
-          <div className="glyph">
-            <svg viewBox="0 0 24 24" fill="none">
-              <rect x="5" y="11" width="14" height="9" rx="2" stroke="currentColor" strokeWidth="1.8" />
-              <path
-                d="M8 11V8a4 4 0 018 0v3"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-              <circle cx="12" cy="15.5" r="1.2" fill="currentColor" />
-            </svg>
-          </div>
-          <div>
-            <div className="disclosure-title">Your conversations stay between us.</div>
-            <p className="disclosure-body">
-              Sponsors see aggregate engagement only — never individual messages.
             </p>
           </div>
         </div>

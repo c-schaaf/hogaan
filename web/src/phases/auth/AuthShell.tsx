@@ -9,16 +9,11 @@ export function AuthBrand() {
   return (
     <aside className="auth-brand" aria-hidden="true">
       <div className="auth-brand-inner">
-        <div className="auth-brand-tag">Hogaan · A practice of leadership</div>
         <p className="auth-brand-quote">
           <span className="auth-brand-mark">“</span>
           Unlock Your Transformational Leadership Potential.
           <span className="auth-brand-mark close">”</span>
         </p>
-        <div className="auth-brand-attr">
-          Hamse Warfa ·{' '}
-          <span className="auth-brand-12">The 12 Practices of Transformational Leadership</span>
-        </div>
         <div className="auth-brand-12grid">
           {TWELVE_PRACTICES.map((g) => (
             <div key={g.level} className="auth-brand-12row">
@@ -43,9 +38,6 @@ function MobileTag() {
         <span className="auth-mobile-tag-mark">“</span>
         Unlock Your Transformational Leadership Potential.
         <span className="auth-mobile-tag-mark">”</span>
-      </p>
-      <p className="auth-mobile-tag-attr">
-        Hamse Warfa · The 12 Practices of Transformational Leadership
       </p>
     </div>
   );

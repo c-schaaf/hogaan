@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Arrow, Eyebrow } from '../../components/Primitives';
 
-const TOTAL = 7;
+const TOTAL = 3;
 
 interface Props {
   value: string;

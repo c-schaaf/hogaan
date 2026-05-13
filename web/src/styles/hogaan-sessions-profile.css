@@ -651,6 +651,37 @@
   color: var(--ink-3);
 }
 
+/* About Hogaan card (side column) */
+.pr-about-body {
+  font-family: var(--font-b);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-2);
+  margin: 0 0 18px;
+  text-wrap: pretty;
+}
+.pr-about-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+.pr-about-stat-num {
+  font-family: var(--font-h);
+  font-weight: 500;
+  font-size: 32px;
+  line-height: 1;
+  color: var(--blue);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.pr-about-stat-label {
+  font-family: var(--font-b);
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
 .pr-foot {
   text-align: center;
   padding: 12px 0 0;
@@ -671,7 +702,6 @@
   font-size: 11px;
   color: var(--ink-3);
   letter-spacing: 0.05em;
-  margin-top: 4px;
 }
 
 .pr-foot-space {
