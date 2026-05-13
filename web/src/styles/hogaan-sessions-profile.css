@@ -686,17 +686,6 @@
   text-align: center;
   padding: 12px 0 0;
 }
-.pr-foot-hw {
-  font-family: var(--font-b);
-  font-size: 11.5px;
-  color: var(--ink-3);
-  font-weight: 500;
-  letter-spacing: 0.02em;
-}
-.pr-foot-hw span {
-  color: #0086ff;
-  font-weight: 600;
-}
 .pr-foot-ver {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;

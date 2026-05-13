@@ -28,6 +28,10 @@ export interface CoachingInbound {
   receivedAt: Date;
   /** Trace ID — typically the Fastify request ID propagated from the webhook. */
   traceId: string;
+  /** Channel of origin — 'whatsapp' (default, Twilio webhook) or 'web' (in-browser SPA via /api/coaching/turn). Used by sendBody to short-circuit Twilio dispatch on 'web'. */
+  channel?: 'whatsapp' | 'web';
+  /** Web-only: when true, the session row is flagged as private and excluded from the user's session list. */
+  isPrivate?: boolean;
 }
 
 /**
