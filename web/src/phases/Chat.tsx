@@ -313,26 +313,57 @@ export function Chat({
       return;
     }
     setThinking(true);
+
+    // Add a placeholder bot bubble that grows as tokens stream in.
+    let streamingText = '';
+    let placeholderInserted = false;
+    const upsertStreamingBot = () => {
+      const r = renderResponse(streamingText);
+      setItems((prev) => {
+        if (!placeholderInserted) {
+          placeholderInserted = true;
+          return [...prev, { kind: 'bot', paras: r.paras, chips: r.chips }];
+        }
+        const next = [...prev];
+        // Replace the last bot bubble (the one we're streaming into).
+        for (let i = next.length - 1; i >= 0; i--) {
+          if (next[i].kind === 'bot') {
+            next[i] = { kind: 'bot', paras: r.paras, chips: r.chips };
+            break;
+          }
+        }
+        return next;
+      });
+    };
+
     try {
-      const resp = await api.turn({
+      let gotCrisis = false;
+      for await (const ev of api.turnStream({
         message: t,
         ...(sessionId !== null ? { sessionId } : {}),
         private: privateMode,
-      });
-      setThinking(false);
-      setSessionId(resp.sessionId);
-      if (resp.crisis) {
-        setItems((prev) => [...prev, { kind: 'crisis' }]);
-        return;
+      })) {
+        if (ev.type === 'start') {
+          setSessionId(ev.sessionId);
+          setThinking(false); // first byte received — drop the spinner
+        } else if (ev.type === 'delta') {
+          streamingText += ev.text;
+          upsertStreamingBot();
+        } else if (ev.type === 'crisis') {
+          gotCrisis = true;
+          setThinking(false);
+          setItems((prev) => [...prev, { kind: 'crisis' }]);
+        } else if (ev.type === 'error') {
+          throw new Error(ev.message);
+        } else if (ev.type === 'end') {
+          // Stream complete — refresh the rail so the new session/title
+          // shows up.
+          if (!gotCrisis) void reloadPast();
+        }
       }
-      const r = renderResponse(resp.responseText);
-      setItems((prev) => [...prev, { kind: 'bot', paras: r.paras, chips: r.chips }]);
-      // Server may have just generated a title for this session - refresh
-      // the rail/drawer so it shows up.
-      void reloadPast();
     } catch (err) {
       setThinking(false);
-      console.error('turn failed', err);
+      console.error('stream turn failed', err);
       setItems((prev) => [
         ...prev,
         {

@@ -102,9 +102,83 @@ async function call<T>(path: string, opts: FetchOpts = {}): Promise<T> {
   return (await resp.json()) as T;
 }
 
+/**
+ * Streaming coaching-turn event. The /api/chat/turn/stream endpoint emits
+ * named SSE events; this is the typed union the client consumes.
+ */
+export type TurnStreamEvent =
+  | { type: 'start'; sessionId: string }
+  | { type: 'delta'; text: string }
+  | { type: 'crisis'; reason: string; resources: Record<string, string> }
+  | { type: 'end'; turnId: string | null; sessionId: string | null; latencyMs: number }
+  | { type: 'error'; message: string };
+
+/**
+ * POST /api/chat/turn/stream as an async generator. Yields TurnStreamEvent
+ * for each parsed SSE event. Throws ApiError on HTTP-level failure
+ * (auth, 4xx/5xx before the stream opens). Mid-stream errors arrive as
+ * `{ type: 'error' }` events, not thrown.
+ */
+export async function* turnStream(body: ChatTurnRequest): AsyncGenerator<TurnStreamEvent> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+  };
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const resp = await fetch('/api/chat/turn/stream', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok || resp.body === null) {
+    throw new ApiError(resp.status, `stream open failed: ${resp.status}`);
+  }
+
+  const reader = resp.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += value;
+    // SSE events are separated by a blank line ("\n\n"). Parse complete
+    // events out of the buffer and leave any incomplete tail for the
+    // next chunk.
+    let sep: number;
+    while ((sep = buffer.indexOf('\n\n')) !== -1) {
+      const raw = buffer.slice(0, sep);
+      buffer = buffer.slice(sep + 2);
+      const parsed = parseSseBlock(raw);
+      if (parsed !== null) yield parsed;
+    }
+  }
+}
+
+function parseSseBlock(block: string): TurnStreamEvent | null {
+  let eventName = 'message';
+  const dataLines: string[] = [];
+  for (const line of block.split('\n')) {
+    if (line.startsWith('event:')) {
+      eventName = line.slice(6).trim();
+    } else if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trim());
+    }
+  }
+  if (dataLines.length === 0) return null;
+  try {
+    const payload = JSON.parse(dataLines.join('\n')) as Record<string, unknown>;
+    return { type: eventName, ...payload } as TurnStreamEvent;
+  } catch {
+    return null;
+  }
+}
+
 export const api = {
   turn: (body: ChatTurnRequest) =>
     call<ChatTurnResponse>('/api/chat/turn', { method: 'POST', body }),
+  turnStream,
   sessions: {
     list: () => call<{ sessions: SessionSummary[] }>('/api/sessions'),
     get: (id: string) => call<SessionDetail>(`/api/sessions/${id}`),
