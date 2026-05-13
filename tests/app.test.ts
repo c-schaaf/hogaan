@@ -29,6 +29,8 @@ const testConfig: AppConfig = {
   resendApiKey: undefined,
   resendFromEmail: undefined,
   sponsorPortalBaseUrl: undefined,
+    supabaseUrl: undefined,
+    supabaseAnonKey: undefined,
 };
 
 describe('app', () => {

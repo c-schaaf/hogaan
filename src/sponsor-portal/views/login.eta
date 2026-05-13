@@ -1,12 +1,12 @@
 <form method="POST" action="/auth/sponsor/request-link">
   <h2 style="margin-top:0;">Sign in</h2>
-  <p style="color:#666;font-size:14px;">Enter your sponsor portal email. We'll send you a one-time login link that expires in 10 minutes.</p>
+  <p style="color:var(--ink-2);font-size:14px;line-height:1.5;margin:0 0 16px;">Enter your sponsor portal email. We'll send you a one-time login link that expires in 10 minutes.</p>
   <input type="email" name="email" required placeholder="you@example.com" autofocus>
   <button type="submit">Send login link</button>
   <% if (it.message) { %>
-    <p style="margin-top:16px;font-size:14px;color:#5a8c4a;"><%= it.message %></p>
+    <p style="margin-top:16px;font-size:14px;color:var(--blue-deep);"><%= it.message %></p>
   <% } %>
   <% if (it.error) { %>
-    <p style="margin-top:16px;font-size:14px;color:#c0392b;"><%= it.error %></p>
+    <p style="margin-top:16px;font-size:14px;color:rgb(176,70,62);"><%= it.error %></p>
   <% } %>
 </form>

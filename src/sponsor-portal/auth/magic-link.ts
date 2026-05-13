@@ -180,11 +180,20 @@ export async function handleCallback(deps: CallbackDeps, token: string): Promise
 
 function renderHtml(callbackUrl: string): string {
   return `<!DOCTYPE html>
-<html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px;">
-<h2 style="color:#222;">Sponsor portal login</h2>
-<p>Click the button below to sign into the Hogaan sponsor portal. The link expires in 10 minutes.</p>
-<p><a href="${callbackUrl}" style="display:inline-block;padding:12px 24px;background:#222;color:#fff;text-decoration:none;border-radius:4px;">Sign in to Hogaan</a></p>
-<p style="color:#666;font-size:12px;">If you didn't request this, you can safely ignore this email.</p>
+<html>
+<body style="margin:0;padding:0;background:#eaf4ff;font-family:'Inter','Segoe UI',-apple-system,sans-serif;color:#00004d;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eaf4ff;padding:32px 16px;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;background:#f4f9ff;border-radius:16px;padding:40px 32px;border:1px solid rgba(0,0,77,0.06);">
+<tr><td>
+<h2 style="margin:0 0 12px;font-family:'Lexend Deca','Inter',sans-serif;font-weight:500;font-size:22px;color:#00004d;letter-spacing:-0.01em;">Sponsor portal login</h2>
+<p style="margin:0 0 24px;font-size:15px;line-height:1.55;color:#00004d;">Click the button below to sign into the Hogaan sponsor portal. The link expires in 10 minutes.</p>
+<p style="margin:0 0 28px;"><a href="${callbackUrl}" style="display:inline-block;padding:14px 28px;background:#0086ff;color:#ffffff;text-decoration:none;border-radius:12px;font-weight:600;font-size:15px;">Sign in to Hogaan</a></p>
+<p style="margin:0;color:#6b6b7a;font-size:12.5px;line-height:1.5;">If you didn't request this, you can safely ignore this email.</p>
+</td></tr>
+</table>
+</td></tr>
+</table>
 </body></html>`;
 }
 

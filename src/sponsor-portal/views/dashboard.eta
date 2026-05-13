@@ -1,7 +1,7 @@
 <h2>Cohort overview</h2>
 
 <% if (it.seats.length === 0) { %>
-  <p style="color:#666;">No cohorts visible at your access level.</p>
+  <p style="color:var(--ink-2);">No cohorts visible at your access level.</p>
 <% } else { %>
   <table>
     <thead>
@@ -33,7 +33,7 @@
 
 <h2>Redemption velocity (last 30 days)</h2>
 <% if (it.velocity.length === 0) { %>
-  <p style="color:#666;">No redemptions in the last 30 days.</p>
+  <p style="color:var(--ink-2);">No redemptions in the last 30 days.</p>
 <% } else { %>
   <table>
     <thead>
@@ -49,7 +49,7 @@
 
 <h2>Geography breakdown</h2>
 <% if (it.geography.length === 0) { %>
-  <p style="color:#666;">No geographies recorded.</p>
+  <p style="color:var(--ink-2);">No geographies recorded.</p>
 <% } else { %>
   <table>
     <thead>

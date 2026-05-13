@@ -38,6 +38,8 @@ function makeTestConfig(jwtSecretBase64: string): AppConfig {
     resendApiKey: undefined,
     resendFromEmail: undefined,
     sponsorPortalBaseUrl: undefined,
+    supabaseUrl: undefined,
+    supabaseAnonKey: undefined,
   };
 }
 

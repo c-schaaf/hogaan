@@ -35,7 +35,7 @@
 <% if (it.practices.suppressed) { %>
   <div class="suppressed"><%= it.practices.copy %></div>
 <% } else if (it.practices.value.length === 0) { %>
-  <p style="color:#666;">No practice tags meet the privacy floor in this window.</p>
+  <p style="color:var(--ink-2);">No practice tags meet the privacy floor in this window.</p>
 <% } else { %>
   <table>
     <thead>
