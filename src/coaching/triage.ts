@@ -182,11 +182,33 @@ export async function triage(
   body: string,
   mediaUrls: string[],
 ): Promise<TriageResult> {
+  void config; // 🚨 PRE-LAUNCH RE-ENABLE: delete this line when llmTriage is restored below
   const sync = fastPathTriage(body, mediaUrls);
   if (sync !== null) {
     return sync;
   }
-  return llmTriage(config, body);
+  // ╔════════════════════════════════════════════════════════════════════╗
+  // ║ 🚨🚨🚨  PRE-LAUNCH RE-ENABLE  — LLM TRIAGE CLASSIFIER DISABLED  🚨🚨🚨 ║
+  // ╠════════════════════════════════════════════════════════════════════╣
+  // ║ Disabled 2026-05-13 (Muhsin) for latency measurement during the    ║
+  // ║ v0_unified rollout. The fast-path keyword check above still runs   ║
+  // ║ (free; covers empty, media-only, and blatant crisis keywords like  ║
+  // ║ "kill myself", "suicide", "abuse me"). The ~1s LLM round-trip is   ║
+  // ║ skipped.                                                            ║
+  // ║                                                                    ║
+  // ║ While this is disabled, the ONLY layer detecting non-blatant       ║
+  // ║ crisis language ("I can't keep doing this", "what's even the       ║
+  // ║ point") is the §0 rule baked into the coaching_v0_unified system   ║
+  // ║ prompt — an LLM-stochastic layer that can be ignored or            ║
+  // ║ prompt-injected.                                                   ║
+  // ║                                                                    ║
+  // ║ Per CLAUDE.md hard rule #1, this is NOT acceptable for production  ║
+  // ║ launch. Re-enable before shipping to real users.                   ║
+  // ║                                                                    ║
+  // ║ TO RESTORE: replace the `return { status: 'valid', ... }` below    ║
+  // ║ with `return llmTriage(config, body);`                             ║
+  // ╚════════════════════════════════════════════════════════════════════╝
+  return { status: 'valid', reason: 'triage-llm-disabled-2026-05-13', intent: 'Coaching' };
 }
 
 /** Test seam — exposes the keyword list for audit / red-team coverage. */

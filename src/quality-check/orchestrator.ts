@@ -3,7 +3,8 @@ import { reportIncident } from '../shared/observability/incidents.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import {
   check3SignatureStructure,
-  check8SafetyCrisis,
+  // 🚨 PRE-LAUNCH RE-ENABLE: uncomment to restore the Check 8 safety gate.
+  // check8SafetyCrisis,
   // Voice-shaping LLM graders below are disabled per 2026-05-13 trim.
   // Re-import to re-enable. See block comment on line ~30 for rationale.
   // check4AssetBased,
@@ -352,7 +353,23 @@ async function runAllChecks(
   ];
   const llm = await Promise.all([
     check3SignatureStructure(deps.config, candidate),
-    check8SafetyCrisis(deps.config, input.userMessage, candidate),
+    // ╔════════════════════════════════════════════════════════════════════╗
+    // ║ 🚨🚨🚨  PRE-LAUNCH RE-ENABLE  —  CHECK 8 SAFETY GATE DISABLED  🚨🚨🚨 ║
+    // ╠════════════════════════════════════════════════════════════════════╣
+    // ║ Disabled 2026-05-13 (Muhsin) alongside the LLM-triage bypass for   ║
+    // ║ latency measurement during the v0_unified rollout. Check 8 was the ║
+    // ║ fail-closed second-line crisis + response-safety gate. With it     ║
+    // ║ off, NO post-response safety check runs — every response Claude    ║
+    // ║ emits ships to the user without an independent safety review.     ║
+    // ║                                                                    ║
+    // ║ Per CLAUDE.md hard rule #1 ("Crisis routing supersedes everything. ║
+    // ║ Never bypass for cost, latency, or convenience"), this is NOT      ║
+    // ║ acceptable for production launch.                                  ║
+    // ║                                                                    ║
+    // ║ TO RESTORE: uncomment the check8SafetyCrisis call below and the    ║
+    // ║ matching import at the top of the file.                            ║
+    // ╚════════════════════════════════════════════════════════════════════╝
+    // check8SafetyCrisis(deps.config, input.userMessage, candidate),
     // Voice-shaping graders below disabled 2026-05-13 (see header note).
     // To re-enable: uncomment + restore imports from './checks-llm.js'.
     // check4AssetBased(deps.config, candidate),
