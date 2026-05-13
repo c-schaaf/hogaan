@@ -41,6 +41,8 @@ function configWith(
     resendApiKey: undefined,
     resendFromEmail: undefined,
     sponsorPortalBaseUrl: undefined,
+    supabaseUrl: undefined,
+    supabaseAnonKey: undefined,
   };
 }
 

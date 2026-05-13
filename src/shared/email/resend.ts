@@ -1,0 +1,96 @@
+import { reportP1 } from '../../incident-handling/index.js';
+import { type AppConfig, requireConfig } from '../secrets/config.js';
+
+/**
+ * Resend transport - the one place that talks to https://api.resend.com.
+ *
+ * Phase 9 (sponsor portal) was the first consumer and originally owned a
+ * copy of this helper. Phase B (web app) shares it: same API key, same
+ * RESEND_FROM_EMAIL, same failure semantics. Per the sponsor portal
+ * comment: delivery failures are non-blocking - callers return success to
+ * the requester regardless and incidents are logged via reportP1.
+ */
+
+const RESEND_ENDPOINT = 'https://api.resend.com/emails';
+
+export interface SendOptions {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  /** Source tag for incident reports. Helps ops triage failed sends by feature. */
+  source: string;
+}
+
+export interface SendResult {
+  ok: boolean;
+  /** Resend's message id when the API accepted the send. */
+  messageId?: string;
+  /** Sanitized failure cause; safe for logs. No recipient PII. */
+  reason?: string;
+}
+
+export async function sendEmail(config: AppConfig, opts: SendOptions): Promise<SendResult> {
+  let apiKey: string;
+  let from: string;
+  try {
+    apiKey = requireConfig(config, 'resendApiKey');
+    from = requireConfig(config, 'resendFromEmail');
+  } catch (err) {
+    reportP1('Resend not configured; email cannot send', {
+      source: opts.source,
+      extra: { error: err instanceof Error ? err.message : String(err) },
+    });
+    return { ok: false, reason: 'resend_not_configured' };
+  }
+
+  const body = {
+    from,
+    to: [opts.to],
+    subject: opts.subject,
+    html: opts.html,
+    text: opts.text,
+  };
+
+  let resp: Response;
+  try {
+    resp = await fetch(RESEND_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch (err) {
+    reportP1('Resend network error', {
+      source: opts.source,
+      extra: { error: err instanceof Error ? err.message : String(err) },
+    });
+    return { ok: false, reason: 'resend_network_error' };
+  }
+
+  if (!resp.ok) {
+    let detail = '';
+    try {
+      detail = (await resp.text()).slice(0, 200);
+    } catch {
+      // ignore
+    }
+    reportP1('Resend rejected send', {
+      source: opts.source,
+      tags: { status: String(resp.status) },
+      extra: { detail },
+    });
+    return { ok: false, reason: `resend_${resp.status}` };
+  }
+
+  let parsed: { id?: string } = {};
+  try {
+    parsed = (await resp.json()) as { id?: string };
+  } catch {
+    // success status but malformed body — treat as ok with no id.
+  }
+  return { ok: true, ...(parsed.id !== undefined ? { messageId: parsed.id } : {}) };
+}

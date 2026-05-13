@@ -4,29 +4,56 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= it.title %> · Hogaan sponsor portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 0; background: #f6f6f4; color: #222; }
-    header { background: #222; color: #fff; padding: 16px 32px; }
-    header h1 { margin: 0; font-size: 20px; font-weight: 600; }
-    header .meta { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+    :root {
+      --bg: #eaf4ff;
+      --paper: #f4f9ff;
+      --surface-field: #dcebfb;
+      --navy: #00004d;
+      --blue: #0086ff;
+      --cyan: #00b7ff;
+      --blue-deep: #0068cc;
+      --ink-2: #6b6b7a;
+      --ink-3: #8a8794;
+      --hairline: rgba(0, 0, 77, 0.08);
+      --hero-gradient: linear-gradient(135deg, #eaf4ff 0%, #d6e8fa 50%, #c2dcf5 100%);
+      --ambient-stripes: repeating-linear-gradient(45deg, rgba(0, 183, 255, 0.02) 0 1px, transparent 1px 14px);
+    }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--ambient-stripes), var(--bg);
+      color: var(--navy);
+      min-height: 100vh;
+    }
+    header { background: var(--hero-gradient); color: var(--navy); padding: 28px 32px; border-bottom: 1px solid var(--hairline); }
+    header h1 { margin: 0; font-family: 'Lexend Deca', 'Inter', sans-serif; font-weight: 500; font-size: 22px; letter-spacing: -0.01em; }
+    header .meta { font-size: 12px; color: var(--ink-2); margin-top: 6px; }
     header .tagline { font-style: italic; }
-    footer { max-width: 960px; margin: 32px auto 16px; padding: 0 32px; font-size: 12px; color: #888; text-align: right; }
-    nav { background: #fff; border-bottom: 1px solid #e2e2dc; padding: 0 32px; }
-    nav a { display: inline-block; padding: 12px 16px; color: #222; text-decoration: none; border-bottom: 2px solid transparent; }
-    nav a.active { border-bottom-color: #222; font-weight: 600; }
+    footer { max-width: 960px; margin: 32px auto 16px; padding: 0 32px; font-size: 12px; color: var(--ink-3); text-align: right; }
+    nav { background: var(--paper); border-bottom: 1px solid var(--hairline); padding: 0 32px; }
+    nav a { display: inline-block; padding: 14px 16px; color: var(--navy); text-decoration: none; border-bottom: 2px solid transparent; font-weight: 500; font-size: 14px; }
+    nav a:hover { color: var(--blue); }
+    nav a.active { border-bottom-color: var(--blue); color: var(--blue); font-weight: 600; }
     main { max-width: 960px; margin: 0 auto; padding: 32px; }
-    h2 { margin-top: 32px; font-size: 18px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; }
-    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #e2e2dc; font-size: 14px; }
-    th { background: #f0f0eb; font-weight: 600; }
-    .suppressed { background: #fff8e1; padding: 16px; border-left: 4px solid #d4a017; font-size: 14px; color: #5b4a00; margin: 12px 0; border-radius: 2px; }
+    h2 { margin-top: 32px; font-family: 'Lexend Deca', 'Inter', sans-serif; font-weight: 500; font-size: 18px; letter-spacing: -0.005em; }
+    table { width: 100%; border-collapse: collapse; background: var(--paper); border-radius: 12px; overflow: hidden; }
+    th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--hairline); font-size: 14px; }
+    th { background: var(--surface-field); font-weight: 600; color: var(--navy); }
+    .suppressed { background: rgba(0, 134, 255, 0.06); padding: 16px; border-left: 4px solid var(--blue); font-size: 14px; color: var(--navy); margin: 12px 0; border-radius: 6px; }
     .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 24px; font-size: 14px; }
-    .kv dt { color: #666; }
+    .kv dt { color: var(--ink-2); }
     .kv dd { margin: 0; font-weight: 600; }
-    form { background: #fff; padding: 24px; border: 1px solid #e2e2dc; border-radius: 4px; max-width: 420px; margin: 64px auto; }
-    input[type="email"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 3px; font-size: 14px; box-sizing: border-box; }
-    button { background: #222; color: #fff; border: 0; padding: 10px 20px; font-size: 14px; border-radius: 3px; cursor: pointer; margin-top: 12px; }
-    .pct { font-variant-numeric: tabular-nums; color: #5a8c4a; font-weight: 600; }
+    form { background: var(--paper); padding: 28px; border: 1px solid var(--hairline); border-radius: 16px; max-width: 420px; margin: 64px auto; }
+    label { display: block; font-size: 13px; font-weight: 500; color: var(--navy); margin-bottom: 8px; }
+    input[type="email"], input[type="text"] { width: 100%; padding: 12px 14px; border: 1.5px solid transparent; border-radius: 12px; font-size: 14px; box-sizing: border-box; background: var(--surface-field); color: var(--navy); font-family: inherit; outline: none; }
+    input[type="email"]:focus, input[type="text"]:focus { background: var(--paper); border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0, 134, 255, 0.18); }
+    button { background: var(--blue); color: #ffffff; border: 0; padding: 12px 22px; font-size: 14px; font-weight: 600; border-radius: 12px; cursor: pointer; margin-top: 14px; font-family: inherit; transition: background 180ms ease; }
+    button:hover { background: var(--blue-deep); }
+    .pct { font-variant-numeric: tabular-nums; color: var(--blue-deep); font-weight: 600; }
     .num { font-variant-numeric: tabular-nums; }
   </style>
 </head>

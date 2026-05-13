@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hogaan — Home</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            hogaan: {
+              bg: '#FAF6F1', card: '#FFFFFF', sunken: '#F3EDE4',
+              text: '#0A1F4D', mute: '#6B6B7A', soft: '#9090A0',
+              accent: '#C49B4A', 'accent-light': '#E8D5A8', 'accent-tint': '#F5EAD0',
+            },
+            hw: { navy: '#00004D', blue: '#0086FF' },
+          },
+          fontFamily: { display: ['Fraunces', 'serif'], body: ['Inter', 'sans-serif'] },
+          boxShadow: { card: '0 2px 8px rgba(10, 31, 77, 0.06)', 'card-lg': '0 4px 16px rgba(10, 31, 77, 0.08)' },
+        },
+      },
+    };
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .font-display { font-family: 'Fraunces', serif; }
+    .wordmark-underline { position: relative; display: inline-block; }
+    .wordmark-underline::after {
+      content: ''; position: absolute; bottom: -4px; left: 12%; right: 12%; height: 3px;
+      background: #C49B4A; border-radius: 2px;
+    }
+  </style>
+</head>
+<body class="bg-hogaan-bg text-hogaan-text min-h-screen pb-24">
+
+  <!-- Top -->
+  <header class="max-w-2xl mx-auto px-6 pt-10 text-center">
+    <span class="font-display text-3xl font-semibold tracking-tight wordmark-underline">Hogaan</span>
+    <p class="text-sm text-hogaan-mute mt-3">Your leadership companion.</p>
+  </header>
+
+  <main class="max-w-2xl mx-auto px-6 mt-12">
+
+    <!-- Greeting -->
+    <section class="mb-7">
+      <h1 class="font-display text-3xl md:text-4xl font-medium text-hogaan-accent leading-tight">Good evening, Khadija.</h1>
+      <p class="text-hogaan-mute mt-2">What's on your mind tonight?</p>
+    </section>
+
+    <!-- Input -->
+    <section class="mb-10">
+      <div class="bg-hogaan-card rounded-2xl shadow-card p-5">
+        <div class="flex items-start gap-4">
+          <button class="w-11 h-11 rounded-full bg-hogaan-text flex items-center justify-center flex-shrink-0 hover:bg-hogaan-text/90 transition" aria-label="Voice input">
+            <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="3" width="6" height="13" rx="3"/>
+              <path d="M5 11a7 7 0 0014 0M12 18v4M8 22h8"/>
+            </svg>
+          </button>
+          <div class="flex-1 min-w-0">
+            <input type="text" placeholder="Tell me what happened today…"
+                   class="w-full bg-transparent text-hogaan-text placeholder:text-hogaan-soft focus:outline-none text-base py-2.5">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Suggestions -->
+    <section class="mb-10">
+      <h2 class="text-sm font-medium text-hogaan-mute mb-4">You might want to explore</h2>
+      <div class="space-y-3">
+
+        <a href="chat.html" class="flex items-center gap-4 bg-hogaan-card rounded-xl p-4 shadow-card hover:shadow-card-lg transition group">
+          <div class="w-10 h-10 rounded-lg bg-hogaan-accent-tint flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-hogaan-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"/></svg>
+          </div>
+          <span class="flex-1 text-hogaan-text font-medium">Difficult conversation tomorrow</span>
+          <svg class="w-5 h-5 text-hogaan-soft group-hover:text-hogaan-text transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </a>
+
+        <a href="chat.html" class="flex items-center gap-4 bg-hogaan-card rounded-xl p-4 shadow-card hover:shadow-card-lg transition group">
+          <div class="w-10 h-10 rounded-lg bg-hogaan-accent-tint flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-hogaan-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+          </div>
+          <span class="flex-1 text-hogaan-text font-medium">Team member underperforming</span>
+          <svg class="w-5 h-5 text-hogaan-soft group-hover:text-hogaan-text transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </a>
+
+        <a href="chat.html" class="flex items-center gap-4 bg-hogaan-card rounded-xl p-4 shadow-card hover:shadow-card-lg transition group">
+          <div class="w-10 h-10 rounded-lg bg-hogaan-accent-tint flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-hogaan-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </div>
+          <span class="flex-1 text-hogaan-text font-medium">Disagreeing with my boss</span>
+          <svg class="w-5 h-5 text-hogaan-soft group-hover:text-hogaan-text transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- Recent sessions -->
+    <section class="mb-10">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-medium text-hogaan-mute">Recent sessions</h2>
+        <a href="#" class="text-sm text-hogaan-accent font-medium hover:underline">View all</a>
+      </div>
+
+      <div class="space-y-3">
+        <a href="chat.html" class="flex items-center gap-4 bg-hogaan-card rounded-xl p-4 shadow-card hover:shadow-card-lg transition group">
+          <div class="w-10 h-10 rounded-lg bg-hogaan-text flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-hogaan-text font-medium truncate">Tuesday — Hiring decision for Nairobi office</p>
+            <p class="text-xs text-hogaan-soft mt-0.5">3 days ago</p>
+          </div>
+          <svg class="w-5 h-5 text-hogaan-soft group-hover:text-hogaan-text transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </a>
+
+        <a href="chat.html" class="flex items-center gap-4 bg-hogaan-card rounded-xl p-4 shadow-card hover:shadow-card-lg transition group">
+          <div class="w-10 h-10 rounded-lg bg-hogaan-text flex items-center justify-center flex-shrink-0">
+            <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-hogaan-text font-medium truncate">Sunday — Board update prep</p>
+            <p class="text-xs text-hogaan-soft mt-0.5">6 days ago</p>
+          </div>
+          <svg class="w-5 h-5 text-hogaan-soft group-hover:text-hogaan-text transition" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+        </a>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom nav -->
+  <nav class="fixed bottom-0 left-0 right-0 bg-hogaan-card border-t border-hogaan-sunken">
+    <div class="max-w-2xl mx-auto px-2 py-2 grid grid-cols-4">
+      <a href="home.html" class="flex flex-col items-center gap-1 py-2 text-hogaan-text">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l9-9 9 9M5 10v10a2 2 0 002 2h3M19 10v10a2 2 0 01-2 2h-3M9 22V12h6v10"/></svg>
+        <span class="text-xs font-medium">Home</span>
+      </a>
+      <a href="#" class="flex flex-col items-center gap-1 py-2 text-hogaan-soft hover:text-hogaan-text transition">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        <span class="text-xs">Sessions</span>
+      </a>
+      <a href="#" class="flex flex-col items-center gap-1 py-2 text-hogaan-soft hover:text-hogaan-text transition">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        <span class="text-xs">Growth</span>
+      </a>
+      <a href="#" class="flex flex-col items-center gap-1 py-2 text-hogaan-soft hover:text-hogaan-text transition">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span class="text-xs">Profile</span>
+      </a>
+    </div>
+  </nav>
+
+</body>
+</html>

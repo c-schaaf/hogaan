@@ -1,7 +1,10 @@
+import 'dotenv/config';
 import { buildApp } from './app.js';
 import { loadConfig } from './shared/secrets/config.js';
 import { initSentry, shutdownSentry, startHeartbeat } from './shared/observability/index.js';
 import { wireSponsorPortalRoutes } from './sponsor-portal/setup.js';
+import { wireWebApiRoutes } from './web-api/setup.js';
+import { wireWebStatic } from './web-static/setup.js';
 import { wireWhatsAppDeliveryRoutes } from './whatsapp-delivery/setup.js';
 
 // DEBUG INSTRUMENTATION — startup probes. Bypass pino entirely (writes
@@ -48,6 +51,20 @@ async function main(): Promise<void> {
   app.log.info(
     { sponsorPortalRoutes: portalWired.registered, reason: portalWired.reason ?? 'ok' },
     'sponsor portal routes',
+  );
+  // End-user web auth is handled by Supabase Auth in the browser. The
+  // backend just validates the `Authorization: Bearer <supabase-token>`
+  // header on /api/* via web-api/supabase-session.ts middleware.
+  const webApiWired = await wireWebApiRoutes(app, config);
+  app.log.info(
+    { webApiRoutes: webApiWired.registered, reason: webApiWired.reason ?? 'ok' },
+    'web api routes',
+  );
+  // Static SPA serve — must come LAST so it doesn't claim API/webhook paths.
+  const staticWired = await wireWebStatic(app, config);
+  app.log.info(
+    { webStatic: staticWired.registered, reason: staticWired.reason ?? 'ok' },
+    'web static (SPA)',
   );
   const heartbeat = startHeartbeat(config);
   startupProbe('startHeartbeat() returned');

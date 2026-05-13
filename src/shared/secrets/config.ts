@@ -23,7 +23,9 @@ type OptionalKey =
   | 'BETTERSTACK_HEARTBEAT_URL'
   | 'RESEND_API_KEY'
   | 'RESEND_FROM_EMAIL'
-  | 'SPONSOR_PORTAL_BASE_URL';
+  | 'SPONSOR_PORTAL_BASE_URL'
+  | 'SUPABASE_URL'
+  | 'SUPABASE_ANON_KEY';
 
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'staging' | 'production';
@@ -52,6 +54,8 @@ export interface AppConfig {
   resendApiKey: string | undefined;
   resendFromEmail: string | undefined;
   sponsorPortalBaseUrl: string | undefined;
+  supabaseUrl: string | undefined;
+  supabaseAnonKey: string | undefined;
 }
 
 export class ConfigError extends Error {
@@ -126,6 +130,8 @@ export function loadConfig(): AppConfig {
     resendApiKey: readOptional('RESEND_API_KEY'),
     resendFromEmail: readOptional('RESEND_FROM_EMAIL'),
     sponsorPortalBaseUrl: readOptional('SPONSOR_PORTAL_BASE_URL'),
+    supabaseUrl: readOptional('SUPABASE_URL'),
+    supabaseAnonKey: readOptional('SUPABASE_ANON_KEY'),
   };
 }
 

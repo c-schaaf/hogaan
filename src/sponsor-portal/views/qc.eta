@@ -13,11 +13,11 @@
 <% } %>
 
 <h2>Crisis events by category (last 30 days)</h2>
-<p style="color:#666;font-size:13px;">No transcripts. Counts only. The privacy floor below is enforced over baseline cohort engagement.</p>
+<p style="color:var(--ink-2);font-size:13px;">No transcripts. Counts only. The privacy floor below is enforced over baseline cohort engagement.</p>
 <% if (it.crisis.suppressed) { %>
   <div class="suppressed"><%= it.crisis.copy %></div>
 <% } else if (it.crisis.value.length === 0) { %>
-  <p style="color:#666;">No crisis events in the window.</p>
+  <p style="color:var(--ink-2);">No crisis events in the window.</p>
 <% } else { %>
   <table>
     <thead><tr><th>Category</th><th class="num">Events</th></tr></thead>
