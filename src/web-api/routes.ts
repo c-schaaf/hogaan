@@ -291,13 +291,22 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       return reply;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
       const isAssembly = err instanceof PromptAssemblyError;
+      // Surface to dev console + Fastify log so the cause is visible without
+      // having to spelunk Sentry/Axiom. Keeps reportP2 wired for prod traces.
+      req.log.error(
+        { err: { message: msg, stack, kind: isAssembly ? 'prompt-assembly' : 'llm-or-other' } },
+        'streaming turn failed',
+      );
       reportP2('streaming turn failed', {
         source: 'PhaseC.WebApi.Stream',
         extra: { error: msg, kind: isAssembly ? 'prompt-assembly' : 'llm-or-other' },
       });
       try {
-        sendEvent('error', { message: 'Something went wrong on my side. Try again.' });
+        // Echo the actual error message back to the client (dev-friendly).
+        // Tighten this to a generic copy before launch.
+        sendEvent('error', { message: `stream failed: ${msg.slice(0, 300)}` });
         sendEvent('end', { turnId: null, sessionId: null, latencyMs: Date.now() - t0 });
         reply.raw.end();
       } catch {
