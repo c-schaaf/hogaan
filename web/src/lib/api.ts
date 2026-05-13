@@ -128,21 +128,38 @@ export async function* turnStream(body: ChatTurnRequest): AsyncGenerator<TurnStr
   const token = data.session?.access_token;
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
+  console.log('[stream] opening POST /api/chat/turn/stream');
   const resp = await fetch('/api/chat/turn/stream', {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
   });
+  console.log('[stream] response opened', {
+    status: resp.status,
+    contentType: resp.headers.get('content-type'),
+    hasBody: resp.body !== null,
+  });
   if (!resp.ok || resp.body === null) {
     throw new ApiError(resp.status, `stream open failed: ${resp.status}`);
   }
 
-  const reader = resp.body.pipeThrough(new TextDecoderStream()).getReader();
+  // Manual TextDecoder (more reliable across browsers / dev proxies than
+  // pipeThrough(new TextDecoderStream())).
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder('utf-8');
   let buffer = '';
+  let chunkCount = 0;
+  let eventCount = 0;
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
-    buffer += value;
+    if (done) {
+      console.log('[stream] reader done', { chunkCount, eventCount, bufferLeft: buffer.length });
+      break;
+    }
+    chunkCount += 1;
+    const text = decoder.decode(value, { stream: true });
+    console.log('[stream] chunk', { bytes: value.byteLength, preview: text.slice(0, 80) });
+    buffer += text;
     // SSE events are separated by a blank line ("\n\n"). Parse complete
     // events out of the buffer and leave any incomplete tail for the
     // next chunk.
@@ -151,7 +168,12 @@ export async function* turnStream(body: ChatTurnRequest): AsyncGenerator<TurnStr
       const raw = buffer.slice(0, sep);
       buffer = buffer.slice(sep + 2);
       const parsed = parseSseBlock(raw);
-      if (parsed !== null) yield parsed;
+      if (parsed !== null) {
+        eventCount += 1;
+        yield parsed;
+      } else {
+        console.warn('[stream] unparseable SSE block', raw.slice(0, 120));
+      }
     }
   }
 }
