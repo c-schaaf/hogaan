@@ -153,6 +153,11 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     const t0 = Date.now();
     const userId = asUserId(session.userId);
 
+    // Tell Fastify to stop managing this response — we're going raw for SSE.
+    // Without hijack, Fastify can layer Content-Length/serialization on top
+    // of our chunked writes and the browser never enters event-stream mode.
+    reply.hijack();
+
     // SSE headers — `reply.raw` lets us write chunks manually.
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -160,6 +165,9 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     });
+    // Push the headers immediately so the browser enters SSE-receive mode
+    // before any data chunks arrive.
+    reply.raw.flushHeaders();
     const sendEvent = (event: string, data: unknown): void => {
       reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
