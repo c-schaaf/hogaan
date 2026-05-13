@@ -44,40 +44,6 @@ function InlineButton({ children, icon }: { children: ReactNode; icon?: ReactNod
   );
 }
 
-interface RadioOpt<T extends string> {
-  id: T;
-  title: string;
-  sub?: string;
-}
-
-function Radio<T extends string>({
-  value,
-  options,
-  onChange,
-}: {
-  value: T;
-  options: RadioOpt<T>[];
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="pr-radio" role="radiogroup">
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          className={`pr-radio-opt ${value === o.id ? 'is-on' : ''}`}
-          role="radio"
-          aria-checked={value === o.id}
-          onClick={() => onChange(o.id)}
-        >
-          <span className="pr-radio-title">{o.title}</span>
-          {o.sub && <span className="pr-radio-sub">{o.sub}</span>}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function PracticesView({
   selected,
   editing,
@@ -124,9 +90,6 @@ function PracticesView({
   );
 }
 
-type CommStyle = 'direct' | 'warm';
-type Depth = 'quick' | 'standard' | 'deep';
-
 interface Props {
   user: { name: string; email: string };
   practices?: string[];
@@ -135,8 +98,6 @@ interface Props {
 }
 
 export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
-  const [style, setStyle] = useState<CommStyle>('warm');
-  const [depth, setDepth] = useState<Depth>('standard');
   const [fullName, setFullName] = useState(user.name || '');
   const [email, setEmail] = useState(user.email || '');
   const [livePractices, setLivePractices] = useState<string[]>(practices);
@@ -152,8 +113,6 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
         const p = await api.profile.get();
         if (p.fullName) setFullName(p.fullName);
         if (p.email) setEmail(p.email);
-        if (p.commStyle) setStyle(p.commStyle);
-        if (p.responseDepth) setDepth(p.responseDepth);
         if (p.mappedPractices.length > 0) {
           setLivePractices(p.mappedPractices);
           setDraftPractices(p.mappedPractices);
@@ -187,28 +146,6 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
     setDraftPractices(livePractices);
     setEditingPractices(false);
   };
-
-  const updateStyle = async (v: CommStyle) => {
-    setStyle(v);
-    try {
-      await api.profile.patch({ commStyle: v });
-    } catch (err) {
-      console.error('patch commStyle failed', err);
-    }
-  };
-  const updateDepth = async (v: Depth) => {
-    setDepth(v);
-    try {
-      await api.profile.patch({ responseDepth: v });
-    } catch (err) {
-      console.error('patch responseDepth failed', err);
-    }
-  };
-
-  // Privacy & data card was removed per 2026-05-12 feedback. The
-  // handleDeleteAccount / handleDownload handlers used to live here; the
-  // backend endpoints (DELETE /api/profile, /api/sessions list as JSON)
-  // remain in case a Settings page surfaces them later.
 
   return (
     <div className="pr-page">
@@ -294,34 +231,6 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
                   />
                 </ProfileCard>
 
-                <ProfileCard title="How we talk">
-                  <div className="pr-subsec">
-                    <div className="pr-subsec-h">Communication style</div>
-                    <Radio<CommStyle>
-                      value={style}
-                      onChange={updateStyle}
-                      options={[
-                        { id: 'direct', title: 'Direct & challenging', sub: 'Push me when I need it.' },
-                        { id: 'warm', title: 'Warm & considered', sub: 'Lead with care.' },
-                      ]}
-                    />
-                  </div>
-                  <div className="pr-subsec">
-                    <div className="pr-subsec-h">Default response depth</div>
-                    <Radio<Depth>
-                      value={depth}
-                      onChange={updateDepth}
-                      options={[
-                        { id: 'quick', title: 'Quick' },
-                        { id: 'standard', title: 'Standard' },
-                        { id: 'deep', title: 'Deep' },
-                      ]}
-                    />
-                  </div>
-                </ProfileCard>
-              </div>
-
-              <div className="pr-col pr-col--side">
                 <ProfileCard title="Support">
                   <div className="pr-sup">
                     <div className="pr-sup-row">
@@ -344,11 +253,24 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
                     </div>
                   </div>
                 </ProfileCard>
+              </div>
+
+              <div className="pr-col pr-col--side">
+                <ProfileCard title="About Hogaan">
+                  <p className="pr-about-body">
+                    Leadership coaching grounded in the 12 Practices of Transformational
+                    Leadership — built to meet you in the moments that matter, not the ones
+                    you've already figured out.
+                  </p>
+                  <div className="pr-about-stat">
+                    <div className="pr-about-stat-num">{livePractices.length}</div>
+                    <div className="pr-about-stat-label">
+                      {livePractices.length === 1 ? 'practice in focus' : 'practices in focus'}
+                    </div>
+                  </div>
+                </ProfileCard>
 
                 <footer className="pr-foot">
-                  <div className="pr-foot-hw">
-                    A <span>Hamse Warfa</span> product
-                  </div>
                   <div className="pr-foot-ver">Hogaan · v0.4.0</div>
                 </footer>
               </div>

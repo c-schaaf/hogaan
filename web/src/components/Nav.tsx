@@ -54,7 +54,7 @@ export function DesktopSidebar({ active, onNav }: NavProps) {
         ))}
       </nav>
       <div className="hm-side-bottom">
-        <div className="hm-side-attr">A Hamse Warfa practice</div>
+        <div className="hm-side-attr">Hogaan Leadership</div>
       </div>
     </aside>
   );

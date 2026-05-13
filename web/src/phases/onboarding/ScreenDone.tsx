@@ -28,9 +28,6 @@ export function ScreenDone({ name, onOpen }: Props) {
       <h1>You're set{name ? `, ${name}` : ''}.</h1>
       <p>Bring me a moment — anything on your mind.</p>
       <div className="wordmark">Hogaan · Leadership</div>
-      <div className="attribution">
-        A <span className="hamse">Hamse Warfa</span> product
-      </div>
       <div style={{ flex: 1 }} />
       <button type="button" className="cta" style={{ maxWidth: 240 }} onClick={onOpen}>
         Open Hogaan <Arrow />
