@@ -1,18 +1,23 @@
 import { and, desc, eq, sql as drizzleSql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { fetchCoachingContext } from '../coaching/context-fetch.js';
 import { runCoachingTurn } from '../coaching/orchestrator.js';
+import { fastPathTriage } from '../coaching/triage.js';
 import type { CoachingInbound } from '../coaching/types.js';
 import { reportP2 } from '../incident-handling/index.js';
+import { assemblePrompt, PromptAssemblyError } from '../prompt-assembly/index.js';
+import { resolveSession } from '../session-lifecycle/index.js';
 import type { Database } from '../shared/db/client.js';
 import { hashPhone } from '../shared/db/encryption.js';
 import { sessions } from '../shared/db/schema/sessions.js';
 import { turns } from '../shared/db/schema/turns.js';
 import { users } from '../shared/db/schema/users.js';
+import { chatStream } from '../shared/llm/chat.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import type { TraceEmitter } from '../shared/trace/index.js';
-import { asPhoneE164, asUserId } from '../shared/types/index.js';
+import { asPhoneE164, asSessionId, asUserId } from '../shared/types/index.js';
 import { generateSessionTitle } from './session-title.js';
 import { requireSupabaseSession } from './supabase-session.js';
 
@@ -117,6 +122,189 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       crisis,
       endEvent: result.endEvent,
     });
+  });
+
+  // POST /api/chat/turn/stream ----------------------------------------
+  // Streaming variant of /api/chat/turn. Returns Server-Sent Events:
+  //   event: start   data: { sessionId }
+  //   event: delta   data: { text }            (one per token chunk)
+  //   event: crisis  data: { resources... }    (instead of stream, on fast-path crisis)
+  //   event: end     data: { turnId, sessionId, latencyMs }
+  //   event: error   data: { message }         (on any failure mid-stream)
+  //
+  // The path is intentionally a minimal inline orchestration that bypasses
+  // runCoachingTurn — we need direct control over the LLM call to surface
+  // chunks as they arrive. QC, tagger, voice-grading are all already off
+  // per 2026-05-13; the streaming path simply embodies that simplified
+  // pipeline.
+  app.post<{
+    Body: { message?: unknown; sessionId?: unknown; private?: unknown };
+  }>('/api/chat/turn/stream', async (req, reply) => {
+    const session = await requireSupabaseSession(req, reply, opts);
+    if (session === null) return;
+
+    const message =
+      typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+    if (message.length === 0) {
+      return reply.code(400).send({ error: 'message_required' });
+    }
+    const isPrivate = req.body?.private === true;
+
+    const t0 = Date.now();
+    const userId = asUserId(session.userId);
+
+    // SSE headers — `reply.raw` lets us write chunks manually.
+    reply.raw.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    const sendEvent = (event: string, data: unknown): void => {
+      reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      // ---- Fast-path triage (regex, no LLM) --------------------------
+      const sync = fastPathTriage(message, []);
+      if (sync !== null && sync.status === 'crisis') {
+        sendEvent('crisis', {
+          reason: sync.reason,
+          resources: {
+            '988': 'Suicide & Crisis Lifeline — call or text 988',
+            '741741': 'Crisis Text Line — text HOME to 741741',
+            '911': 'Emergency — 911 if there is immediate danger',
+            international: 'findahelpline.com',
+          },
+        });
+        sendEvent('end', { turnId: null, sessionId: null, latencyMs: Date.now() - t0 });
+        reply.raw.end();
+        return reply;
+      }
+      // empty/media_only on the streaming endpoint shouldn't happen (web
+      // sends text-only), but if it does just emit the templated copy.
+      if (sync !== null && sync.status === 'media_only') {
+        sendEvent('delta', { text: "I work with text only for now. Type out what's on your mind and I'll respond." });
+        sendEvent('end', { turnId: null, sessionId: null, latencyMs: Date.now() - t0 });
+        reply.raw.end();
+        return reply;
+      }
+
+      // ---- Session resolution ----------------------------------------
+      const resolved = await resolveSession(opts.db, { userId });
+      const sessionId = resolved.sessionId;
+
+      // ---- Context fetch (profile + recent turns + memory) -----------
+      const ctx = await fetchCoachingContext(
+        { config: opts.config, db: opts.db },
+        {
+          userId,
+          sessionId: asSessionId(sessionId),
+          query: message,
+          memoryTopN: 3,
+          recentTurnsLimit: 3,
+        },
+      );
+
+      // ---- Prompt assembly (v0_unified handles all response modes) ---
+      const promptBundle = await assemblePrompt(opts.config, opts.db, {
+        userId,
+        sessionId: asSessionId(sessionId),
+        responseMode: 'FullCoachingResponse',
+        userMessage: message,
+        userProfile: ctx.profile,
+        sessionTurns: ctx.sessionTurns,
+        retrievedMemories: ctx.memories,
+      });
+
+      sendEvent('start', { sessionId });
+
+      // ---- Stream the response ---------------------------------------
+      const stream = chatStream(opts.config, {
+        systemPrompt: promptBundle.assembledPrompt,
+        messages: [{ role: 'user', content: message }],
+        maxTokens: 600,
+        temperature: 0.7,
+      });
+
+      let accumulated = '';
+      let final;
+      // Manual iteration so we can capture the generator's return value.
+      while (true) {
+        const next = await stream.next();
+        if (next.done === true) {
+          final = next.value;
+          break;
+        }
+        accumulated += next.value;
+        sendEvent('delta', { text: next.value });
+      }
+
+      // ---- Persist turn row ------------------------------------------
+      const latencyMs = Date.now() - t0;
+      let turnId: string | null = null;
+      try {
+        const inserted = await opts.db
+          .insert(turns)
+          .values({
+            sessionId,
+            userId,
+            userMessage: message,
+            responseText: accumulated,
+            intent: 'Coaching',
+            practiceTag: 'integrity',
+            levelTag: 'self',
+            taggerConfidence: '0',
+            responseMode: 'FullCoachingResponse',
+            modelUsed: final?.modelUsed ?? 'claude-haiku-4-5',
+            fallbackPath: 'none',
+            qaOutcome: 'E1_ApprovedFirstAttempt',
+            latencyMs,
+            terminalEvent: 'E1_TurnCompleted',
+          })
+          .returning({ id: turns.id });
+        turnId = inserted[0]?.id ?? null;
+
+        // Bump session.lastTurnAt / turnCount.
+        await opts.db
+          .update(sessions)
+          .set({
+            lastTurnAt: new Date(),
+            turnCount: drizzleSql`${sessions.turnCount} + 1`,
+            ...(isPrivate ? { isPrivate: true } : {}),
+          })
+          .where(eq(sessions.id, sessionId));
+      } catch (err) {
+        reportP2('streaming turn persist failed (non-blocking)', {
+          source: 'PhaseC.WebApi.Stream',
+          extra: { error: err instanceof Error ? err.message : String(err) },
+        });
+      }
+
+      sendEvent('end', { turnId, sessionId, latencyMs });
+      reply.raw.end();
+
+      // Fire-and-forget session title generation (after the user sees their reply).
+      if (!isPrivate) {
+        void generateSessionTitle(opts.config, opts.db, sessionId, message);
+      }
+      return reply;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const isAssembly = err instanceof PromptAssemblyError;
+      reportP2('streaming turn failed', {
+        source: 'PhaseC.WebApi.Stream',
+        extra: { error: msg, kind: isAssembly ? 'prompt-assembly' : 'llm-or-other' },
+      });
+      try {
+        sendEvent('error', { message: 'Something went wrong on my side. Try again.' });
+        sendEvent('end', { turnId: null, sessionId: null, latencyMs: Date.now() - t0 });
+        reply.raw.end();
+      } catch {
+        // Connection already closed; nothing to do.
+      }
+      return reply;
+    }
   });
 
   // GET /api/sessions --------------------------------------------------

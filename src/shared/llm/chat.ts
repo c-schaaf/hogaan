@@ -1,5 +1,5 @@
 import type { AppConfig } from '../secrets/config.js';
-import { anthropicChat } from './anthropic.js';
+import { anthropicChat, anthropicChatStream, type AnthropicStreamFinal } from './anthropic.js';
 import { buildBreaker } from './breaker.js';
 import {
   LlmServiceUnavailableError,
@@ -166,6 +166,39 @@ function safeTemplateResponse(text: string, startedAt: number): ChatResponse {
     latencyMs: Date.now() - startedAt,
     inputTokens: 0,
     outputTokens: 0,
+  };
+}
+
+/**
+ * Streaming variant of chat(). Primary-only — Claude Haiku 4.5 with no
+ * Groq fallback (streaming + cross-provider fallback is complex; first
+ * iteration ships without it). On any error during the stream the
+ * generator throws and the caller emits an SSE error event.
+ *
+ * Yields: text deltas as the model generates them.
+ * Returns: final accumulated text + token usage after the stream closes.
+ */
+export interface ChatStreamFinal extends AnthropicStreamFinal {
+  modelUsed: 'claude-haiku-4-5';
+  latencyMs: number;
+}
+
+export async function* chatStream(
+  config: AppConfig,
+  req: Omit<ChatRequest, 'primaryTimeoutMs' | 'fallbackTimeoutMs'>,
+): AsyncGenerator<string, ChatStreamFinal, void> {
+  const start = Date.now();
+  const final = yield* anthropicChatStream(config, {
+    model: 'claude-haiku-4-5',
+    systemPrompt: req.systemPrompt,
+    messages: req.messages,
+    maxTokens: req.maxTokens,
+    ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+  });
+  return {
+    ...final,
+    modelUsed: 'claude-haiku-4-5',
+    latencyMs: Date.now() - start,
   };
 }
 

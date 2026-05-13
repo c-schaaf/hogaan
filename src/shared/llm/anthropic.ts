@@ -95,6 +95,68 @@ function mapAnthropicError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
 }
 
+/**
+ * Streaming variant of anthropicChat. Yields text deltas as the model
+ * generates them. The final accumulated text + usage are returned in the
+ * resolved promise after the stream closes.
+ *
+ * No timeout / breaker / fallback applied at this layer — streaming has
+ * different latency semantics (TTFB vs total) and a mid-stream timeout
+ * would leave the user looking at a half-written reply. Callers handle
+ * mid-stream errors by emitting an error event and closing.
+ */
+export interface AnthropicStreamFinal {
+  text: string;
+  inputTokens: number;
+  outputTokens: number;
+  stopReason: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use' | 'pause_turn' | 'refusal';
+}
+
+export async function* anthropicChatStream(
+  config: AppConfig,
+  req: Omit<AnthropicChatRequest, 'timeoutMs'>,
+): AsyncGenerator<string, AnthropicStreamFinal, void> {
+  const client = getClient(config);
+
+  let stream;
+  try {
+    stream = client.messages.stream({
+      model: req.model,
+      max_tokens: req.maxTokens,
+      ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+      system: req.systemPrompt,
+      messages: req.messages,
+    });
+  } catch (err) {
+    throw mapAnthropicError(err);
+  }
+
+  try {
+    for await (const event of stream) {
+      if (
+        event.type === 'content_block_delta' &&
+        event.delta.type === 'text_delta' &&
+        event.delta.text.length > 0
+      ) {
+        yield event.delta.text;
+      }
+    }
+    const final = await stream.finalMessage();
+    const text = final.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('');
+    return {
+      text,
+      inputTokens: final.usage.input_tokens,
+      outputTokens: final.usage.output_tokens,
+      stopReason: final.stop_reason ?? 'end_turn',
+    };
+  } catch (err) {
+    throw mapAnthropicError(err);
+  }
+}
+
 export function resetAnthropicClientForTests(): void {
   cached = undefined;
 }
