@@ -314,25 +314,22 @@ export function Chat({
     }
     setThinking(true);
 
-    // Add a placeholder bot bubble that grows as tokens stream in.
+    // Streaming bot bubble. The upsert reads the items array to decide
+    // append vs. replace — no closure boolean (StrictMode double-invokes
+    // setState updaters in dev, which mutates closure state out from
+    // under us). Append iff the last item is not the bot bubble we're
+    // streaming into; otherwise replace.
     let streamingText = '';
-    let placeholderInserted = false;
-    const upsertStreamingBot = () => {
-      const r = renderResponse(streamingText);
+    const upsertStreamingBot = (text: string) => {
+      const r = renderResponse(text);
       setItems((prev) => {
-        if (!placeholderInserted) {
-          placeholderInserted = true;
-          return [...prev, { kind: 'bot', paras: r.paras, chips: r.chips }];
+        const lastIdx = prev.length - 1;
+        if (lastIdx >= 0 && prev[lastIdx].kind === 'bot') {
+          const next = prev.slice();
+          next[lastIdx] = { kind: 'bot', paras: r.paras, chips: r.chips };
+          return next;
         }
-        const next = [...prev];
-        // Replace the last bot bubble (the one we're streaming into).
-        for (let i = next.length - 1; i >= 0; i--) {
-          if (next[i].kind === 'bot') {
-            next[i] = { kind: 'bot', paras: r.paras, chips: r.chips };
-            break;
-          }
-        }
-        return next;
+        return [...prev, { kind: 'bot', paras: r.paras, chips: r.chips }];
       });
     };
 
@@ -348,7 +345,7 @@ export function Chat({
           setThinking(false); // first byte received — drop the spinner
         } else if (ev.type === 'delta') {
           streamingText += ev.text;
-          upsertStreamingBot();
+          upsertStreamingBot(streamingText);
         } else if (ev.type === 'crisis') {
           gotCrisis = true;
           setThinking(false);
