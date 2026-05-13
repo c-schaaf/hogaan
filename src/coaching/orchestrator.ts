@@ -28,7 +28,9 @@ import { fetchCoachingContext } from './context-fetch.js';
 import { decideContinuation } from './continuation.js';
 import type { CoachingEndEvent } from './end-events.js';
 import { persistPostTurn, persistShortCircuitTurn } from './post-turn.js';
-import { tagPracticeAndLevel } from './tagger.js';
+// 🚨 PRE-LAUNCH RE-ENABLE — tagger disabled 2026-05-13 (see banner at the
+// Step 6 call site). To restore, uncomment this import.
+// import { tagPracticeAndLevel } from './tagger.js';
 import { triage } from './triage.js';
 import type { CoachingInbound, CoachingTurnResult, TriageResult } from './types.js';
 
@@ -248,7 +250,33 @@ export async function runCoachingTurn(
   );
 
   // ---- Step 6: practice + level tagging ------------------------------
-  const tags = tagPracticeAndLevel(inbound.body, ctx.profile.mappedPractices ?? []);
+  // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║ 🚨🚨🚨  PRE-LAUNCH RE-ENABLE  —  TAGGER DISABLED  🚨🚨🚨               ║
+  // ╠══════════════════════════════════════════════════════════════════════╣
+  // ║ Disabled 2026-05-13 (Muhsin). The tagger was a sync regex/heuristic  ║
+  // ║ over the 12 practices + 4 levels; its output drove the practice and  ║
+  // ║ level framing blocks in the prompt. The v0_unified system prompt     ║
+  // ║ embeds the framework lens directly in §3, so the tagger no longer    ║
+  // ║ shapes the prompt. Sponsor impact reports can re-derive tags offline ║
+  // ║ from the saved `turns.user_message` column via a batch classifier.   ║
+  // ║                                                                      ║
+  // ║ Every turn now records practice='integrity', level='self',           ║
+  // ║ confidence=0, tagSource='fallback' — placeholders that satisfy the   ║
+  // ║ non-null DB columns. Treat these values as MEANINGLESS in analytics. ║
+  // ║                                                                      ║
+  // ║ TO RESTORE: uncomment the import at the top and replace the stub     ║
+  // ║ below with `const tags = tagPracticeAndLevel(inbound.body,           ║
+  // ║ ctx.profile.mappedPractices ?? []);`                                 ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
+  const tags = {
+    practiceTag: 'integrity' as const,
+    levelTag: 'self' as const,
+    tagSource: 'fallback' as const,
+    hits: 0,
+    secondaryPracticeTag: null,
+    secondaryLevelTag: null,
+    confidence: 0,
+  };
 
   // ---- Step 7: clarification decision (v1: skip — always advance) ----
 
