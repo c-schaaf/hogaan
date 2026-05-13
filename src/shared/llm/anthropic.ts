@@ -120,41 +120,58 @@ export async function* anthropicChatStream(
 
   let stream;
   try {
-    stream = client.messages.stream({
+    // Lower-level streaming API — returns an async iterable of raw events.
+    // Preferred over messages.stream() because event types are stable across
+    // SDK versions and we don't depend on the helper's finalMessage() shape.
+    stream = await client.messages.create({
       model: req.model,
       max_tokens: req.maxTokens,
       ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
       system: req.systemPrompt,
       messages: req.messages,
+      stream: true,
     });
   } catch (err) {
     throw mapAnthropicError(err);
   }
 
+  let text = '';
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let stopReason: AnthropicStreamFinal['stopReason'] = 'end_turn';
+
   try {
     for await (const event of stream) {
-      if (
+      if (event.type === 'message_start') {
+        inputTokens = event.message.usage.input_tokens;
+        outputTokens = event.message.usage.output_tokens;
+      } else if (
         event.type === 'content_block_delta' &&
         event.delta.type === 'text_delta' &&
         event.delta.text.length > 0
       ) {
+        text += event.delta.text;
         yield event.delta.text;
+      } else if (event.type === 'message_delta') {
+        outputTokens = event.usage.output_tokens;
+        const sr = event.delta.stop_reason;
+        if (
+          sr === 'end_turn' ||
+          sr === 'max_tokens' ||
+          sr === 'stop_sequence' ||
+          sr === 'tool_use' ||
+          sr === 'pause_turn' ||
+          sr === 'refusal'
+        ) {
+          stopReason = sr;
+        }
       }
     }
-    const final = await stream.finalMessage();
-    const text = final.content
-      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
-      .map((b) => b.text)
-      .join('');
-    return {
-      text,
-      inputTokens: final.usage.input_tokens,
-      outputTokens: final.usage.output_tokens,
-      stopReason: final.stop_reason ?? 'end_turn',
-    };
   } catch (err) {
     throw mapAnthropicError(err);
   }
+
+  return { text, inputTokens, outputTokens, stopReason };
 }
 
 export function resetAnthropicClientForTests(): void {
