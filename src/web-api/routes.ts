@@ -207,16 +207,13 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       );
 
       // ---- Prompt assembly (v0_unified handles all response modes) ---
-      // validateInputPayload runs before the unified-template short-circuit,
-      // so we still have to pass practiceTag + levelTag even though the
-      // assembler ignores them under coaching_v0_unified. Same fallback
-      // placeholders as src/coaching/orchestrator.ts Step 6.
+      // No practiceTag / levelTag — the validator's mode-dependent check was
+      // removed 2026-05-13 (see prompt-assembly/validate.ts header note) and
+      // the v0_unified assembler skips practice/level framing entirely.
       const promptBundle = await assemblePrompt(opts.config, opts.db, {
         userId,
         sessionId: asSessionId(sessionId),
         responseMode: 'FullCoachingResponse',
-        practiceTag: 'integrity',
-        levelTag: 'self',
         userMessage: message,
         userProfile: ctx.profile,
         sessionTurns: ctx.sessionTurns,
