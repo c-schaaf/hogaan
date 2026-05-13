@@ -83,11 +83,24 @@ export async function assemblePrompt(
   // Step 3: system template selection (throws E8)
   const template = selectSystemTemplate(libs.promptTemplates.payload, validated.responseMode);
 
+  // 2026-05-13 — v0_unified short-circuit. The unified prompt embeds the
+  // framework lens (§3), the therapeutic toolkit (§4), and the turn shape
+  // (§5) inside its systemText. Re-injecting practice framing / level
+  // framing / directives / voice rules / cultural framing on top of it
+  // would (a) double the prompt's token cost and (b) pull the model toward
+  // a checklist register that conflicts with the "values-driven companion"
+  // register the new prompt establishes. We deliberately skip those blocks
+  // when the unified template is active. Rollback to v1 is one
+  // `publishLibraryVersion(..., makeActive:true)` away and restores the
+  // legacy assembly path automatically because template.id flips back.
+  const isUnifiedV0 = template.id === 'coaching_v0_unified';
+
   // Steps 4–5: practice + level framing (throw E7 on bad tag)
   const tagsRequired =
-    validated.responseMode === 'FullCoachingResponse' ||
-    validated.responseMode === 'ProfileUpdateAcknowledgment' ||
-    validated.responseMode === 'ScenarioRolePlay';
+    !isUnifiedV0 &&
+    (validated.responseMode === 'FullCoachingResponse' ||
+      validated.responseMode === 'ProfileUpdateAcknowledgment' ||
+      validated.responseMode === 'ScenarioRolePlay');
 
   const practiceFramingText =
     tagsRequired && validated.practiceTag !== undefined
@@ -100,21 +113,26 @@ export async function assemblePrompt(
 
   // Batch P Piece 1 — structural directives. Tells the LLM to use the
   // tagged practice as the organizing frame and anchor at the tagged
-  // level. Empty when either tag is missing (untagged response modes).
-  const directivesBlockText = buildDirectivesBlock(
-    tagsRequired ? (validated.practiceTag ?? null) : null,
-    tagsRequired ? (validated.levelTag ?? null) : null,
-  );
+  // level. Empty when either tag is missing (untagged response modes)
+  // or when the unified v0 prompt is active (handled inside the prompt).
+  const directivesBlockText = isUnifiedV0
+    ? ''
+    : buildDirectivesBlock(
+        tagsRequired ? (validated.practiceTag ?? null) : null,
+        tagsRequired ? (validated.levelTag ?? null) : null,
+      );
 
-  // Step 6: voice rules
-  const voiceRulesText = buildVoiceRules(libs.voiceRules.payload);
+  // Step 6: voice rules (skipped under unified v0 — voice baked into systemText)
+  const voiceRulesText = isUnifiedV0 ? '' : buildVoiceRules(libs.voiceRules.payload);
 
-  // Step 7: cultural framing (deterministic affinity-map for v1)
-  const cultural = selectCulturalFraming(
-    libs.culturalFraming.payload,
-    validated.responseMode,
-    validated.practiceTag,
-  );
+  // Step 7: cultural framing (skipped under unified v0)
+  const cultural = isUnifiedV0
+    ? null
+    : selectCulturalFraming(
+        libs.culturalFraming.payload,
+        validated.responseMode,
+        validated.practiceTag,
+      );
 
   // Steps 8–11: dynamic blocks
   const memoryBlockText = buildMemoryBlock(validated.retrievedMemories);
@@ -235,7 +253,9 @@ function canonicalAssemble(p: PromptUnderConstruction): string {
   if (p.directivesBlockText.length > 0) {
     parts.push(p.directivesBlockText);
   }
-  parts.push(p.voiceRulesText);
+  if (p.voiceRulesText.length > 0) {
+    parts.push(p.voiceRulesText);
+  }
   if (p.culturalFramingText !== null && p.culturalFramingText.length > 0) {
     parts.push(p.culturalFramingText);
   }
