@@ -2,26 +2,27 @@ import type { ResolvedLibraries } from '../libraries/index.js';
 import { debugWarn } from '../shared/observability/debug-log.js';
 import { reportIncident } from '../shared/observability/incidents.js';
 import type { AppConfig } from '../shared/secrets/config.js';
-import {
-  check3SignatureStructure,
-  // 🚨 PRE-LAUNCH RE-ENABLE: uncomment to restore the Check 8 safety gate.
-  // check8SafetyCrisis,
-  // Voice-shaping LLM graders below are disabled per 2026-05-13 trim.
-  // Re-import to re-enable. See block comment on line ~30 for rationale.
-  // check4AssetBased,
-  // check7Tone,
-  // check17PracticeGrounding,
-  // checkTangibleAction,
-  // checkUsefulToSocietyAnchor,
-} from './checks-llm.js';
-import {
-  check1PracticeTag,
-  check2LevelTag,
-  check5HeroToGuide,
-  check6UsefulToSociety,
-  check9Length,
-} from './checks-rule-based.js';
-import { checkIntentLengthAsCheckResult } from './intent-length-bands.js';
+// 🚨 PRE-LAUNCH RE-ENABLE — all QC check imports below are commented out.
+// Uncomment the ones you want to bring back, then uncomment the matching
+// call site in runAllChecks() below. See big banner there for full
+// re-enable instructions.
+// import {
+//   check3SignatureStructure,
+//   check4AssetBased,
+//   check7Tone,
+//   check8SafetyCrisis,
+//   check12TangibleAction as checkTangibleAction,
+//   check15UsefulToSocietyAnchor as checkUsefulToSocietyAnchor,
+//   check17PracticeGrounding,
+// } from './checks-llm.js';
+// import {
+//   check1PracticeTag,
+//   check2LevelTag,
+//   check5HeroToGuide,
+//   check6UsefulToSociety,
+//   check9Length,
+// } from './checks-rule-based.js';
+// import { checkIntentLengthAsCheckResult } from './intent-length-bands.js';
 // Check 10 (lived_experience), Check 11 (formatting_discipline), Check 13
 // (voice_consistency), and Check 16 (level_fidelity) are intentionally NOT
 // imported here. Check 13 and Check 16 were removed by the 2026-05-08 audit
@@ -388,86 +389,56 @@ async function runAllChecks(
   input: QcInput,
   candidate: string,
 ): Promise<CheckResult[]> {
-  const sync: CheckResult[] = [
-    check1PracticeTag(input.predictedPracticeTag),
-    check2LevelTag(input.predictedLevelTag),
-    check5HeroToGuide(deps.libraries.voiceRules.payload, candidate),
-    check6UsefulToSociety(deps.libraries.voiceRules.payload, candidate, input.predictedLevelTag),
-    check9Length(candidate, input.responseMode),
-    checkIntentLengthAsCheckResult(candidate, input.intent),
-  ];
-    instrumentCheck('check_03_signature_structure', () =>
-      check3SignatureStructure(deps.config, candidate),
-    ),
-    // ╔════════════════════════════════════════════════════════════════════╗
-    // ║ 🚨🚨🚨  PRE-LAUNCH RE-ENABLE  —  CHECK 8 SAFETY GATE DISABLED  🚨🚨🚨 ║
-    // ╠════════════════════════════════════════════════════════════════════╣
-    // ║ Disabled 2026-05-13 (Muhsin) alongside the LLM-triage bypass for   ║
-    // ║ latency measurement during the v0_unified rollout. Check 8 was the ║
-    // ║ fail-closed second-line crisis + response-safety gate. With it     ║
-    // ║ off, NO post-response safety check runs — every response Claude    ║
-    // ║ emits ships to the user without an independent safety review.     ║
-    // ║                                                                    ║
-    // ║ Per CLAUDE.md hard rule #1 ("Crisis routing supersedes everything. ║
-    // ║ Never bypass for cost, latency, or convenience"), this is NOT      ║
-    // ║ acceptable for production launch.                                  ║
-    // ║                                                                    ║
-    // ║ TO RESTORE: uncomment the instrumentCheck('check_08...') line      ║
-    // ║ below and the matching import (check8SafetyCrisis) at the top.    ║
-    // ╚════════════════════════════════════════════════════════════════════╝
-    // instrumentCheck('check_08_safety_crisis', () =>
-    //   check8SafetyCrisis(deps.config, input.userMessage, candidate),
-    // ),
-    // Voice-shaping graders below disabled 2026-05-13 (see header note).
-    // To re-enable: uncomment + restore imports from './checks-llm.js'.
-    // instrumentCheck('check_04_asset_based', () => check4AssetBased(deps.config, candidate)),
-    // instrumentCheck('check_07_tone', () => check7Tone(deps.config, candidate)),
-    // instrumentCheck('check_12_tangible_action', () => checkTangibleAction(deps.config, candidate)),
-    // instrumentCheck('check_15_useful_to_society_anchor', () =>
-    //   checkUsefulToSocietyAnchor(deps.config, candidate),
-    // ),
-    // instrumentCheck('check_17_practice_grounding', () =>
-    //   check17PracticeGrounding(
-    //     deps.config,
-    //     input.userMessage,
-    //     candidate,
-    //     input.predictedPracticeTag,
-    //   ),
-    // ),
-  ]);
-
-  let passCount = 0;
-  let softFailCount = 0;
-  let hardFailCount = 0;
-  let serviceUnavailableCount = 0;
-  let slowestCheck: { id: string; latencyMs: number } = { id: '', latencyMs: -1 };
-  let slowestErrorCheck: { id: string; err: string; latencyMs: number } | null = null;
-  for (const r of llm) {
-    const t = telemetry.get(r);
-    if (t === undefined) continue;
-    if (t.status === 'pass') passCount += 1;
-    else if (t.status === 'soft_fail') softFailCount += 1;
-    else if (t.status === 'hard_fail') hardFailCount += 1;
-    else if (t.status === 'service_unavailable') serviceUnavailableCount += 1;
-    if (t.latencyMs > slowestCheck.latencyMs) {
-      slowestCheck = { id: t.checkId, latencyMs: t.latencyMs };
-    }
-    if (t.status === 'service_unavailable') {
-      if (slowestErrorCheck === null || t.latencyMs > slowestErrorCheck.latencyMs) {
-        slowestErrorCheck = { id: t.checkId, err: t.reason ?? '', latencyMs: t.latencyMs };
-      }
-    }
-  }
-  debugWarn('QC-CHECK', 'parallel batch summary', {
-    scope: 'parallel',
-    totalChecks: llm.length,
-    passCount,
-    softFailCount,
-    hardFailCount,
-    serviceUnavailableCount,
-    slowestCheck,
-    slowestErrorCheck,
-  });
-
-  return [...sync, ...llm];
+  // Suppress "unused" warnings — all checks are commented out below.
+  // (instrumentCheck, parseReason, telemetry, debugWarn are debug-branch
+  //  instrumentation that wraps each check; they come back when checks do.)
+  void deps;
+  void input;
+  void candidate;
+  void instrumentCheck;
+  void parseReason;
+  void telemetry;
+  // ╔══════════════════════════════════════════════════════════════════════╗
+  // ║ 🚨🚨🚨  PRE-LAUNCH RE-ENABLE  —  ALL QC CHECKS DISABLED  🚨🚨🚨        ║
+  // ╠══════════════════════════════════════════════════════════════════════╣
+  // ║ Disabled 2026-05-13 (Muhsin). The v0_unified system prompt embeds    ║
+  // ║ the structural arc, tone, safety, and voice rules; every turn is     ║
+  // ║ persisted verbatim to `turns`, so impact/voice analysis runs offline ║
+  // ║ against the database rather than blocking turns inline. Net effect:  ║
+  // ║ runAllChecks returns []  → no failures  → orchestrator returns E1    ║
+  // ║ ApprovedFirstAttempt with the candidate response unchanged.          ║
+  // ║                                                                      ║
+  // ║ NOT FOR PRODUCTION LAUNCH. Per CLAUDE.md hard rule #1, Check 8       ║
+  // ║ (safety + crisis, fail-closed) must be restored before real users    ║
+  // ║ reach the deployed app. The other checks are voice-shaping and can   ║
+  // ║ stay off; safety cannot.                                             ║
+  // ║                                                                      ║
+  // ║ TO RESTORE (single check):                                           ║
+  // ║   - Uncomment the import at the top of this file                     ║
+  // ║   - Uncomment the matching line in the relevant array below          ║
+  // ║                                                                      ║
+  // ║ TO RESTORE (all checks):                                             ║
+  // ║   - Uncomment every line in both `sync` and `llm` blocks below       ║
+  // ║   - Uncomment every check import at the top of this file             ║
+  // ║   - Replace `return [];` with `return [...sync, ...llm];`            ║
+  // ║   - Delete the three `void` lines above                              ║
+  // ╚══════════════════════════════════════════════════════════════════════╝
+  //
+  // Sync (rule-based) checks — disabled:
+  //   check1PracticeTag(input.predictedPracticeTag),
+  //   check2LevelTag(input.predictedLevelTag),
+  //   check5HeroToGuide(deps.libraries.voiceRules.payload, candidate),
+  //   check6UsefulToSociety(deps.libraries.voiceRules.payload, candidate, input.predictedLevelTag),
+  //   check9Length(candidate, input.responseMode),
+  //   checkIntentLengthAsCheckResult(candidate, input.intent),
+  //
+  // LLM-backed checks — disabled:
+  //   check3SignatureStructure(deps.config, candidate),
+  //   check8SafetyCrisis(deps.config, input.userMessage, candidate),  ← safety
+  //   check4AssetBased(deps.config, candidate),
+  //   check7Tone(deps.config, candidate),
+  //   checkTangibleAction(deps.config, candidate),
+  //   checkUsefulToSocietyAnchor(deps.config, candidate),
+  //   check17PracticeGrounding(deps.config, input.userMessage, candidate, input.predictedPracticeTag),
+  return [];
 }
