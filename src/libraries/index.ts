@@ -38,7 +38,7 @@ export type {
 
 export { voiceRulesV1 } from './seed/voice-rules.js';
 export { culturalFramingV1 } from './seed/cultural-framing.js';
-export { promptTemplatesV1 } from './seed/prompt-templates.js';
+export { promptTemplatesV1, promptTemplatesV2Unified } from './seed/prompt-templates.js';
 export { crisisResourcesV1 } from './seed/crisis-resources.js';
 export { crisisResourcesV2 } from './seed/crisis-resources-v2.js';
 export { scenariosV1 } from './seed/scenarios.js';

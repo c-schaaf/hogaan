@@ -81,9 +81,11 @@ export function buildUserProfileBlock(profile: InputPayload['userProfile']): str
   if (Array.isArray(profile.goals) && profile.goals.length > 0) {
     lines.push(`Goals: ${profile.goals.join(', ')}`);
   }
-  if (Array.isArray(profile.mappedPractices) && profile.mappedPractices.length > 0) {
-    lines.push(`Practices in focus: ${profile.mappedPractices.join(', ')}`);
-  }
+  // 2026-05-13 — practices in focus / commStyle / responseDepth omitted on
+  // purpose. The v0_unified system prompt embeds the framework lens (§3) and
+  // tone calibration (§2/§5) so the model handles those organically; injecting
+  // them again here both inflates token cost and pulls the model toward a
+  // checklist register rather than the values-driven companion register.
   if (lines.length === 1) {
     lines.push('(profile is sparse — proceed without strong personalization)');
   }

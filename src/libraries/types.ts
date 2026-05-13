@@ -16,7 +16,13 @@ import type { LevelTag, PracticeTag, ResponseMode } from '../shared/types/index.
 
 export interface PromptTemplate {
   /** Stable id used by Process #9 §3 system-template selection. */
-  id: 'coaching_main_v3' | 'profile_ack_v1' | 'clarify_v1' | 'meta_v1' | 'scenario_rolePlay_v1';
+  id:
+    | 'coaching_main_v3'
+    | 'profile_ack_v1'
+    | 'clarify_v1'
+    | 'meta_v1'
+    | 'scenario_rolePlay_v1'
+    | 'coaching_v0_unified';
   responseMode: ResponseMode;
   /** Approximate token count of the system text — used for budget planning. */
   tokenBudget: number;
