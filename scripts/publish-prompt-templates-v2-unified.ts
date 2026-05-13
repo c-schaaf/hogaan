@@ -49,15 +49,21 @@ async function main(): Promise<void> {
 
     const result = await publishLibraryVersion(db, {
       libraryName: 'prompt_templates',
-      version: 'v2_unified',
+      version: 'v2_unified_tune1',
       payload: promptTemplatesV2Unified,
-      publishedBy: 'muhsin:hamse-ordered-overhaul-2026-05-13',
+      publishedBy: 'muhsin:audit-driven-tune-2026-05-13',
       notes:
-        'v2_unified — values-driven companion overhaul ordered by Hamse 2026-05-13 ' +
-        'after demo review. One system prompt subsumes all five response modes. ' +
-        'Voice content is now the single source of truth; practice framing, level ' +
-        'framing, voice rules, and cultural framing are skipped by the assembler ' +
-        'when this version is active. Rollback: republish v1 with makeActive:true.',
+        'v2_unified — values-driven companion. Original overhaul ordered by Hamse ' +
+        '2026-05-13 after demo review; subsequent same-day tune driven by Chunk-1 ' +
+        'coaching-quality audit. Tune targets three failure modes the audit found: ' +
+        '(1) reflexive question-ending (27/30 turns ended on a question) — §5 now ' +
+        'permits and encourages landing a take and stopping; (2) multi-option ' +
+        'menus and stacked questions (18/30 turns) — §6 explicitly bans both; ' +
+        '(3) refusing to give a draft when the user asks for one (S8 canonical ' +
+        'failure) — §2 and §6 now require giving 1–3 line drafts on request. ' +
+        'Also adds context-carry preamble to §5 and two new example exchanges ' +
+        '(Ex 5: draft-on-request, Ex 6: land-and-stop). Rollback: republish v1 ' +
+        'with makeActive:true.',
       makeActive: true,
     });
 
