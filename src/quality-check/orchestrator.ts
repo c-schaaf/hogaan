@@ -4,12 +4,14 @@ import { reportIncident } from '../shared/observability/incidents.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import {
   check3SignatureStructure,
-  check4AssetBased,
-  check7Tone,
   check8SafetyCrisis,
-  check17PracticeGrounding,
-  checkTangibleAction,
-  checkUsefulToSocietyAnchor,
+  // Voice-shaping LLM graders below are disabled per 2026-05-13 trim.
+  // Re-import to re-enable. See block comment on line ~30 for rationale.
+  // check4AssetBased,
+  // check7Tone,
+  // check17PracticeGrounding,
+  // checkTangibleAction,
+  // checkUsefulToSocietyAnchor,
 } from './checks-llm.js';
 import {
   check1PracticeTag,
@@ -32,6 +34,15 @@ import { checkIntentLengthAsCheckResult } from './intent-length-bands.js';
 // for the deactivation record and reactivation criteria. Implementations
 // (checkLivedExperienceDiscipline, checkFormattingDiscipline) are
 // preserved for unit tests and future revival.
+//
+// 2026-05-13 voice-grader trim: Check 4 (asset_based), Check 7 (tone),
+// Check 12 (tangible_action), Check 15 (useful_to_society_anchor), and
+// Check 17 (practice_grounding) are additionally deactivated for the
+// trusted-user pilot. Rationale: each adds ~4s of latency and ~$0.001 per
+// turn; we lack user-feedback evidence that any of them catches drift
+// real users notice. Re-enable on observed voice regression. Safety
+// (Check 8, fail-closed) and structural arc (Check 3) remain on; rule-
+// based checks (Checks 1, 2, 5, 6, 9, intent-length) are unaffected.
 import { regenerate, REGEN_BUDGET_HEADROOM_MS } from './corrective.js';
 import { fallbackDegraded, fallbackMaxRetries } from './fallbacks.js';
 import type { CheckResult, QcInput, QcResult } from './types.js';
@@ -388,24 +399,25 @@ async function runAllChecks(
     instrumentCheck('check_03_signature_structure', () =>
       check3SignatureStructure(deps.config, candidate),
     ),
-    instrumentCheck('check_04_asset_based', () => check4AssetBased(deps.config, candidate)),
-    instrumentCheck('check_07_tone', () => check7Tone(deps.config, candidate)),
     instrumentCheck('check_08_safety_crisis', () =>
       check8SafetyCrisis(deps.config, input.userMessage, candidate),
     ),
-    instrumentCheck('check_12_tangible_action', () => checkTangibleAction(deps.config, candidate)),
-    instrumentCheck('check_15_useful_to_society_anchor', () =>
-      checkUsefulToSocietyAnchor(deps.config, candidate),
-    ),
-    // Batch P Piece 3 — LLM-judged practice grounding (parallel batch).
-    instrumentCheck('check_17_practice_grounding', () =>
-      check17PracticeGrounding(
-        deps.config,
-        input.userMessage,
-        candidate,
-        input.predictedPracticeTag,
-      ),
-    ),
+    // Voice-shaping graders below disabled 2026-05-13 (see header note).
+    // To re-enable: uncomment + restore imports from './checks-llm.js'.
+    // instrumentCheck('check_04_asset_based', () => check4AssetBased(deps.config, candidate)),
+    // instrumentCheck('check_07_tone', () => check7Tone(deps.config, candidate)),
+    // instrumentCheck('check_12_tangible_action', () => checkTangibleAction(deps.config, candidate)),
+    // instrumentCheck('check_15_useful_to_society_anchor', () =>
+    //   checkUsefulToSocietyAnchor(deps.config, candidate),
+    // ),
+    // instrumentCheck('check_17_practice_grounding', () =>
+    //   check17PracticeGrounding(
+    //     deps.config,
+    //     input.userMessage,
+    //     candidate,
+    //     input.predictedPracticeTag,
+    //   ),
+    // ),
   ]);
 
   let passCount = 0;

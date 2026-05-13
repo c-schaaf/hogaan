@@ -3,7 +3,6 @@ import { type ExperienceBand, type GoalOption, type LastCompletedStep } from './
 import {
   CONSENT_DECLINED_MESSAGE,
   CONSENT_PROMPT,
-  EXPERIENCE_PROMPT,
   EXPERIENCE_RETRY_PROMPT,
   FIRST_COACHING_PROMPT,
   formatPracticeAcknowledgment,
