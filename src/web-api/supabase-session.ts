@@ -120,8 +120,6 @@ export async function readSupabaseSession(
       profileFlags: fullName !== '' ? { fullName } : {},
     });
   } catch (err) {
-    // Race / unique-violation: another concurrent request may have inserted.
-    // Re-read and return.
     const errMsg = err instanceof Error ? err.message : String(err);
     req.log.error(
       { error: errMsg, supabaseUserId, email },
@@ -131,6 +129,8 @@ export async function readSupabaseSession(
       source: 'PhaseBbis.SupabaseSession',
       extra: { error: errMsg },
     });
+
+    // Case A: race with another concurrent JIT insert on the same supabaseUserId.
     const refetched = await opts.db
       .select({ id: users.id, email: users.email })
       .from(users)
@@ -139,6 +139,41 @@ export async function readSupabaseSession(
     if (refetched[0] !== undefined) {
       return { userId: refetched[0].id, email: refetched[0].email ?? email, supabaseUserId };
     }
+
+    // Case B: orphan row owns the email. Happens when an auth identity is
+    // deleted and recreated for the same email — the public.users row from
+    // the prior identity still holds the email but points at a stale
+    // supabase_user_id. Re-link it. Authority for the email comes from
+    // Supabase having just confirmed the user owns it.
+    if (email !== '' && errMsg.includes('users_email_unique')) {
+      const byEmail = await opts.db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.email, email))
+        .limit(1);
+      if (byEmail[0] !== undefined) {
+        const relinkId = byEmail[0].id;
+        try {
+          await opts.db.update(users).set({ supabaseUserId }).where(eq(users.id, relinkId));
+          req.log.warn(
+            { supabaseUserId, email, relinkId },
+            'supabase-session: relinked existing public.users row to new supabase identity',
+          );
+          return { userId: relinkId, email, supabaseUserId };
+        } catch (relinkErr) {
+          req.log.error(
+            {
+              error: relinkErr instanceof Error ? relinkErr.message : String(relinkErr),
+              supabaseUserId,
+              email,
+              relinkId,
+            },
+            'supabase-session: relink update failed',
+          );
+        }
+      }
+    }
+
     req.log.error(
       { supabaseUserId },
       'supabase-session: refetch after insert-fail found nothing — returning null',
