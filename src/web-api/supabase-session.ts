@@ -54,15 +54,35 @@ export async function readSupabaseSession(
   opts: ReadSessionOpts,
 ): Promise<WebSession | null> {
   const auth = req.headers.authorization;
+  const hasAuthHeader = typeof auth === 'string' && auth.length > 0;
   const token =
     typeof auth === 'string' && auth.toLowerCase().startsWith('bearer ')
       ? auth.slice(7).trim()
       : '';
-  if (token === '') return null;
+  if (token === '') {
+    req.log.warn(
+      { hasAuthHeader, authHeaderPreview: hasAuthHeader ? auth.slice(0, 16) + '…' : null },
+      'supabase-session: no bearer token on request',
+    );
+    return null;
+  }
 
   const supabase = getSupabase(opts.config);
   const { data, error } = await supabase.auth.getUser(token);
-  if (error !== null || data.user === null) return null;
+  if (error !== null || data.user === null) {
+    req.log.warn(
+      {
+        supabaseUrl: opts.config.supabaseUrl,
+        errorName: error?.name ?? null,
+        errorMessage: error?.message ?? null,
+        errorStatus: (error as { status?: number } | null)?.status ?? null,
+        tokenPreview: token.slice(0, 12) + '…',
+        tokenLen: token.length,
+      },
+      'supabase-session: getUser rejected token',
+    );
+    return null;
+  }
 
   const supabaseUserId = data.user.id;
   const email = (data.user.email ?? '').toLowerCase();
@@ -102,9 +122,14 @@ export async function readSupabaseSession(
   } catch (err) {
     // Race / unique-violation: another concurrent request may have inserted.
     // Re-read and return.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    req.log.error(
+      { error: errMsg, supabaseUserId, email },
+      'supabase-session: JIT insert into public.users failed',
+    );
     reportP2('supabase-session: insert race', {
       source: 'PhaseBbis.SupabaseSession',
-      extra: { error: err instanceof Error ? err.message : String(err) },
+      extra: { error: errMsg },
     });
     const refetched = await opts.db
       .select({ id: users.id, email: users.email })
@@ -114,6 +139,10 @@ export async function readSupabaseSession(
     if (refetched[0] !== undefined) {
       return { userId: refetched[0].id, email: refetched[0].email ?? email, supabaseUserId };
     }
+    req.log.error(
+      { supabaseUserId },
+      'supabase-session: refetch after insert-fail found nothing — returning null',
+    );
     return null;
   }
   return { userId, email, supabaseUserId };
