@@ -38,6 +38,8 @@ type Phase =
   | 'sessions'
   | 'profile';
 
+const AUTHED_PHASES = new Set<Phase>(['home', 'chat', 'sessions', 'profile']);
+
 export function Shell() {
   const [phase, setPhase] = useState<Phase>('boot');
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -46,6 +48,10 @@ export function Shell() {
   const [chatSeed, setChatSeed] = useState<string | null>(null);
   const initialUrl = useRef(new URL(window.location.href));
   const [linkError, setLinkError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (AUTHED_PHASES.has(phase)) sessionStorage.setItem('shell-phase', phase);
+  }, [phase]);
 
   const routeAuthed = useCallback(async () => {
     try {
@@ -60,7 +66,10 @@ export function Shell() {
         setPhase('reset');
         return;
       }
-      const next = p.onboarded ? 'home' : 'onboarding';
+      const stored = sessionStorage.getItem('shell-phase') as Phase | null;
+      const next: Phase = p.onboarded
+        ? (stored !== null && AUTHED_PHASES.has(stored) ? stored : 'home')
+        : 'onboarding';
       console.log('[shell] routing to', next);
       setPhase(next);
     } catch (err) {

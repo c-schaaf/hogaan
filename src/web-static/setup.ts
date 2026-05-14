@@ -31,7 +31,7 @@ export async function wireWebStatic(
     root,
     prefix: '/',
     wildcard: false, // exact-file match only - the notFound handler does SPA fallback
-    decorateReply: false,
+    decorateReply: true,
   });
 
   app.setNotFoundHandler((req, reply) => {
