@@ -1,0 +1,14 @@
+{
+  "recordedAt": "2026-05-10T20:31:29.139Z",
+  "testId": "phase-10/bpmn-coverage/process-2/e10-clarifying-question-deferred",
+  "controlId": "T2.Process2.E10_ClarifyingQuestionSent",
+  "tier": "T2",
+  "outcome": "deferred",
+  "description": "Process #2 Step 7 (clarification decision) is intentionally a no-op in v1 per src/coaching/orchestrator.ts (\"v1: skip — always advance\"). The end event is in the catalog but unreachable in current code. Reachability requires v2 wiring of the small-LLM ambiguity classifier (Phase 7 plan §7.7); deferred until Phase 7-revisit batch.",
+  "phase": "phase-10",
+  "details": {
+    "gating": "v2",
+    "codeReference": "src/coaching/orchestrator.ts Step 7 comment",
+    "masterPlan": "Phase 7.7 — clarification decision (small LLM ambiguity classifier)"
+  }
+}

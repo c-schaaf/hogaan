@@ -1,145 +1,274 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hogaan — Coaching session</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            hogaan: {
-              bg: '#FAF6F1', card: '#FFFFFF', sunken: '#F3EDE4',
-              text: '#0A1F4D', mute: '#6B6B7A', soft: '#9090A0',
-              accent: '#C49B4A', 'accent-light': '#E8D5A8', 'accent-tint': '#F5EAD0',
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hogaan — Coaching session</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              hogaan: {
+                bg: '#FAF6F1',
+                card: '#FFFFFF',
+                sunken: '#F3EDE4',
+                text: '#0A1F4D',
+                mute: '#6B6B7A',
+                soft: '#9090A0',
+                accent: '#C49B4A',
+                'accent-light': '#E8D5A8',
+                'accent-tint': '#F5EAD0',
+              },
+              hw: { navy: '#00004D', blue: '#0086FF' },
             },
-            hw: { navy: '#00004D', blue: '#0086FF' },
+            fontFamily: { display: ['Fraunces', 'serif'], body: ['Inter', 'sans-serif'] },
+            boxShadow: {
+              card: '0 2px 8px rgba(10, 31, 77, 0.06)',
+              'card-lg': '0 4px 16px rgba(10, 31, 77, 0.08)',
+            },
           },
-          fontFamily: { display: ['Fraunces', 'serif'], body: ['Inter', 'sans-serif'] },
-          boxShadow: { card: '0 2px 8px rgba(10, 31, 77, 0.06)', 'card-lg': '0 4px 16px rgba(10, 31, 77, 0.08)' },
         },
-      },
-    };
-  </script>
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    .font-display { font-family: 'Fraunces', serif; }
-  </style>
-</head>
-<body class="bg-hogaan-bg text-hogaan-text min-h-screen flex flex-col">
-
-  <!-- Header -->
-  <header class="bg-hogaan-card border-b border-hogaan-sunken sticky top-0 z-10">
-    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-      <a href="home.html" class="w-9 h-9 rounded-lg hover:bg-hogaan-sunken flex items-center justify-center transition" aria-label="Back">
-        <svg class="w-5 h-5 text-hogaan-text" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-      </a>
-      <div class="flex-1 text-center">
-        <p class="font-display font-medium text-hogaan-text">Coaching session</p>
-        <p class="text-xs text-hogaan-soft mt-0.5">Practices in focus: Integrity, Empathy, Peace</p>
-      </div>
-      <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-hogaan-sunken text-xs text-hogaan-mute">
-        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
-        <span>Private</span>
-      </div>
-    </div>
-  </header>
-
-  <!-- Chat scroll area -->
-  <main class="flex-1 overflow-y-auto">
-    <div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
-
-      <!-- Session start divider -->
-      <div class="flex items-center gap-3 my-2">
-        <div class="flex-1 h-px bg-hogaan-sunken"></div>
-        <span class="text-xs text-hogaan-soft">Today, 11:45 PM</span>
-        <div class="flex-1 h-px bg-hogaan-sunken"></div>
-      </div>
-
-      <!-- User message -->
-      <div class="flex justify-end">
-        <div class="bg-hogaan-text text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] text-[15px] leading-relaxed shadow-card">
-          My team isn't communicating and I think I'm part of the problem.
-        </div>
-      </div>
-
-      <!-- Bot response — Hamse arc: Insight + Action -->
-      <div class="flex gap-3">
-        <div class="w-9 h-9 rounded-full bg-hogaan-accent flex items-center justify-center text-white font-display font-semibold flex-shrink-0">H</div>
-        <div class="bg-hogaan-card rounded-2xl rounded-tl-md px-5 py-4 max-w-[85%] text-[15px] leading-relaxed text-hogaan-text shadow-card">
-          <p>Naming yourself as part of the problem is already half the work — most leaders never get there.</p>
-
-          <p class="mt-3">Here's what I'm sensing: when communication breaks down, it's rarely about the words. It's about the room. Your team isn't talking because somewhere in their experience of you, they've decided talking isn't safe — or isn't useful. The fix isn't a better meeting agenda. The fix is rebuilding the conditions under which honesty pays off.</p>
-
-          <p class="mt-3">This week, try one move: in your next one-on-one, ask each person, <em class="font-display">"What's something you've been holding back from telling me?"</em> Then listen without correcting or defending. Just take notes. If they say nothing, the silence is your answer — and that's data too.</p>
-
-          <p class="mt-3">What's the first name that comes to mind when you read that question?</p>
-        </div>
-      </div>
-
-      <!-- Quick reply chips -->
-      <div class="flex flex-wrap gap-2 pl-12">
-        <button class="px-3.5 py-2 rounded-full bg-hogaan-accent-tint text-hogaan-text text-sm font-medium hover:bg-hogaan-accent-light transition">
-          Marcus, my deputy
-        </button>
-        <button class="px-3.5 py-2 rounded-full bg-hogaan-accent-tint text-hogaan-text text-sm font-medium hover:bg-hogaan-accent-light transition">
-          The newer hire
-        </button>
-        <button class="px-3.5 py-2 rounded-full bg-hogaan-accent-tint text-hogaan-text text-sm font-medium hover:bg-hogaan-accent-light transition">
-          Let me think
-        </button>
-      </div>
-
-      <!-- User follow-up -->
-      <div class="flex justify-end pt-4">
-        <div class="bg-hogaan-text text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] text-[15px] leading-relaxed shadow-card">
-          Marcus. He used to push back on me and now he just agrees with everything. I think he's protecting himself.
-        </div>
-      </div>
-
-      <!-- Bot follow-up -->
-      <div class="flex gap-3">
-        <div class="w-9 h-9 rounded-full bg-hogaan-accent flex items-center justify-center text-white font-display font-semibold flex-shrink-0">H</div>
-        <div class="bg-hogaan-card rounded-2xl rounded-tl-md px-5 py-4 max-w-[85%] text-[15px] leading-relaxed text-hogaan-text shadow-card">
-          <p>That shift you're describing — from pushback to agreement — that's expensive for him. Disagreement was costing him something with you, so he stopped paying.</p>
-
-          <p class="mt-3">Here's the harder question: what did Marcus learn about the cost of disagreeing with you? Not what you intended — what he <em class="font-display">learned</em>. Those are usually different.</p>
-
-          <p class="mt-3">When you sit with him next, don't open with "I want your honest feedback." That language has been spent. Try this instead: <em class="font-display">"I think the last time you pushed back on me, I didn't handle it well. Walk me through what that felt like from your seat."</em> Specific incident, his perspective, you positioned as the one who got it wrong.</p>
-
-          <p class="mt-3">He won't believe you on the first try. The second time he tests you and you stay open — that's when the room changes.</p>
-        </div>
-      </div>
-
-    </div>
-  </main>
-
-  <!-- Input bar -->
-  <div class="bg-hogaan-card border-t border-hogaan-sunken">
-    <div class="max-w-2xl mx-auto px-4 py-3">
-      <div class="flex items-center gap-3">
-        <button class="w-10 h-10 rounded-full bg-hogaan-accent flex items-center justify-center flex-shrink-0 hover:bg-hogaan-accent/90 transition" aria-label="Voice input">
-          <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="3" width="6" height="13" rx="3"/>
-            <path d="M5 11a7 7 0 0014 0M12 18v4M8 22h8"/>
+      };
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      .font-display {
+        font-family: 'Fraunces', serif;
+      }
+    </style>
+  </head>
+  <body class="bg-hogaan-bg text-hogaan-text min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-hogaan-card border-b border-hogaan-sunken sticky top-0 z-10">
+      <div class="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+        <a
+          href="home.html"
+          class="w-9 h-9 rounded-lg hover:bg-hogaan-sunken flex items-center justify-center transition"
+          aria-label="Back"
+        >
+          <svg
+            class="w-5 h-5 text-hogaan-text"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M15 18l-6-6 6-6" />
           </svg>
-        </button>
-        <div class="flex-1 bg-hogaan-sunken rounded-full px-4 py-2.5 flex items-center gap-2">
-          <input type="text" placeholder="Type your message…"
-                 class="flex-1 bg-transparent text-hogaan-text placeholder:text-hogaan-soft focus:outline-none text-[15px]">
-          <button class="w-8 h-8 rounded-full bg-hogaan-text flex items-center justify-center hover:bg-hogaan-text/90 transition" aria-label="Send">
-            <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>
+        </a>
+        <div class="flex-1 text-center">
+          <p class="font-display font-medium text-hogaan-text">Coaching session</p>
+          <p class="text-xs text-hogaan-soft mt-0.5">
+            Practices in focus: Integrity, Empathy, Peace
+          </p>
+        </div>
+        <div
+          class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-hogaan-sunken text-xs text-hogaan-mute"
+        >
+          <svg
+            class="w-3.5 h-3.5"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <rect x="5" y="11" width="14" height="10" rx="2" />
+            <path d="M8 11V7a4 4 0 018 0v4" />
+          </svg>
+          <span>Private</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Chat scroll area -->
+    <main class="flex-1 overflow-y-auto">
+      <div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+        <!-- Session start divider -->
+        <div class="flex items-center gap-3 my-2">
+          <div class="flex-1 h-px bg-hogaan-sunken"></div>
+          <span class="text-xs text-hogaan-soft">Today, 11:45 PM</span>
+          <div class="flex-1 h-px bg-hogaan-sunken"></div>
+        </div>
+
+        <!-- User message -->
+        <div class="flex justify-end">
+          <div
+            class="bg-hogaan-text text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] text-[15px] leading-relaxed shadow-card"
+          >
+            My team isn't communicating and I think I'm part of the problem.
+          </div>
+        </div>
+
+        <!-- Bot response — Hamse arc: Insight + Action -->
+        <div class="flex gap-3">
+          <div
+            class="w-9 h-9 rounded-full bg-hogaan-accent flex items-center justify-center text-white font-display font-semibold flex-shrink-0"
+          >
+            H
+          </div>
+          <div
+            class="bg-hogaan-card rounded-2xl rounded-tl-md px-5 py-4 max-w-[85%] text-[15px] leading-relaxed text-hogaan-text shadow-card"
+          >
+            <p>
+              Naming yourself as part of the problem is already half the work — most leaders never
+              get there.
+            </p>
+
+            <p class="mt-3">
+              Here's what I'm sensing: when communication breaks down, it's rarely about the words.
+              It's about the room. Your team isn't talking because somewhere in their experience of
+              you, they've decided talking isn't safe — or isn't useful. The fix isn't a better
+              meeting agenda. The fix is rebuilding the conditions under which honesty pays off.
+            </p>
+
+            <p class="mt-3">
+              This week, try one move: in your next one-on-one, ask each person,
+              <em class="font-display"
+                >"What's something you've been holding back from telling me?"</em
+              >
+              Then listen without correcting or defending. Just take notes. If they say nothing, the
+              silence is your answer — and that's data too.
+            </p>
+
+            <p class="mt-3">
+              What's the first name that comes to mind when you read that question?
+            </p>
+          </div>
+        </div>
+
+        <!-- Quick reply chips -->
+        <div class="flex flex-wrap gap-2 pl-12">
+          <button
+            class="px-3.5 py-2 rounded-full bg-hogaan-accent-tint text-hogaan-text text-sm font-medium hover:bg-hogaan-accent-light transition"
+          >
+            Marcus, my deputy
+          </button>
+          <button
+            class="px-3.5 py-2 rounded-full bg-hogaan-accent-tint text-hogaan-text text-sm font-medium hover:bg-hogaan-accent-light transition"
+          >
+            The newer hire
+          </button>
+          <button
+            class="px-3.5 py-2 rounded-full bg-hogaan-accent-tint text-hogaan-text text-sm font-medium hover:bg-hogaan-accent-light transition"
+          >
+            Let me think
           </button>
         </div>
-      </div>
-      <p class="text-center text-xs text-hogaan-soft mt-2">Hogaan keeps your messages private. Practice picks: <span class="font-medium">Integrity · Empathy · Peace</span></p>
-    </div>
-  </div>
 
-</body>
+        <!-- User follow-up -->
+        <div class="flex justify-end pt-4">
+          <div
+            class="bg-hogaan-text text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] text-[15px] leading-relaxed shadow-card"
+          >
+            Marcus. He used to push back on me and now he just agrees with everything. I think he's
+            protecting himself.
+          </div>
+        </div>
+
+        <!-- Bot follow-up -->
+        <div class="flex gap-3">
+          <div
+            class="w-9 h-9 rounded-full bg-hogaan-accent flex items-center justify-center text-white font-display font-semibold flex-shrink-0"
+          >
+            H
+          </div>
+          <div
+            class="bg-hogaan-card rounded-2xl rounded-tl-md px-5 py-4 max-w-[85%] text-[15px] leading-relaxed text-hogaan-text shadow-card"
+          >
+            <p>
+              That shift you're describing — from pushback to agreement — that's expensive for him.
+              Disagreement was costing him something with you, so he stopped paying.
+            </p>
+
+            <p class="mt-3">
+              Here's the harder question: what did Marcus learn about the cost of disagreeing with
+              you? Not what you intended — what he <em class="font-display">learned</em>. Those are
+              usually different.
+            </p>
+
+            <p class="mt-3">
+              When you sit with him next, don't open with "I want your honest feedback." That
+              language has been spent. Try this instead:
+              <em class="font-display"
+                >"I think the last time you pushed back on me, I didn't handle it well. Walk me
+                through what that felt like from your seat."</em
+              >
+              Specific incident, his perspective, you positioned as the one who got it wrong.
+            </p>
+
+            <p class="mt-3">
+              He won't believe you on the first try. The second time he tests you and you stay open
+              — that's when the room changes.
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Input bar -->
+    <div class="bg-hogaan-card border-t border-hogaan-sunken">
+      <div class="max-w-2xl mx-auto px-4 py-3">
+        <div class="flex items-center gap-3">
+          <button
+            class="w-10 h-10 rounded-full bg-hogaan-accent flex items-center justify-center flex-shrink-0 hover:bg-hogaan-accent/90 transition"
+            aria-label="Voice input"
+          >
+            <svg
+              class="w-5 h-5 text-white"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="9" y="3" width="6" height="13" rx="3" />
+              <path d="M5 11a7 7 0 0014 0M12 18v4M8 22h8" />
+            </svg>
+          </button>
+          <div class="flex-1 bg-hogaan-sunken rounded-full px-4 py-2.5 flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Type your message…"
+              class="flex-1 bg-transparent text-hogaan-text placeholder:text-hogaan-soft focus:outline-none text-[15px]"
+            />
+            <button
+              class="w-8 h-8 rounded-full bg-hogaan-text flex items-center justify-center hover:bg-hogaan-text/90 transition"
+              aria-label="Send"
+            >
+              <svg
+                class="w-4 h-4 text-white"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <p class="text-center text-xs text-hogaan-soft mt-2">
+          Hogaan keeps your messages private. Practice picks:
+          <span class="font-medium">Integrity · Empathy · Peace</span>
+        </p>
+      </div>
+    </div>
+  </body>
 </html>

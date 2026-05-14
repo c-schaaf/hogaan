@@ -11,6 +11,7 @@ import { registerWebApiRoutes } from './routes.js';
  * Same gating as web-auth (DB + Redis + JWT + base URL) plus the rate-
  * limiter + trace emitter the coaching orchestrator needs.
  */
+// eslint-disable-next-line @typescript-eslint/require-await -- async signature kept symmetric with other setup helpers
 export async function wireWebApiRoutes(
   app: FastifyInstance,
   config: AppConfig,

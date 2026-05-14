@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T19:36:51.076Z",
+  "testId": "audit/R-04-cousin-step9-llm-failure-handled",
+  "controlId": "T3.Audit.R04Cousin_Step9LlmFailure",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "R-04 cousin: Step 9 catch must dispatch FALLBACK_DEGRADED via sendBody before finalize. Pre-fix the orchestrator returned an empty body and the user received nothing.",
+  "phase": "phase-12"
+}

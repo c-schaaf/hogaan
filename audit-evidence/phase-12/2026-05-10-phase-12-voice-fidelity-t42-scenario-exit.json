@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T20:31:38.994Z",
+  "testId": "phase-12/voice-fidelity/T42-scenario-exit",
+  "controlId": "T5.VoiceFidelity.T42_ScenarioExit",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Phase 12 R19 — \"exit\" abandons active scenario cleanly; user returned to coaching mode.",
+  "phase": "phase-12"
+}

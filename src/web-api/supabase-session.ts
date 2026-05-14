@@ -84,7 +84,7 @@ export async function readSupabaseSession(
     typeof meta['full_name'] === 'string'
       ? meta['full_name']
       : typeof meta['name'] === 'string'
-        ? (meta['name'] as string)
+        ? meta['name']
         : '';
 
   const userId = randomUUID();

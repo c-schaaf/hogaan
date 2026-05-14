@@ -135,9 +135,7 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
   }, []);
 
   const togglePracticeDraft = (p: string) => {
-    setDraftPractices((prev) =>
-      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
-    );
+    setDraftPractices((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
   };
 
   const savePractices = async () => {
@@ -202,7 +200,10 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
                           onChange={(e) => setDraftName(e.target.value)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') void saveName();
-                            if (e.key === 'Escape') { setDraftName(fullName); setEditingName(false); }
+                            if (e.key === 'Escape') {
+                              setDraftName(fullName);
+                              setEditingName(false);
+                            }
                           }}
                         />
                         <button
@@ -217,7 +218,10 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
                           type="button"
                           className="pr-card-action"
                           style={{ background: 'transparent', color: 'var(--ink-2)' }}
-                          onClick={() => { setDraftName(fullName); setEditingName(false); }}
+                          onClick={() => {
+                            setDraftName(fullName);
+                            setEditingName(false);
+                          }}
                         >
                           Cancel
                         </button>
@@ -230,7 +234,10 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
                       action={
                         <InlineButton
                           icon={<PrIconEdit />}
-                          onClick={() => { setDraftName(fullName); setEditingName(true); }}
+                          onClick={() => {
+                            setDraftName(fullName);
+                            setEditingName(true);
+                          }}
                         >
                           Edit
                         </InlineButton>
@@ -325,9 +332,9 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
               <div className="pr-col pr-col--side">
                 <ProfileCard title="About Hogaan">
                   <p className="pr-about-body">
-                    Leadership coaching grounded in the 12 Practices of Transformational
-                    Leadership — built to meet you in the moments that matter, not the ones
-                    you've already figured out.
+                    Leadership coaching grounded in the 12 Practices of Transformational Leadership
+                    — built to meet you in the moments that matter, not the ones you've already
+                    figured out.
                   </p>
                   <div className="pr-about-stat">
                     <div className="pr-about-stat-num">{livePractices.length}</div>

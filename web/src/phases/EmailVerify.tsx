@@ -55,8 +55,9 @@ export function EmailVerify({ email, mode = 'signup', onContinue, goSignup }: Pr
           </>
         ) : (
           <>
-            We sent a confirmation link to <strong className="auth-strong">{email || 'your email'}</strong>.
-            Click it to verify your account and start onboarding.
+            We sent a confirmation link to{' '}
+            <strong className="auth-strong">{email || 'your email'}</strong>. Click it to verify
+            your account and start onboarding.
           </>
         )}
       </p>
@@ -67,7 +68,12 @@ export function EmailVerify({ email, mode = 'signup', onContinue, goSignup }: Pr
         </button>
         <div className="auth-help-row">
           <span>Link expires in 60 minutes. Don't see it? Check spam, or </span>
-          <button type="button" className="auth-link" onClick={() => void onResend()} disabled={counter > 0}>
+          <button
+            type="button"
+            className="auth-link"
+            onClick={() => void onResend()}
+            disabled={counter > 0}
+          >
             {counter > 0 ? `resend (${counter}s)` : 'resend'}
           </button>
           <span>.</span>

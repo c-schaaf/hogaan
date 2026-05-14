@@ -1,0 +1,18 @@
+{
+  "recordedAt": "2026-05-10T20:31:35.924Z",
+  "testId": "phase-10/bpmn-coverage/process-10/E8_ShipDegradedCandidate",
+  "controlId": "T2.Process10.E8_ShipDegradedCandidate",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #10 E8_ShipDegradedCandidate is referenced in 2 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "QualityCheck",
+    "endEvent": "E8_ShipDegradedCandidate",
+    "coveringFiles": [
+      "tests\\quality-check\\corrective.test.ts",
+      "tests\\quality-check\\end-events.test.ts"
+    ],
+    "hits": 2
+  }
+}

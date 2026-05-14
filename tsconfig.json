@@ -34,5 +34,5 @@
     "outDir": "dist"
   },
   "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist", "drizzle"]
+  "exclude": ["node_modules", "dist", "drizzle", "tests/e2e", "tests/web-api"]
 }

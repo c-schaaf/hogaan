@@ -1,0 +1,13 @@
+{
+  "recordedAt": "2026-05-10T20:31:41.832Z",
+  "testId": "phase-11/dead-letter/SMtest-r12-typeerror",
+  "controlId": "T2.DeadLetter.QueuedForReview",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Failed inbound payload landed in dead-letter queue for ops triage.",
+  "phase": "phase-10",
+  "details": {
+    "inboundMessageSid": "SMtest-r12-typeerror",
+    "errorName": "TypeError"
+  }
+}

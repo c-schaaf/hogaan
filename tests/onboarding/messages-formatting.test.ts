@@ -68,4 +68,3 @@ describe('Phase 12 R16 — CONSENT_PROMPT specifically', () => {
     expect(t).toMatch(/stop|opt.out/);
   });
 });
-

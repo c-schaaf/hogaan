@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T20:31:16.281Z",
+  "testId": "phase-12/voice-fidelity/T7-cost-cutting-assets",
+  "controlId": "T5.VoiceFidelity.T7_CostCutting",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Asset-based reframe target — \"morale is low\" + \"what we don't have\" / \"scarcity\" → assets practice. Approved keywords: \"what we don't have\", \"morale is low\", \"scarcity\". Level=organization driven by existing \"the org\" keyword in spec sentence.",
+  "phase": "phase-12"
+}

@@ -2,14 +2,18 @@ import { expect, test } from '@playwright/test';
 
 test.describe('Signup page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/auth/v1/**', (route) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ access_token: null, user: null }),
-    }));
+    await page.route('**/auth/v1/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ access_token: null, user: null }),
+      }),
+    );
     await page.goto('/');
     // Navigate to signup
-    await page.waitForSelector('input[name="email"], button:has-text("Create an account")', { timeout: 8000 });
+    await page.waitForSelector('input[name="email"], button:has-text("Create an account")', {
+      timeout: 8000,
+    });
     const createBtn = page.locator('button', { hasText: 'Create an account' });
     if (await createBtn.isVisible()) {
       await createBtn.click();

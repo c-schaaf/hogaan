@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T19:36:33.632Z",
+  "testId": "phase-12/voice-fidelity/T4-lost-face",
+  "controlId": "T5.VoiceFidelity.T4_LostFace",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Past-tense \"lost face\" → dignity practice. Approved keywords: \"lost face\", \"losing face\". Level axis not asserted: §3 keyword approval covers practice only; the spec sentence has no team-level keyword, so level falls back to self.",
+  "phase": "phase-12"
+}

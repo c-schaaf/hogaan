@@ -45,6 +45,20 @@ const URL_PATH_TO_PHASE: Partial<Record<string, Phase>> = {
   '/profile': 'profile',
 };
 
+// Phases that own their own URL path. Home/chat live at '/'.
+const PHASE_TO_URL_PATH: Partial<Record<Phase, string>> = {
+  sessions: '/sessions',
+  profile: '/profile',
+  home: '/',
+  chat: '/',
+};
+
+function readPhaseFromUrl(): Phase | null {
+  const path = window.location.pathname;
+  const mapped = URL_PATH_TO_PHASE[path];
+  return mapped ?? null;
+}
+
 export function Shell() {
   const [phase, setPhase] = useState<Phase>('boot');
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -56,17 +70,27 @@ export function Shell() {
   const [linkError, setLinkError] = useState<string | null>(null);
   const lastAuthedTokenRef = useRef<string | null>(null);
   const phaseRef = useRef<Phase>('boot');
-  const urlPhaseRef = useRef<Phase | null>(
-    (URL_PATH_TO_PHASE[new URL(window.location.href).pathname] as Phase) ?? null,
-  );
+  const routeAuthedInFlight = useRef(false);
   const [chatOrigin, setChatOrigin] = useState<Phase>('home');
 
   useEffect(() => {
     phaseRef.current = phase;
-    if (AUTHED_PHASES.has(phase)) sessionStorage.setItem('shell-phase', phase);
+    if (AUTHED_PHASES.has(phase)) {
+      sessionStorage.setItem('shell-phase', phase);
+      const desiredPath = PHASE_TO_URL_PATH[phase];
+      if (desiredPath !== undefined && window.location.pathname !== desiredPath) {
+        window.history.replaceState(
+          {},
+          '',
+          desiredPath + window.location.search + window.location.hash,
+        );
+      }
+    }
   }, [phase]);
 
   const routeAuthed = useCallback(async () => {
+    if (routeAuthedInFlight.current) return;
+    routeAuthedInFlight.current = true;
     try {
       console.log('[shell] routeAuthed: fetching /api/profile');
       const p = await api.profile.get();
@@ -79,15 +103,22 @@ export function Shell() {
         setPhase('reset');
         return;
       }
+      // URL is authoritative — read fresh on every routeAuthed call so a refresh
+      // on /sessions or /profile lands the user back where they were. Fall back
+      // to sessionStorage only when the URL is something we don't recognise.
+      const urlPhase = readPhaseFromUrl();
       const stored = sessionStorage.getItem('shell-phase') as Phase | null;
-      let next: Phase = p.onboarded
-        ? (stored !== null && AUTHED_PHASES.has(stored) ? stored : 'home')
-        : 'onboarding';
-      if (p.onboarded && urlPhaseRef.current !== null) {
-        next = urlPhaseRef.current;
-        urlPhaseRef.current = null; // consume — only used on first boot
+      let next: Phase;
+      if (!p.onboarded) {
+        next = 'onboarding';
+      } else if (urlPhase !== null && AUTHED_PHASES.has(urlPhase)) {
+        next = urlPhase;
+      } else if (stored !== null && AUTHED_PHASES.has(stored)) {
+        next = stored;
+      } else {
+        next = 'home';
       }
-      console.log('[shell] routing to', next);
+      console.log('[shell] routing to', next, '(urlPhase:', urlPhase, 'stored:', stored, ')');
       setPhase(next);
     } catch (err) {
       console.error('[shell] profile fetch failed', err);
@@ -99,6 +130,8 @@ export function Shell() {
       // Treat network/5xx as unauthed - user can retry.
       setMe(null);
       setPhase('signup');
+    } finally {
+      routeAuthedInFlight.current = false;
     }
   }, []);
 
@@ -167,6 +200,18 @@ export function Shell() {
     });
     return () => sub.subscription.unsubscribe();
   }, [routeAuthed]);
+
+  // Browser back/forward: keep phase in sync with the URL the user navigated to.
+  useEffect(() => {
+    const onPopState = () => {
+      const fromUrl = readPhaseFromUrl();
+      if (fromUrl !== null && AUTHED_PHASES.has(fromUrl) && AUTHED_PHASES.has(phaseRef.current)) {
+        setPhase(fromUrl);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   const onNav = (tab: Tab) => setPhase(tab);
 
@@ -253,9 +298,7 @@ export function Shell() {
       body = <Forgot prefill={pendingEmail ?? undefined} goLogin={() => setPhase('login')} />;
       break;
     case 'reset':
-      body = (
-        <Reset onSuccess={() => void routeAuthed()} goForgot={() => setPhase('forgot')} />
-      );
+      body = <Reset onSuccess={() => void routeAuthed()} goForgot={() => setPhase('forgot')} />;
       break;
     case 'onboarding':
       body = (
@@ -284,7 +327,12 @@ export function Shell() {
       body = (
         <Sessions
           onBack={() => setPhase('home')}
-          onOpen={(id) => { setOpenSessionId(id); setChatSeed(null); setChatOrigin('sessions'); setPhase('chat'); }}
+          onOpen={(id) => {
+            setOpenSessionId(id);
+            setChatSeed(null);
+            setChatOrigin('sessions');
+            setPhase('chat');
+          }}
           onNav={onNav}
         />
       );
@@ -309,7 +357,10 @@ export function Shell() {
           }
           seed={chatSeed}
           openSessionId={openSessionId}
-          onBack={() => { setOpenSessionId(null); setPhase(chatOrigin); }}
+          onBack={() => {
+            setOpenSessionId(null);
+            setPhase(chatOrigin);
+          }}
         />
       );
       break;

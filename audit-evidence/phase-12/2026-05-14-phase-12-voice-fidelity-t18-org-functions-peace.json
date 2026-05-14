@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T19:36:33.688Z",
+  "testId": "phase-12/voice-fidelity/T18-org-functions-peace",
+  "controlId": "T5.VoiceFidelity.T18_OrgFunctions",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Inter-functional org friction → peace practice + organization level. Approved practice keywords: \"hate each other\", \"don't get along\", \"always fighting\". Approved level keywords: \"engineering and product\", \"product and engineering\", \"and sales\", \"and marketing\", \"cross-functional\".",
+  "phase": "phase-12"
+}

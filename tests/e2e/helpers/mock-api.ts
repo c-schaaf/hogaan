@@ -26,9 +26,7 @@ export async function mockTurnStream(page: Page, textChunks: string[], sessionId
       { type: 'end', turnId: 't-test-1', sessionId, latencyMs: 50 },
     ];
 
-    const body = events
-      .map((ev) => `event: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`)
-      .join('');
+    const body = events.map((ev) => `event: ${ev.type}\ndata: ${JSON.stringify(ev)}\n\n`).join('');
 
     return route.fulfill({
       status: 200,

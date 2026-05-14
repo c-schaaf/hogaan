@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T19:36:33.684Z",
+  "testId": "phase-12/voice-fidelity/T27-formatting-headers",
+  "controlId": "T5.VoiceFidelity.T27_FormattingHeaders",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Voice Rule 11 — WhatsApp-native formatting. Markdown headers (## ...) flagged as soft_fail; QC retry loop fixes.",
+  "phase": "phase-12"
+}

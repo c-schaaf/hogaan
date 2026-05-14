@@ -219,7 +219,11 @@ export function Onboarding({ initialName, onComplete }: Props) {
         );
       case 'practices':
         return (
-          <Screen5Practices values={answers.practices} onToggle={togglePractice} onContinue={goNext} />
+          <Screen5Practices
+            values={answers.practices}
+            onToggle={togglePractice}
+            onContinue={goNext}
+          />
         );
       case 'consent':
         return (

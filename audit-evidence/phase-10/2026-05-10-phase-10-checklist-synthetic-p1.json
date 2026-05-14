@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T20:31:33.988Z",
+  "testId": "phase-10/checklist/synthetic-p1",
+  "controlId": "T1.AccessControl.P1Alerting",
+  "tier": "T1",
+  "outcome": "pass",
+  "description": "Synthetic P1 incident fires through reportP1 without throwing. Routes to Sentry + Axiom.",
+  "phase": "phase-10"
+}

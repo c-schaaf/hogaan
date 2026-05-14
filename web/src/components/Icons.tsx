@@ -277,7 +277,13 @@ export function HomeIconSpark() {
   );
 }
 
-export function NavIcon({ name, active }: { name: 'home' | 'sessions' | 'profile'; active: boolean }) {
+export function NavIcon({
+  name,
+  active,
+}: {
+  name: 'home' | 'sessions' | 'profile';
+  active: boolean;
+}) {
   switch (name) {
     case 'home':
       return (

@@ -29,6 +29,10 @@ export const supabase = createClient(url, anonKey, {
 if (typeof window !== 'undefined') {
   supabase.auth.onAuthStateChange((event, session) => {
     // eslint-disable-next-line no-console
-    console.log('[supabase-auth]', event, session ? `${session.user.email} (${session.user.id})` : null);
+    console.log(
+      '[supabase-auth]',
+      event,
+      session ? `${session.user.email} (${session.user.id})` : null,
+    );
   });
 }

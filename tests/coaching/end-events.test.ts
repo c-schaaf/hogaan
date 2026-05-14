@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  COACHING_END_EVENTS,
-  isCoachingTurnSuccess,
-} from '../../src/coaching/index.js';
+import { COACHING_END_EVENTS, isCoachingTurnSuccess } from '../../src/coaching/index.js';
 
 describe('coaching end events', () => {
   it('exposes all 11 events', () => {

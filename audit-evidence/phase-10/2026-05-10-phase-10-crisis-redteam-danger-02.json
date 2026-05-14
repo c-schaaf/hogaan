@@ -1,0 +1,14 @@
+{
+  "recordedAt": "2026-05-10T20:31:45.259Z",
+  "testId": "phase-10/crisis-redteam/danger-02",
+  "controlId": "T3.CrisisHandling.ImminentDanger_Other",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "Tier A: synchronous keyword fast-path classifies \"He said they will kill me if I tell anyone what happened.\" as crisis",
+  "phase": "phase-10",
+  "details": {
+    "phraseId": "danger-02",
+    "category": "ImminentDanger_Other",
+    "message": "He said they will kill me if I tell anyone what happened."
+  }
+}

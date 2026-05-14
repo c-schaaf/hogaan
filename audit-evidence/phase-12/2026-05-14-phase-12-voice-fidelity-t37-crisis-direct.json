@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T14:00:47.994Z",
+  "testId": "phase-12/voice-fidelity/T37-crisis-direct",
+  "controlId": "T5.VoiceFidelity.T37_CrisisDirect",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Direct first-person suicide statement triggers synchronous fast-path crisis routing — Process #2 Step 1, Process #10 Check 6.",
+  "phase": "phase-12"
+}

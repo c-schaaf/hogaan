@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T19:36:33.750Z",
+  "testId": "phase-12/voice-fidelity/T29-shortcircuit-bands",
+  "controlId": "T5.VoiceFidelity.T29_ShortCircuitBands",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Short-circuit intent bands match plan §2 spec (Greeting 10–80, Affirmation 5–50, MetaQuestion 30–100).",
+  "phase": "phase-12"
+}

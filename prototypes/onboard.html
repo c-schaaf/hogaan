@@ -1,203 +1,347 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hogaan — Get set up</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            hogaan: {
-              bg: '#FAF6F1', card: '#FFFFFF', sunken: '#F3EDE4',
-              text: '#0A1F4D', mute: '#6B6B7A', soft: '#9090A0',
-              accent: '#C49B4A', 'accent-light': '#E8D5A8', 'accent-tint': '#F5EAD0',
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hogaan — Get set up</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              hogaan: {
+                bg: '#FAF6F1',
+                card: '#FFFFFF',
+                sunken: '#F3EDE4',
+                text: '#0A1F4D',
+                mute: '#6B6B7A',
+                soft: '#9090A0',
+                accent: '#C49B4A',
+                'accent-light': '#E8D5A8',
+                'accent-tint': '#F5EAD0',
+              },
+              hw: { navy: '#00004D', blue: '#0086FF' },
             },
-            hw: { navy: '#00004D', blue: '#0086FF' },
+            fontFamily: { display: ['Fraunces', 'serif'], body: ['Inter', 'sans-serif'] },
+            boxShadow: {
+              card: '0 2px 8px rgba(10, 31, 77, 0.06)',
+              'card-lg': '0 4px 16px rgba(10, 31, 77, 0.08)',
+            },
           },
-          fontFamily: { display: ['Fraunces', 'serif'], body: ['Inter', 'sans-serif'] },
-          boxShadow: { card: '0 2px 8px rgba(10, 31, 77, 0.06)', 'card-lg': '0 4px 16px rgba(10, 31, 77, 0.08)' },
         },
-      },
-    };
-  </script>
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    .font-display { font-family: 'Fraunces', serif; }
-    .wordmark-underline { position: relative; display: inline-block; }
-    .wordmark-underline::after {
-      content: ''; position: absolute; bottom: -4px; left: 12%; right: 12%; height: 2px;
-      background: #C49B4A; border-radius: 2px;
-    }
-    .practice-chip { transition: all 0.15s ease; }
-    .practice-chip:hover { transform: translateY(-1px); }
-    .practice-chip.selected {
-      background: #0A1F4D;
-      color: white;
-      border-color: #0A1F4D;
-    }
-    .practice-chip.selected .gloss { color: rgba(255,255,255,0.7); }
-  </style>
-</head>
-<body class="bg-hogaan-bg text-hogaan-text min-h-screen">
+      };
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      .font-display {
+        font-family: 'Fraunces', serif;
+      }
+      .wordmark-underline {
+        position: relative;
+        display: inline-block;
+      }
+      .wordmark-underline::after {
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 12%;
+        right: 12%;
+        height: 2px;
+        background: #c49b4a;
+        border-radius: 2px;
+      }
+      .practice-chip {
+        transition: all 0.15s ease;
+      }
+      .practice-chip:hover {
+        transform: translateY(-1px);
+      }
+      .practice-chip.selected {
+        background: #0a1f4d;
+        color: white;
+        border-color: #0a1f4d;
+      }
+      .practice-chip.selected .gloss {
+        color: rgba(255, 255, 255, 0.7);
+      }
+    </style>
+  </head>
+  <body class="bg-hogaan-bg text-hogaan-text min-h-screen">
+    <!-- Top -->
+    <header class="max-w-3xl mx-auto px-6 py-6">
+      <span class="font-display text-2xl font-semibold tracking-tight wordmark-underline"
+        >Hogaan</span
+      >
+    </header>
 
-  <!-- Top -->
-  <header class="max-w-3xl mx-auto px-6 py-6">
-    <span class="font-display text-2xl font-semibold tracking-tight wordmark-underline">Hogaan</span>
-  </header>
+    <main class="max-w-3xl mx-auto px-6 pb-20">
+      <!-- Welcome section -->
+      <section class="mb-10">
+        <p class="text-hogaan-accent text-sm font-medium uppercase tracking-wider mb-3">
+          Welcome, Khadija
+        </p>
+        <h1
+          class="font-display text-4xl md:text-5xl font-medium leading-tight mb-5 text-hogaan-text"
+        >
+          Three quick things, then we begin.
+        </h1>
+        <p class="text-hogaan-mute text-lg leading-relaxed">
+          I'm Hogaan — a coaching presence anchored in Hamse Warfa's 12 Practices of
+          Transformational Leadership. Here's what you should know before we start.
+        </p>
+      </section>
 
-  <main class="max-w-3xl mx-auto px-6 pb-20">
-
-    <!-- Welcome section -->
-    <section class="mb-10">
-      <p class="text-hogaan-accent text-sm font-medium uppercase tracking-wider mb-3">Welcome, Khadija</p>
-      <h1 class="font-display text-4xl md:text-5xl font-medium leading-tight mb-5 text-hogaan-text">
-        Three quick things, then we begin.
-      </h1>
-      <p class="text-hogaan-mute text-lg leading-relaxed">
-        I'm Hogaan — a coaching presence anchored in Hamse Warfa's 12 Practices of Transformational Leadership. Here's what you should know before we start.
-      </p>
-    </section>
-
-    <!-- Disclosures card -->
-    <section class="bg-hogaan-card rounded-2xl shadow-card p-7 mb-10 space-y-5">
-      <div class="flex gap-4">
-        <div class="w-9 h-9 rounded-lg bg-hogaan-accent-tint flex items-center justify-center flex-shrink-0">
-          <svg class="w-5 h-5 text-hogaan-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-        </div>
-        <div>
-          <p class="font-medium mb-1">I'm an AI built in Hamse's voice.</p>
-          <p class="text-hogaan-mute text-sm leading-relaxed">Not a therapist, doctor, or lawyer. For mental health crises, I'll point you to specific resources rather than try to handle it myself.</p>
-        </div>
-      </div>
-
-      <div class="flex gap-4">
-        <div class="w-9 h-9 rounded-lg bg-hogaan-accent-tint flex items-center justify-center flex-shrink-0">
-          <svg class="w-5 h-5 text-hogaan-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
-        </div>
-        <div>
-          <p class="font-medium mb-1">Your conversations stay between us.</p>
-          <p class="text-hogaan-mute text-sm leading-relaxed">Sponsors see <span class="font-medium text-hogaan-text">aggregate</span> engagement only — never your individual messages.</p>
-        </div>
-      </div>
-
-      <div class="flex gap-4">
-        <div class="w-9 h-9 rounded-lg bg-hogaan-accent-tint flex items-center justify-center flex-shrink-0">
-          <svg class="w-5 h-5 text-hogaan-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
-        </div>
-        <div>
-          <p class="font-medium mb-1">You can leave anytime.</p>
-          <p class="text-hogaan-mute text-sm leading-relaxed">Type <span class="font-medium text-hogaan-text">STOP</span> at any point and I'll stop messaging you — completely.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- Practice picker -->
-    <section>
-      <h2 class="font-display text-3xl font-medium mb-3 text-hogaan-text">Pick the practices you're working on.</h2>
-      <p class="text-hogaan-mute mb-8 leading-relaxed">
-        Two or three is the sweet spot. You can change them anytime.
-      </p>
-
-      <div class="space-y-7">
-
-        <!-- Self level -->
-        <div>
-          <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">Self</p>
-          <div class="grid sm:grid-cols-3 gap-3">
-            <button class="practice-chip selected text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Integrity</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Showing up consistently with what you believe</p>
-            </button>
-            <button class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Purpose</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">The work you'd still do if no one was watching</p>
-            </button>
-            <button class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Accountability</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Owning the call you made, the team you shaped</p>
-            </button>
+      <!-- Disclosures card -->
+      <section class="bg-hogaan-card rounded-2xl shadow-card p-7 mb-10 space-y-5">
+        <div class="flex gap-4">
+          <div
+            class="w-9 h-9 rounded-lg bg-hogaan-accent-tint flex items-center justify-center flex-shrink-0"
+          >
+            <svg
+              class="w-5 h-5 text-hogaan-accent"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 8v4M12 16h.01" />
+            </svg>
+          </div>
+          <div>
+            <p class="font-medium mb-1">I'm an AI built in Hamse's voice.</p>
+            <p class="text-hogaan-mute text-sm leading-relaxed">
+              Not a therapist, doctor, or lawyer. For mental health crises, I'll point you to
+              specific resources rather than try to handle it myself.
+            </p>
           </div>
         </div>
 
-        <!-- Team level -->
-        <div>
-          <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">Team</p>
-          <div class="grid sm:grid-cols-3 gap-3">
-            <button class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Dignity</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Preserving standing while telling the hard truth</p>
-            </button>
-            <button class="practice-chip selected text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Empathy</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Understanding interior states, not just behavior</p>
-            </button>
-            <button class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Inclusion</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Making space for voices that don't volunteer</p>
-            </button>
+        <div class="flex gap-4">
+          <div
+            class="w-9 h-9 rounded-lg bg-hogaan-accent-tint flex items-center justify-center flex-shrink-0"
+          >
+            <svg
+              class="w-5 h-5 text-hogaan-accent"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0110 0v4" />
+            </svg>
+          </div>
+          <div>
+            <p class="font-medium mb-1">Your conversations stay between us.</p>
+            <p class="text-hogaan-mute text-sm leading-relaxed">
+              Sponsors see <span class="font-medium text-hogaan-text">aggregate</span> engagement
+              only — never your individual messages.
+            </p>
           </div>
         </div>
 
-        <!-- Organization level -->
-        <div>
-          <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">Organization</p>
-          <div class="grid sm:grid-cols-3 gap-3">
-            <button class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Assets</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Leading from what you have, not what you lack</p>
-            </button>
-            <button class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Innovation</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Trying a different way when the current one stops</p>
-            </button>
-            <button class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Prosperity</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Value that compounds across people, not zero-sum</p>
-            </button>
+        <div class="flex gap-4">
+          <div
+            class="w-9 h-9 rounded-lg bg-hogaan-accent-tint flex items-center justify-center flex-shrink-0"
+          >
+            <svg
+              class="w-5 h-5 text-hogaan-accent"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"
+              />
+            </svg>
+          </div>
+          <div>
+            <p class="font-medium mb-1">You can leave anytime.</p>
+            <p class="text-hogaan-mute text-sm leading-relaxed">
+              Type <span class="font-medium text-hogaan-text">STOP</span> at any point and I'll stop
+              messaging you — completely.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Practice picker -->
+      <section>
+        <h2 class="font-display text-3xl font-medium mb-3 text-hogaan-text">
+          Pick the practices you're working on.
+        </h2>
+        <p class="text-hogaan-mute mb-8 leading-relaxed">
+          Two or three is the sweet spot. You can change them anytime.
+        </p>
+
+        <div class="space-y-7">
+          <!-- Self level -->
+          <div>
+            <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">
+              Self
+            </p>
+            <div class="grid sm:grid-cols-3 gap-3">
+              <button
+                class="practice-chip selected text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Integrity</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Showing up consistently with what you believe
+                </p>
+              </button>
+              <button
+                class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Purpose</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  The work you'd still do if no one was watching
+                </p>
+              </button>
+              <button
+                class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Accountability</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Owning the call you made, the team you shaped
+                </p>
+              </button>
+            </div>
+          </div>
+
+          <!-- Team level -->
+          <div>
+            <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">
+              Team
+            </p>
+            <div class="grid sm:grid-cols-3 gap-3">
+              <button
+                class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Dignity</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Preserving standing while telling the hard truth
+                </p>
+              </button>
+              <button
+                class="practice-chip selected text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Empathy</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Understanding interior states, not just behavior
+                </p>
+              </button>
+              <button
+                class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Inclusion</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Making space for voices that don't volunteer
+                </p>
+              </button>
+            </div>
+          </div>
+
+          <!-- Organization level -->
+          <div>
+            <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">
+              Organization
+            </p>
+            <div class="grid sm:grid-cols-3 gap-3">
+              <button
+                class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Assets</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Leading from what you have, not what you lack
+                </p>
+              </button>
+              <button
+                class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Innovation</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Trying a different way when the current one stops
+                </p>
+              </button>
+              <button
+                class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Prosperity</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Value that compounds across people, not zero-sum
+                </p>
+              </button>
+            </div>
+          </div>
+
+          <!-- Community level -->
+          <div>
+            <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">
+              Community
+            </p>
+            <div class="grid sm:grid-cols-3 gap-3">
+              <button
+                class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Humility</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Admitting wrong, listening for what you don't know
+                </p>
+              </button>
+              <button
+                class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Democracy</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Fair process, transparent decisions
+                </p>
+              </button>
+              <button
+                class="practice-chip selected text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent"
+              >
+                <p class="font-display font-medium text-lg">Peace</p>
+                <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">
+                  Ending cycles of conflict, not winning them
+                </p>
+              </button>
+            </div>
           </div>
         </div>
 
-        <!-- Community level -->
-        <div>
-          <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">Community</p>
-          <div class="grid sm:grid-cols-3 gap-3">
-            <button class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Humility</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Admitting wrong, listening for what you don't know</p>
-            </button>
-            <button class="practice-chip text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Democracy</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Fair process, transparent decisions</p>
-            </button>
-            <button class="practice-chip selected text-left bg-hogaan-card border-2 border-hogaan-sunken rounded-xl p-4 hover:border-hogaan-accent">
-              <p class="font-display font-medium text-lg">Peace</p>
-              <p class="gloss text-xs text-hogaan-mute mt-1 leading-relaxed">Ending cycles of conflict, not winning them</p>
+        <!-- CTA -->
+        <div class="mt-10 sticky bottom-6">
+          <div
+            class="bg-hogaan-card rounded-2xl shadow-card-lg p-5 flex items-center justify-between"
+          >
+            <p class="text-sm text-hogaan-mute">
+              <span class="font-medium text-hogaan-text">3 selected</span> · Integrity, Empathy,
+              Peace
+            </p>
+            <button
+              class="px-6 py-3 bg-hogaan-text text-white rounded-xl font-medium hover:bg-hogaan-text/90 transition"
+            >
+              Start coaching →
             </button>
           </div>
         </div>
-
-      </div>
-
-      <!-- CTA -->
-      <div class="mt-10 sticky bottom-6">
-        <div class="bg-hogaan-card rounded-2xl shadow-card-lg p-5 flex items-center justify-between">
-          <p class="text-sm text-hogaan-mute">
-            <span class="font-medium text-hogaan-text">3 selected</span> · Integrity, Empathy, Peace
-          </p>
-          <button class="px-6 py-3 bg-hogaan-text text-white rounded-xl font-medium hover:bg-hogaan-text/90 transition">
-            Start coaching →
-          </button>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-</body>
+      </section>
+    </main>
+  </body>
 </html>

@@ -38,7 +38,9 @@ describe('parseSseBlock', () => {
   });
 
   it('parses an end event', () => {
-    const result = parseSseBlock('event: end\ndata: {"turnId":"t1","sessionId":"s1","latencyMs":250}');
+    const result = parseSseBlock(
+      'event: end\ndata: {"turnId":"t1","sessionId":"s1","latencyMs":250}',
+    );
     expect(result).toEqual({ type: 'end', turnId: 't1', sessionId: 's1', latencyMs: 250 });
   });
 

@@ -73,7 +73,9 @@
   font-size: 14.5px;
   color: var(--ink-1);
   outline: none;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
 }
 .ses-search-input::placeholder {
@@ -118,13 +120,17 @@
   gap: 14px;
   cursor: pointer;
   text-align: left;
-  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease),
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease);
   box-shadow: 0 1px 0 rgba(0, 0, 77, 0.02);
 }
 .ses-row:hover {
   border-color: var(--gold-light);
-  box-shadow: 0 4px 18px -8px rgba(0, 134, 255, 0.35), 0 1px 0 rgba(0, 0, 77, 0.02);
+  box-shadow:
+    0 4px 18px -8px rgba(0, 134, 255, 0.35),
+    0 1px 0 rgba(0, 0, 77, 0.02);
 }
 .ses-row:hover .ses-row-arrow {
   transform: translateX(2px);
@@ -183,7 +189,9 @@
 .ses-row-arrow {
   color: var(--gold-deep);
   opacity: 0.45;
-  transition: transform var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
 }
 
 .ses-noresults {
@@ -470,7 +478,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease),
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease);
 }
 .pr-prac-pill.is-on {
@@ -520,7 +530,9 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
 }
 .pr-radio-opt:hover {
@@ -587,7 +599,9 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease),
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
     border-color var(--dur-fast) var(--ease);
 }
 .pr-priv-btn:hover {

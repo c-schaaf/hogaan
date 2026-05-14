@@ -31,7 +31,13 @@ describe('Sessions', () => {
     mockSessionsList.mockResolvedValue({
       sessions: [
         { id: 's1', title: 'Team Leadership', msgs: 5, when: '2 days ago', group: 'This week' },
-        { id: 's2', title: 'Conflict Resolution', msgs: 3, when: '12 days ago', group: 'Earlier this month' },
+        {
+          id: 's2',
+          title: 'Conflict Resolution',
+          msgs: 3,
+          when: '12 days ago',
+          group: 'Earlier this month',
+        },
         { id: 's3', title: 'Strategic Planning', msgs: 7, when: '45 days ago', group: 'Older' },
       ],
     });

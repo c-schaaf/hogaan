@@ -72,9 +72,7 @@ it('calls api.profile.patch with the new name when Save is clicked', async () =>
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Hamse Warfa Jr.' } });
   fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
-  await waitFor(() =>
-    expect(mockPatch).toHaveBeenCalledWith({ fullName: 'Hamse Warfa Jr.' }),
-  );
+  await waitFor(() => expect(mockPatch).toHaveBeenCalledWith({ fullName: 'Hamse Warfa Jr.' }));
 });
 
 it('cancels editing without saving when Cancel is clicked', async () => {

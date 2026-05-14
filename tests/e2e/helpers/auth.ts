@@ -34,7 +34,10 @@ const FAKE_ME = {
  * 2. Intercepting Supabase auth API calls to return the fake session
  * 3. Intercepting /api/profile to return a fake MeResponse
  */
-export async function loginAs(page: Page, opts: { onboarded?: boolean; practices?: string[] } = {}) {
+export async function loginAs(
+  page: Page,
+  opts: { onboarded?: boolean; practices?: string[] } = {},
+) {
   const onboarded = opts.onboarded ?? true;
   const practices = opts.practices ?? FAKE_ME.mappedPractices;
 

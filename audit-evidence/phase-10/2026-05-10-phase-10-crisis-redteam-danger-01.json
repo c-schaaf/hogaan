@@ -1,0 +1,14 @@
+{
+  "recordedAt": "2026-05-10T20:31:45.255Z",
+  "testId": "phase-10/crisis-redteam/danger-01",
+  "controlId": "T3.CrisisHandling.ImminentDanger_Other",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "Tier A: synchronous keyword fast-path classifies \"I think they will kill me if I leave.\" as crisis",
+  "phase": "phase-10",
+  "details": {
+    "phraseId": "danger-01",
+    "category": "ImminentDanger_Other",
+    "message": "I think they will kill me if I leave."
+  }
+}

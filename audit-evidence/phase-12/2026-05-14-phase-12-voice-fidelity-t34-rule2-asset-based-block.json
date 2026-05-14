@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T19:36:33.780Z",
+  "testId": "phase-12/voice-fidelity/T34-rule2-asset-based-block",
+  "controlId": "T5.VoiceFidelity.T34_Rule2AssetBased",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Structural proxy for T34 — assembled prompt voice-rules block carries Rule 2. Semantic asset-based reframe in actual LLM response → voice-smoke.",
+  "phase": "phase-12"
+}

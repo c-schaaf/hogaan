@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T20:31:49.178Z",
+  "testId": "phase-12/voice-fidelity/T44-mid-convo-thanks-continue",
+  "controlId": "T5.VoiceFidelity.T44_MidConvoThanks",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Acknowledgment phrase (\"that's helpful\", \"thanks\") followed by a coordinating conjunction (but/however/yet) and/or trailing question must NOT close the session. Substring-match on close-tokens previously risked false close.",
+  "phase": "phase-12"
+}

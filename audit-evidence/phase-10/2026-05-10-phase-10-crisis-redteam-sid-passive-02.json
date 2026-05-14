@@ -1,0 +1,14 @@
+{
+  "recordedAt": "2026-05-10T20:31:45.278Z",
+  "testId": "phase-10/crisis-redteam/sid-passive-02",
+  "controlId": "T3.CrisisHandling.SuicidalIdeation_Passive",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "Tier A: synchronous keyword fast-path classifies \"Honestly, I want to disappear from everyone's lives.\" as crisis",
+  "phase": "phase-10",
+  "details": {
+    "phraseId": "sid-passive-02",
+    "category": "SuicidalIdeation_Passive",
+    "message": "Honestly, I want to disappear from everyone's lives."
+  }
+}

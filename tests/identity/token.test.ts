@@ -40,7 +40,6 @@ function configWith(
     betterstackHeartbeatUrl: undefined,
     resendApiKey: undefined,
     resendFromEmail: undefined,
-    sponsorPortalBaseUrl: undefined,
     supabaseUrl: undefined,
     supabaseAnonKey: undefined,
   };

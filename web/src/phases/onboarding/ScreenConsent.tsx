@@ -19,7 +19,15 @@ export function ScreenConsent({ checked, onToggle, onStart, starting }: Props) {
         <div className="disclosure">
           <div className="glyph">
             <svg viewBox="0 0 24 24" fill="none">
-              <rect x="4" y="6" width="16" height="13" rx="3" stroke="currentColor" strokeWidth="1.8" />
+              <rect
+                x="4"
+                y="6"
+                width="16"
+                height="13"
+                rx="3"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              />
               <path d="M12 3v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               <circle cx="9" cy="12" r="1.2" fill="currentColor" />
               <circle cx="15" cy="12" r="1.2" fill="currentColor" />

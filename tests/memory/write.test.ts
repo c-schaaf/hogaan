@@ -45,7 +45,10 @@ describe('writeMemory', () => {
 
     await writeMemory(fakeConfig(), db as never, input);
 
-    expect(vi.mocked(embedDocument)).toHaveBeenCalledWith(fakeConfig(), 'I struggle with delegation');
+    expect(vi.mocked(embedDocument)).toHaveBeenCalledWith(
+      fakeConfig(),
+      'I struggle with delegation',
+    );
   });
 
   it('inserts row with userId, content, metadata, and embedding', async () => {

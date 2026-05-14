@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-05-10T20:31:33.967Z",
+  "testId": "phase-10/checklist/pii-discipline",
+  "controlId": "T3.PrivacyControls.PIIRedaction",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "Phone numbers SHA-256 hashed for IDs; plaintext column-encrypted via AES-256-GCM (ENCRYPTION_KEY_BASE64); first names omitted from prompt assembly to LLM providers.",
+  "phase": "phase-10",
+  "details": {
+    "provingTests": [
+      "tests/shared/encryption.test.ts",
+      "tests/prompt-assembly/framings.test.ts"
+    ],
+    "claudeMdRule": "CLAUDE.md hard rule #4"
+  }
+}

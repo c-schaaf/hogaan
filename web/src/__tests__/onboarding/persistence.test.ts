@@ -35,7 +35,10 @@ describe('Onboarding persistence', () => {
   });
 
   it('savePersisted writes to localStorage with correct key', () => {
-    savePersisted({ stepIdx: 2, answers: { name: 'Hamse', years: '3–5 years', practices: ['Integrity'], consent: false } });
+    savePersisted({
+      stepIdx: 2,
+      answers: { name: 'Hamse', years: '3–5 years', practices: ['Integrity'], consent: false },
+    });
     expect(localStorage.getItem(STORAGE_KEY)).not.toBeNull();
   });
 
@@ -46,7 +49,12 @@ describe('Onboarding persistence', () => {
   it('loadPersisted restores stepIdx and answers correctly', () => {
     const data: PersistedOnboarding = {
       stepIdx: 2,
-      answers: { name: 'Hamse', years: '3–5 years', practices: ['Integrity', 'Peace'], consent: false },
+      answers: {
+        name: 'Hamse',
+        years: '3–5 years',
+        practices: ['Integrity', 'Peace'],
+        consent: false,
+      },
     };
     savePersisted(data);
     const loaded = loadPersisted();
@@ -57,7 +65,10 @@ describe('Onboarding persistence', () => {
   });
 
   it('clearPersisted removes the key', () => {
-    savePersisted({ stepIdx: 1, answers: { name: 'A', years: null, practices: [], consent: false } });
+    savePersisted({
+      stepIdx: 1,
+      answers: { name: 'A', years: null, practices: [], consent: false },
+    });
     clearPersisted();
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });

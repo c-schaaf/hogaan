@@ -20,7 +20,9 @@ const defaultProps = {
 function renderWithHour(hour: number, props = defaultProps) {
   const origDate = global.Date;
   const MockDate = class extends origDate {
-    getHours() { return hour; }
+    getHours() {
+      return hour;
+    }
   };
   vi.spyOn(global, 'Date').mockImplementation((...args: unknown[]) => {
     if (args.length === 0) return new MockDate();
@@ -62,7 +64,9 @@ describe('Home — suggestions', () => {
 
   it('renders suggestions from user practices', () => {
     render(<Home {...defaultProps} practices={['Integrity', 'Peace', 'Empathy']} />);
-    const chips = Array.from(document.querySelectorAll('.hm-chip-label')).map((el) => el.textContent);
+    const chips = Array.from(document.querySelectorAll('.hm-chip-label')).map(
+      (el) => el.textContent,
+    );
     // Integrity, Peace, Empathy all have PRACTICE_SUGGESTIONS entries
     expect(chips.length).toBe(3);
   });

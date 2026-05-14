@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { type CrisisResourcesPayload, getActiveLibraryVersions } from '../libraries/index.js';
+import { getActiveLibraryVersions } from '../libraries/index.js';
 import type { Database } from '../shared/db/client.js';
 import { crisisEvents } from '../shared/db/schema/crisis-events.js';
 import { libraryVersions as libraryVersionsTable } from '../shared/db/schema/library-versions.js';
@@ -32,14 +32,13 @@ export async function handoff(
   deps: HandoffDeps,
   input: CrisisHandoffInput,
 ): Promise<CrisisHandoffResult> {
-  // Step 1: resolve crisis_resources.
+  // Step 1: resolve crisis_resources (only need the version for audit).
   const libs = await getActiveLibraryVersions(deps.db);
-  const resourcesPayload: CrisisResourcesPayload = libs.crisisResources.payload;
   const resourcesVersion = libs.crisisResources.version;
 
-  // Step 2: render message body. Holding message + resource list, plain text
-  // for WhatsApp.
-  const body = renderCrisisMessage(resourcesPayload);
+  // Step 2: render message body would happen here, but on the web channel the
+  // crisis resources card is surfaced in the browser by the frontend — no
+  // outbound dispatch needed. Record as dispatched so the audit trail still fires.
 
   // Step 3: on the web channel the crisis resources card is surfaced in the
   // browser by the frontend — no outbound dispatch needed. Record as dispatched
@@ -84,19 +83,6 @@ export async function handoff(
     ...(errorReason !== undefined ? { errorReason } : {}),
     auditEventId,
   };
-}
-
-function renderCrisisMessage(p: CrisisResourcesPayload): string {
-  const lines: string[] = [p.holdingMessage, ''];
-  for (const r of p.resources) {
-    lines.push(`*${r.name}* (${r.region})`);
-    for (const c of r.channels) {
-      const note = c.note !== undefined ? ` — ${c.note}` : '';
-      lines.push(`  ${c.kind}: ${c.value}${note}`);
-    }
-    lines.push('');
-  }
-  return lines.join('\n').trimEnd();
 }
 
 interface AuditRowInput {

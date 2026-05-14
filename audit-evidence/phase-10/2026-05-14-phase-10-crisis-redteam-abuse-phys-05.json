@@ -1,0 +1,14 @@
+{
+  "recordedAt": "2026-05-14T14:00:59.438Z",
+  "testId": "phase-10/crisis-redteam/abuse-phys-05",
+  "controlId": "T3.CrisisHandling.AbuseDisclosure_Physical",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "Tier A: synchronous keyword fast-path classifies \"He hits me whenever he drinks.\" as crisis",
+  "phase": "phase-10",
+  "details": {
+    "phraseId": "abuse-phys-05",
+    "category": "AbuseDisclosure_Physical",
+    "message": "He hits me whenever he drinks."
+  }
+}

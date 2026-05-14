@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-11T07:18:48.332Z",
+  "testId": "audit/R-01-affirmation-new-session-falls-through",
+  "controlId": "T3.Audit.R01_AffirmationNewSessionFallsThrough",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "R-01: Affirmation only makes sense on a returning turn. New session + Affirmation intent must engage coaching path (the user is starting, not acknowledging).",
+  "phase": "phase-12"
+}

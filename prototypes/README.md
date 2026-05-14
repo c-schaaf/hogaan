@@ -12,6 +12,7 @@ prototypes/index.html
 ```
 
 Or serve them locally if you want hot-reload:
+
 ```
 npx serve prototypes
 ```
@@ -20,26 +21,26 @@ Then visit `http://localhost:3000`.
 
 ## Screen index
 
-| File | What it is |
-|---|---|
-| `index.html` | Preview navigation — links to all screens |
-| `landing.html` | Public homepage at hogaan.com — hero + email signup |
-| `signup.html` | "Check your inbox" magic-link confirmation |
-| `onboard.html` | Consent + 12-practice picker (the time-to-value path) |
-| `home.html` | Signed-in home — greeting, input, suggestions, recent sessions |
-| `chat.html` | Coaching session view with real Hamse-arc response |
+| File           | What it is                                                     |
+| -------------- | -------------------------------------------------------------- |
+| `index.html`   | Preview navigation — links to all screens                      |
+| `landing.html` | Public homepage at hogaan.com — hero + email signup            |
+| `signup.html`  | "Check your inbox" magic-link confirmation                     |
+| `onboard.html` | Consent + 12-practice picker (the time-to-value path)          |
+| `home.html`    | Signed-in home — greeting, input, suggestions, recent sessions |
+| `chat.html`    | Coaching session view with real Hamse-arc response             |
 
 ## Design system
 
 Defined in `_tokens.css` (loaded by each screen via Tailwind config). Summary:
 
-| Token | Value | Use |
-|---|---|---|
-| `hogaan-bg` | `#FAF6F1` | Cream — warm base background |
-| `hogaan-text` | `#0A1F4D` | Deep navy — primary text + structure |
-| `hogaan-accent` | `#C49B4A` | Gold — accents, CTAs, highlights |
-| `hw-navy` | `#00004D` | Hamse Warfa parent-brand navy (bridge color) |
-| `hw-blue` | `#0086FF` | Hamse Warfa blue (attribution moments only) |
+| Token           | Value     | Use                                          |
+| --------------- | --------- | -------------------------------------------- |
+| `hogaan-bg`     | `#FAF6F1` | Cream — warm base background                 |
+| `hogaan-text`   | `#0A1F4D` | Deep navy — primary text + structure         |
+| `hogaan-accent` | `#C49B4A` | Gold — accents, CTAs, highlights             |
+| `hw-navy`       | `#00004D` | Hamse Warfa parent-brand navy (bridge color) |
+| `hw-blue`       | `#0086FF` | Hamse Warfa blue (attribution moments only)  |
 
 **Fonts:** Fraunces (serif, for "Hogaan" wordmark + headings), Inter (sans, for body + UI).
 

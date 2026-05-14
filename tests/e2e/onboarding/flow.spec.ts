@@ -21,11 +21,16 @@ test.describe('Onboarding flow', () => {
       };
     });
 
-    await page.route('**/auth/v1/**', (route) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ access_token: 'fake-token', user: { id: 'test-user', email: 'test@test.com' } }),
-    }));
+    await page.route('**/auth/v1/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          access_token: 'fake-token',
+          user: { id: 'test-user', email: 'test@test.com' },
+        }),
+      }),
+    );
 
     await page.route('**/api/profile', (route) => {
       if (route.request().method() === 'GET') {
@@ -46,11 +51,13 @@ test.describe('Onboarding flow', () => {
       return route.fulfill({ status: 200, body: '{"ok":true}' });
     });
 
-    await page.route('**/api/sessions', (route) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: '{"sessions":[]}',
-    }));
+    await page.route('**/api/sessions', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: '{"sessions":[]}',
+      }),
+    );
 
     await page.goto('/');
     await page.waitForSelector('[class*="q-"], input[placeholder*="name" i]', { timeout: 10000 });

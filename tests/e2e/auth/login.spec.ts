@@ -3,14 +3,18 @@ import { expect, test } from '@playwright/test';
 test.describe('Login page', () => {
   test.beforeEach(async ({ page }) => {
     // Intercept Supabase auth so page loads without real credentials
-    await page.route('**/auth/v1/**', (route) => route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ access_token: null, user: null }),
-    }));
+    await page.route('**/auth/v1/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ access_token: null, user: null }),
+      }),
+    );
     await page.goto('/');
     // Wait for app to boot to unauthenticated state → login screen
-    await page.waitForSelector('[data-testid="phase-login"], input[name="email"]', { timeout: 10000 });
+    await page.waitForSelector('[data-testid="phase-login"], input[name="email"]', {
+      timeout: 10000,
+    });
   });
 
   test('login form renders email and password fields', async ({ page }) => {
@@ -24,11 +28,16 @@ test.describe('Login page', () => {
   });
 
   test('shows error banner for wrong credentials', async ({ page }) => {
-    await page.route('**/auth/v1/token**', (route) => route.fulfill({
-      status: 400,
-      contentType: 'application/json',
-      body: JSON.stringify({ error: 'invalid_grant', error_description: 'Invalid login credentials' }),
-    }));
+    await page.route('**/auth/v1/token**', (route) =>
+      route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: 'invalid_grant',
+          error_description: 'Invalid login credentials',
+        }),
+      }),
+    );
 
     await page.locator('input[name="email"]').fill('user@test.com');
     await page.locator('input[type="password"]').fill('wrongpassword');

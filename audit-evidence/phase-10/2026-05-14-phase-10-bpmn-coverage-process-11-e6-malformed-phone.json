@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T11:36:45.610Z",
+  "testId": "phase-10/bpmn-coverage/process-11/e6-malformed-phone",
+  "controlId": "T2.Process11.E6_MalformedRequest",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "sendOutbound rejects an OutboundRequest with malformed phoneE164",
+  "phase": "phase-10"
+}

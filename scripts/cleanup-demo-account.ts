@@ -25,7 +25,10 @@ async function main(): Promise<void> {
     const orphans = await sql<
       { email: string }[]
     >`DELETE FROM users WHERE supabase_user_id IS NULL AND email IS NOT NULL RETURNING email`;
-    console.log(`orphan public.users deleted: ${orphans.length}`, orphans.map((r) => r.email));
+    console.log(
+      `orphan public.users deleted: ${orphans.length}`,
+      orphans.map((r) => r.email),
+    );
   } finally {
     await sql.end();
   }

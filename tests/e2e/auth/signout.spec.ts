@@ -8,9 +8,10 @@ test.describe('Sign out', () => {
     await page.waitForSelector('[class*="hm-"]', { timeout: 8000 });
     await page.route('**/auth/v1/logout', (route) => route.fulfill({ status: 204, body: '' }));
     // Find and click nav to profile
-    const profileNav = page.locator('[class*="nav"] button', { hasText: /profile/i })
+    const profileNav = page
+      .locator('[class*="nav"] button', { hasText: /profile/i })
       .or(page.locator('[aria-label*="profile" i]'));
-    if (await profileNav.count() > 0) {
+    if ((await profileNav.count()) > 0) {
       await profileNav.first().click();
     } else {
       // Set shell-phase directly

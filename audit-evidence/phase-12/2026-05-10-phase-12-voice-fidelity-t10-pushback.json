@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T20:31:16.250Z",
+  "testId": "phase-12/voice-fidelity/T10-pushback",
+  "controlId": "T5.VoiceFidelity.T10_Pushback",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Pushback acknowledged-as-correct → humility practice via \"pushback\" keyword.",
+  "phase": "phase-12"
+}

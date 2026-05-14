@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T20:31:16.296Z",
+  "testId": "phase-12/voice-fidelity/T9-closed-deal-compounds",
+  "controlId": "T5.VoiceFidelity.T9_ClosedDeal",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Long-view prosperity framing — compounding wins. Approved keywords: \"compound\", \"compounds\", \"compounding\".",
+  "phase": "phase-12"
+}

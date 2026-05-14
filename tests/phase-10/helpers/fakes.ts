@@ -39,7 +39,6 @@ export function fakeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     betterstackHeartbeatUrl: undefined,
     resendApiKey: undefined,
     resendFromEmail: undefined,
-    sponsorPortalBaseUrl: undefined,
     supabaseUrl: undefined,
     supabaseAnonKey: undefined,
     ...overrides,

@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T20:31:34.421Z",
+  "testId": "phase-10/bpmn-coverage/process-11/e8-window-closed",
+  "controlId": "T2.Process11.E8_WindowClosedFreeFormBlocked",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "sendOutbound rejects a FreeForm dispatch when the 24h customer-service window is closed; user must receive a Template instead",
+  "phase": "phase-10"
+}

@@ -8,8 +8,20 @@ vi.mock('../../components/Primitives', () => ({
   Eyebrow: () => null,
 }));
 
-const ALL_PRACTICES = ['Purpose', 'Integrity', 'Accountability', 'Dignity', 'Empathy', 'Inclusion',
-  'Assets', 'Innovation', 'Prosperity', 'Humility', 'Peace', 'Democracy'];
+const ALL_PRACTICES = [
+  'Purpose',
+  'Integrity',
+  'Accountability',
+  'Dignity',
+  'Empathy',
+  'Inclusion',
+  'Assets',
+  'Innovation',
+  'Prosperity',
+  'Humility',
+  'Peace',
+  'Democracy',
+];
 
 describe('Screen5Practices', () => {
   it('renders all 12 practices', () => {
@@ -35,13 +47,21 @@ describe('Screen5Practices', () => {
   });
 
   it('shows correct selected count', () => {
-    render(<Screen5Practices values={['Integrity', 'Peace', 'Empathy']} onToggle={vi.fn()} onContinue={vi.fn()} />);
+    render(
+      <Screen5Practices
+        values={['Integrity', 'Peace', 'Empathy']}
+        onToggle={vi.fn()}
+        onContinue={vi.fn()}
+      />,
+    );
     expect(screen.getByText('3')).toBeTruthy();
   });
 
   it('Continue button is disabled when no practices selected', () => {
     render(<Screen5Practices values={[]} onToggle={vi.fn()} onContinue={vi.fn()} />);
-    const btn = screen.getByText('Continue').closest('button') ?? screen.getByRole('button', { name: /Continue/ });
+    const btn =
+      screen.getByText('Continue').closest('button') ??
+      screen.getByRole('button', { name: /Continue/ });
     expect(btn).toBeDisabled();
   });
 

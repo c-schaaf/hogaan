@@ -56,10 +56,6 @@ vi.mock('../../src/coaching/context-fetch.js', () => ({
   ),
 }));
 
-vi.mock('../../src/whatsapp-delivery/orchestrator.js', () => ({
-  sendOutbound: vi.fn(),
-}));
-
 vi.mock('../../src/prompt-assembly/index.js', async () => {
   const actual = await vi.importActual<typeof PromptAssemblyModule>(
     '../../src/prompt-assembly/index.js',
@@ -127,26 +123,15 @@ const deps = (): Parameters<typeof runCoachingTurn>[0] => ({
 beforeEach(async () => {
   const triageMod = await import('../../src/coaching/triage.js');
   const sessionMod = await import('../../src/session-lifecycle/index.js');
-  const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
   const llmMod = await import('../../src/shared/llm/chat.js');
   const paMod = await import('../../src/prompt-assembly/index.js');
   const qcMod = await import('../../src/quality-check/index.js');
 
   vi.mocked(triageMod.triage).mockReset();
   vi.mocked(sessionMod.resolveSession).mockReset();
-  vi.mocked(wppMod.sendOutbound).mockReset();
   vi.mocked(llmMod.chat).mockReset();
   vi.mocked(paMod.assemblePrompt).mockReset();
   vi.mocked(qcMod.runQualityCheck).mockReset();
-
-  // Default: sendOutbound succeeds
-  vi.mocked(wppMod.sendOutbound).mockResolvedValue({
-    endEvent: 'E1_MessageDispatched',
-    waMessageId: 'SMr01',
-    dispatchPath: 'direct',
-    retryCount: 0,
-    queueLoops: 0,
-  });
   // Default: prompt assembly returns a stub bundle (only used on fall-through tests)
   vi.mocked(paMod.assemblePrompt).mockResolvedValue({
     assembledPrompt: 'system prompt',

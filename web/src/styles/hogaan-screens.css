@@ -161,8 +161,12 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  box-shadow: 0 6px 14px rgba(0, 134, 255, 0.28), 0 1px 2px rgba(0, 0, 77, 0.05);
-  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease),
+  box-shadow:
+    0 6px 14px rgba(0, 134, 255, 0.28),
+    0 1px 2px rgba(0, 0, 77, 0.05);
+  transition:
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
   margin-top: 6px;
 }
@@ -174,7 +178,9 @@
 }
 .auth-cta:focus-visible {
   outline: none;
-  box-shadow: var(--shadow-focus), 0 6px 14px rgba(0, 134, 255, 0.28);
+  box-shadow:
+    var(--shadow-focus),
+    0 6px 14px rgba(0, 134, 255, 0.28);
 }
 .auth-cta:disabled {
   background: rgba(0, 0, 77, 0.08);
@@ -202,7 +208,9 @@
   padding: 2px 0;
   text-decoration: none;
   border-bottom: 1px solid transparent;
-  transition: color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 .auth-link:hover {
   color: var(--gold);
@@ -330,7 +338,9 @@
   background: var(--paper-sunken);
   border: 1.5px solid transparent;
   border-radius: 12px;
-  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
   display: flex;
   align-items: stretch;
@@ -353,7 +363,9 @@
   color: var(--ink-3);
   pointer-events: none;
   transform-origin: 0 0;
-  transition: transform var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    transform var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 .ff.is-focused .ff-label,
 .ff.is-filled .ff-label {
@@ -515,16 +527,22 @@
   background: var(--paper);
   border-radius: 20px;
   padding: 18px 18px 18px 16px;
-  box-shadow: var(--shadow-sm), 0 0 0 1px var(--hairline);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 1px var(--hairline);
   display: flex;
   align-items: center;
   gap: 14px;
   text-align: left;
   cursor: pointer;
-  transition: box-shadow var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  transition:
+    box-shadow var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
 }
 .hm-compose:hover {
-  box-shadow: var(--shadow-md), 0 0 0 1px var(--hairline-strong);
+  box-shadow:
+    var(--shadow-md),
+    0 0 0 1px var(--hairline-strong);
 }
 .hm-compose:active {
   transform: scale(0.99);
@@ -611,7 +629,9 @@
   text-align: left;
   font-family: var(--font-h);
   color: var(--ink-1);
-  transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease),
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease);
 }
 .hm-chip:hover {
@@ -672,7 +692,9 @@
   color: var(--ink-3);
   cursor: pointer;
   border-radius: 12px;
-  transition: color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+  transition:
+    color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease);
   position: relative;
 }
 .hm-nav-tab:hover {
@@ -901,7 +923,9 @@
   padding: 7px 12px;
   border-radius: 999px;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
 }
 .chat-chip:hover {
   background: var(--gold-light);
@@ -1076,7 +1100,9 @@
   flex: 1;
   min-width: 120px;
   letter-spacing: 0.01em;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+  transition:
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 .cr-btn:hover {
   background: var(--gold-tint);

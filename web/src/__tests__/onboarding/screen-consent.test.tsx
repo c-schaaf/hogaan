@@ -22,7 +22,9 @@ describe('ScreenConsent', () => {
 
   it('clicking the checkbox calls onToggle', () => {
     const onToggle = vi.fn();
-    render(<ScreenConsent checked={false} onToggle={onToggle} onStart={vi.fn()} starting={false} />);
+    render(
+      <ScreenConsent checked={false} onToggle={onToggle} onStart={vi.fn()} starting={false} />,
+    );
     fireEvent.click(screen.getByRole('checkbox'));
     expect(onToggle).toHaveBeenCalledOnce();
   });

@@ -9,11 +9,7 @@ import { isFailClosedLlmError } from '../shared/llm/errors.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
-import {
-  type PhoneE164,
-  type SessionId,
-  type UserId,
-} from '../shared/types/index.js';
+import { type PhoneE164, type SessionId, type UserId } from '../shared/types/index.js';
 import { selectScenario } from './select.js';
 import {
   abandonScenario,
@@ -160,10 +156,9 @@ async function kickoffNewScenario(
     reportP1('scenario opener delivery failed', {
       source: 'Phase8B.ScenarioOrchestrator',
       tags: { scenarioId: scenario.id },
-      extra: { reason: sent.reason ?? 'unknown' },
     });
     // Don't unwind state — the scenario is started; user can retry messaging.
-    return { kind: 'failed', reason: `delivery failed: ${sent.reason ?? 'unknown'}` };
+    return { kind: 'failed', reason: 'delivery failed' };
   }
 
   return {
@@ -301,7 +296,7 @@ async function advanceActiveScenario(
     `scenario:${scenario.id}:step${active.currentStep}`,
   );
   if (sent.failed) {
-    return { kind: 'failed', reason: `delivery failed: ${sent.reason ?? 'unknown'}` };
+    return { kind: 'failed', reason: 'delivery failed' };
   }
 
   // Advance state.

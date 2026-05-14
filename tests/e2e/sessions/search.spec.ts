@@ -7,8 +7,20 @@ test.describe('Sessions search', () => {
     await loginAs(page);
     await mockSessionsList(page, [
       { id: 's1', title: 'Team Leadership', when: '1 day ago', turnCount: 3, group: 'This week' },
-      { id: 's2', title: 'Conflict Resolution', when: '2 days ago', turnCount: 2, group: 'This week' },
-      { id: 's3', title: 'Strategic Thinking', when: '10 days ago', turnCount: 4, group: 'Earlier this month' },
+      {
+        id: 's2',
+        title: 'Conflict Resolution',
+        when: '2 days ago',
+        turnCount: 2,
+        group: 'This week',
+      },
+      {
+        id: 's3',
+        title: 'Strategic Thinking',
+        when: '10 days ago',
+        turnCount: 4,
+        group: 'Earlier this month',
+      },
     ]);
 
     await page.waitForSelector('[class*="hm-"]', { timeout: 8000 });

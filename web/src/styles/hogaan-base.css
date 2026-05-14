@@ -2,20 +2,15 @@
   /* Hogaan — Hamse Warfa™ brand palette */
 
   /* Surface system (cool-blue, layered low → high) */
-  --bg: #eaf4ff;            /* page background */
-  --bg-2: #d6e8fa;          /* mid step in the hero gradient (also section dividers) */
-  --bg-3: #c2dcf5;          /* deepest step in the hero gradient */
-  --paper: #f4f9ff;         /* card / panel surface */
-  --paper-sunken: #dcebfb;  /* recessed surface — also the input-field token */
+  --bg: #eaf4ff; /* page background */
+  --bg-2: #d6e8fa; /* mid step in the hero gradient (also section dividers) */
+  --bg-3: #c2dcf5; /* deepest step in the hero gradient */
+  --paper: #f4f9ff; /* card / panel surface */
+  --paper-sunken: #dcebfb; /* recessed surface — also the input-field token */
   --surface-field: #dcebfb; /* explicit alias for input/select/textarea fills */
 
   /* Composite surfaces */
-  --hero-gradient: linear-gradient(
-    135deg,
-    #eaf4ff 0%,
-    #d6e8fa 50%,
-    #c2dcf5 100%
-  );
+  --hero-gradient: linear-gradient(135deg, #eaf4ff 0%, #d6e8fa 50%, #c2dcf5 100%);
   --ambient-stripes: repeating-linear-gradient(
     45deg,
     rgba(0, 183, 255, 0.02) 0 1px,
@@ -143,7 +138,9 @@ body {
     height: min(900px, calc(100vh - 56px));
     max-height: 900px;
     border-radius: 36px;
-    box-shadow: var(--shadow-lg), 0 0 0 1px rgba(0, 0, 77, 0.06);
+    box-shadow:
+      var(--shadow-lg),
+      0 0 0 1px rgba(0, 0, 77, 0.06);
     outline: 8px solid #0d0d22;
     outline-offset: 0;
   }
@@ -235,7 +232,9 @@ body {
   padding: 24px 24px 0;
   display: flex;
   flex-direction: column;
-  transition: transform var(--dur) var(--ease), opacity var(--dur) var(--ease);
+  transition:
+    transform var(--dur) var(--ease),
+    opacity var(--dur) var(--ease);
   will-change: transform, opacity;
 }
 @media (min-width: 700px) {
@@ -327,9 +326,13 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  transition: transform var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
-  box-shadow: 0 6px 16px rgba(0, 134, 255, 0.28), 0 1px 2px rgba(0, 0, 77, 0.05);
+  box-shadow:
+    0 6px 16px rgba(0, 134, 255, 0.28),
+    0 1px 2px rgba(0, 0, 77, 0.05);
 }
 .cta:hover {
   background: var(--gold-deep);
@@ -345,7 +348,9 @@ body {
 }
 .cta:focus-visible {
   outline: none;
-  box-shadow: var(--shadow-focus), 0 6px 16px rgba(0, 134, 255, 0.28);
+  box-shadow:
+    var(--shadow-focus),
+    0 6px 16px rgba(0, 134, 255, 0.28);
 }
 
 .cta-secondary {
@@ -403,7 +408,9 @@ body {
   color: var(--ink-1);
   padding: 14px 16px 12px;
   border-radius: var(--r-btn) var(--r-btn) 0 0;
-  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
   transition: border-color var(--dur-fast) var(--ease);
   letter-spacing: -0.01em;
 }
@@ -451,8 +458,11 @@ body {
   font-weight: 500;
   font-size: 16px;
   color: var(--ink-1);
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
   appearance: none;
   width: 100%;
   display: block;
@@ -471,7 +481,9 @@ body {
 .option.selected {
   border-color: var(--blue);
   background: var(--tint-blue);
-  box-shadow: 0 0 0 1px var(--blue) inset, 0 4px 14px rgba(0, 134, 255, 0.18);
+  box-shadow:
+    0 0 0 1px var(--blue) inset,
+    0 4px 14px rgba(0, 134, 255, 0.18);
 }
 .option.confirming {
   border-color: var(--blue);
@@ -522,7 +534,9 @@ body {
   justify-content: center;
   opacity: 0;
   transform: translateY(-50%) scale(0.7);
-  transition: opacity var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
 }
 .option.selected .check,
 .option.confirming .check {
@@ -584,8 +598,11 @@ body {
   padding: 22px;
   cursor: pointer;
   text-align: left;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
-    transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
   font-family: var(--font-h);
   color: var(--ink-1);
   appearance: none;
@@ -663,8 +680,11 @@ body {
   padding: 12px 14px;
   cursor: pointer;
   text-align: left;
-  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease);
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
   font-family: var(--font-h);
   color: var(--ink-1);
   position: relative;
@@ -803,7 +823,9 @@ body {
   justify-content: center;
   background: var(--paper);
   color: white;
-  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
   flex-shrink: 0;
 }
 .checkbox-row.on .checkbox {
@@ -836,9 +858,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 20px;
-  background:
-    var(--ambient-stripes),
-    var(--hero-gradient);
+  background: var(--ambient-stripes), var(--hero-gradient);
 }
 .celebrate-mark {
   width: 72px;
@@ -923,7 +943,9 @@ body {
   gap: 8px;
   box-shadow: var(--shadow-md);
   z-index: 50;
-  transition: transform 360ms var(--ease), opacity 360ms var(--ease);
+  transition:
+    transform 360ms var(--ease),
+    opacity 360ms var(--ease);
   opacity: 0;
   pointer-events: none;
   white-space: nowrap;

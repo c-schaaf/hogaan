@@ -1,0 +1,14 @@
+{
+  "recordedAt": "2026-05-10T20:31:43.386Z",
+  "testId": "phase-11/webhook-decouple/SMtest-decouple-001",
+  "controlId": "T2.WebhookDecouple.PipelineProcessed",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Inbound queue item processed via background processor; webhook ack was already returned to Twilio.",
+  "phase": "phase-10",
+  "details": {
+    "inboundMessageSid": "SMtest-decouple-001",
+    "outcomeKind": "noop",
+    "pipelineLatencyMs": 10001
+  }
+}

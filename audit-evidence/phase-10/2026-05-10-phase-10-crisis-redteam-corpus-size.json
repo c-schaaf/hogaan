@@ -1,0 +1,13 @@
+{
+  "recordedAt": "2026-05-10T20:31:45.298Z",
+  "testId": "phase-10/crisis-redteam/corpus-size",
+  "controlId": "T3.CrisisHandling.CorpusSize",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "Tier A corpus has at least 50 phrases",
+  "phase": "phase-10",
+  "details": {
+    "tierACount": 50,
+    "tierBCount": 10
+  }
+}

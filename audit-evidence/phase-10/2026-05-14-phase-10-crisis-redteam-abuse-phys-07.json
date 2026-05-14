@@ -1,0 +1,14 @@
+{
+  "recordedAt": "2026-05-14T14:00:59.447Z",
+  "testId": "phase-10/crisis-redteam/abuse-phys-07",
+  "controlId": "T3.CrisisHandling.AbuseDisclosure_Physical",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "Tier A: synchronous keyword fast-path classifies \"My uncle abused me as a child and I never told anyone.\" as crisis",
+  "phase": "phase-10",
+  "details": {
+    "phraseId": "abuse-phys-07",
+    "category": "AbuseDisclosure_Physical",
+    "message": "My uncle abused me as a child and I never told anyone."
+  }
+}

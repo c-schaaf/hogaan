@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T20:31:39.690Z",
+  "testId": "phase-10/bpmn-coverage/process-12/e9-web-session-invalid",
+  "controlId": "T2.Process12.E9_WebSessionInvalid",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Identity orchestrator returns E9_WebSessionInvalid when the web_session token is malformed / expired / signature-invalid. The token path bypasses the phone path; lookup is not called.",
+  "phase": "phase-10"
+}

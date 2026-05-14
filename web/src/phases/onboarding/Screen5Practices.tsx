@@ -16,9 +16,7 @@ export function Screen5Practices({ values, onToggle, onContinue }: Props) {
     <>
       <Eyebrow n={3} total={3} />
       <h1 className="q-headline">Which of these practices do you want to develop?</h1>
-      <p className="q-helper">
-        Pick as many as you'd like — you can change them anytime.
-      </p>
+      <p className="q-helper">Pick as many as you'd like — you can change them anytime.</p>
 
       {PRACTICE_GROUPS.map((g) => (
         <div key={g} className="practice-group">

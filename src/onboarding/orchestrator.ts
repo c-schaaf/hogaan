@@ -1,7 +1,6 @@
 import { eq } from 'drizzle-orm';
 import type { Database } from '../shared/db/client.js';
 import { users } from '../shared/db/schema/users.js';
-import { reportP1 } from '../incident-handling/index.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
@@ -23,8 +22,6 @@ interface OrchestratorDeps {
   redis: RedisBundle;
   rateLimiters: RateLimiters;
 }
-
-const CALLER = 'onboarding';
 
 /**
  * Process #1 entry. Receives an inbound user message, dispatches by
@@ -287,7 +284,7 @@ async function finalizeOnboarded(db: Database, userId: UserId): Promise<void> {
 // ---------------------------------------------------------------------------
 
 // Onboarding responses are delivered via the web UI — no outbound dispatch.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 async function dispatch(
   _deps: OrchestratorDeps,
   _event: OnboardingInboundEvent,

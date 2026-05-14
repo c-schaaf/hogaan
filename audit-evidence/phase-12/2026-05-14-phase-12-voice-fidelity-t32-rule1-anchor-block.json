@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T19:36:33.773Z",
+  "testId": "phase-12/voice-fidelity/T32-rule1-anchor-block",
+  "controlId": "T5.VoiceFidelity.T32_Rule1Anchor",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Structural proxy for T32 — assembled prompt voice-rules block carries Rule 1. Semantic anchor presence in actual LLM response → voice-smoke.",
+  "phase": "phase-12"
+}

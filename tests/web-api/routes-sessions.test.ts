@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import { registerWebApiRoutes } from '../../src/web-api/routes.js';
-import { fakeConfig, fakeRedis, fakeRateLimiters, fakeTraceEmitter } from '../phase-10/helpers/fakes.js';
+import {
+  fakeConfig,
+  fakeRedis,
+  fakeRateLimiters,
+  fakeTraceEmitter,
+} from '../phase-10/helpers/fakes.js';
 
 const TEST_USER_ID = '00000000-0000-0000-0000-000000000001';
 const OTHER_USER_ID = '00000000-0000-0000-0000-000000000002';
@@ -24,7 +29,18 @@ vi.mock('../../src/shared/llm/chat.js', () => ({
 /** Make a drizzle-style chainable query that resolves to `rows`. */
 function makeQuery<T>(rows: T[]) {
   const chain: Record<string, unknown> = {};
-  for (const m of ['select', 'from', 'where', 'orderBy', 'limit', 'offset', 'set', 'returning', 'update', 'delete']) {
+  for (const m of [
+    'select',
+    'from',
+    'where',
+    'orderBy',
+    'limit',
+    'offset',
+    'set',
+    'returning',
+    'update',
+    'delete',
+  ]) {
     chain[m] = () => chain;
   }
   chain.then = (resolve: (v: T[]) => void, reject?: (e: unknown) => void) =>
@@ -65,7 +81,13 @@ describe('GET /api/sessions', () => {
     const now = new Date();
     const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
     const sessionRows = [
-      { id: SESSION_ID, title: 'Leadership Q', startedAt: twoDaysAgo, lastTurnAt: twoDaysAgo, turnCount: 3 },
+      {
+        id: SESSION_ID,
+        title: 'Leadership Q',
+        startedAt: twoDaysAgo,
+        lastTurnAt: twoDaysAgo,
+        turnCount: 3,
+      },
     ];
 
     let selectCallCount = 0;
@@ -115,7 +137,14 @@ describe('GET /api/sessions/:id', () => {
             limit: () =>
               Promise.resolve(
                 callIdx++ === 0
-                  ? [{ id: SESSION_ID, title: 'My session', userId: TEST_USER_ID, isPrivate: false }]
+                  ? [
+                      {
+                        id: SESSION_ID,
+                        title: 'My session',
+                        userId: TEST_USER_ID,
+                        isPrivate: false,
+                      },
+                    ]
                   : [],
               ),
             orderBy: () => ({
@@ -195,8 +224,7 @@ describe('DELETE /api/sessions/:id', () => {
       select: () => ({
         from: () => ({
           where: () => ({
-            limit: () =>
-              Promise.resolve([{ id: SESSION_ID, userId: TEST_USER_ID }]),
+            limit: () => Promise.resolve([{ id: SESSION_ID, userId: TEST_USER_ID }]),
           }),
         }),
       }),
@@ -218,8 +246,7 @@ describe('DELETE /api/sessions/:id', () => {
       select: () => ({
         from: () => ({
           where: () => ({
-            limit: () =>
-              Promise.resolve([{ id: SESSION_ID, userId: OTHER_USER_ID }]),
+            limit: () => Promise.resolve([{ id: SESSION_ID, userId: OTHER_USER_ID }]),
           }),
         }),
       }),

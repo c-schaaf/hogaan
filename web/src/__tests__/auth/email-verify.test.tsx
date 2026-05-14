@@ -104,7 +104,9 @@ describe('EmailVerify', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /resend/ }));
     });
-    act(() => { vi.advanceTimersByTime(1000); });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
     expect(screen.getByRole('button', { name: /resend \(\d+s\)/ })).toBeTruthy();
     vi.useRealTimers();
   });

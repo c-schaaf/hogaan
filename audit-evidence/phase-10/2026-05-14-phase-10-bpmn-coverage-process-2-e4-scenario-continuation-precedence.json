@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T19:36:45.195Z",
+  "testId": "phase-10/bpmn-coverage/process-2/e4-scenario-continuation-precedence",
+  "controlId": "T2.Process2.E4_ScenarioHandoff",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Active scenario continuation: even when the triage intent is Coaching (not ScenarioRequest), an existing activeScenario on the user profile causes the scenario subprocess to handle the turn. Tests the precedence rule documented in src/coaching/orchestrator.ts.",
+  "phase": "phase-10"
+}

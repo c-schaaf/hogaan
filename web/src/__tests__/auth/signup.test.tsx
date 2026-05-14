@@ -100,9 +100,15 @@ describe('Signup', () => {
     fireEvent.change(emailInput(), { target: { value: 'hamse@test.com' } });
     fireEvent.change(passwordInput(), { target: { value: 'password123' } });
     fireEvent.click(screen.getByText('Create my account'));
-    await waitFor(() => {
-      expect(defaultProps.goVerify).toHaveBeenCalledWith({ name: 'Hamse Warfa', email: 'hamse@test.com' });
-    }, { timeout: 1000 });
+    await waitFor(
+      () => {
+        expect(defaultProps.goVerify).toHaveBeenCalledWith({
+          name: 'Hamse Warfa',
+          email: 'hamse@test.com',
+        });
+      },
+      { timeout: 1000 },
+    );
   });
 
   it('shows email field error for already-registered error', async () => {

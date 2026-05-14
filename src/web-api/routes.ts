@@ -53,8 +53,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     const session = await requireSupabaseSession(req, reply, opts);
     if (session === null) return;
 
-    const message =
-      typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
     if (message.length === 0) {
       return reply.code(400).send({ error: 'message_required' });
     }
@@ -139,8 +138,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     const session = await requireSupabaseSession(req, reply, opts);
     if (session === null) return;
 
-    const message =
-      typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
     if (message.length === 0) {
       return reply.code(400).send({ error: 'message_required' });
     }
@@ -174,7 +172,9 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       // empty/media_only on the streaming endpoint shouldn't happen (web
       // sends text-only), but if it does just emit the templated copy.
       if (sync !== null && sync.status === 'media_only') {
-        sendEvent('delta', { text: "I work with text only for now. Type out what's on your mind and I'll respond." });
+        sendEvent('delta', {
+          text: "I work with text only for now. Type out what's on your mind and I'll respond.",
+        });
         sendEvent('end', { turnId: null, sessionId: null, latencyMs: Date.now() - t0 });
         reply.raw.end();
         return reply;
@@ -287,10 +287,14 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
           })
           .where(eq(sessions.id, sessionId));
       } catch (err) {
-        reportP2('streaming turn persist failed (non-blocking)', {
-          source: 'PhaseC.WebApi.Stream',
-          extra: { error: err instanceof Error ? err.message : String(err) },
-        }, err);
+        reportP2(
+          'streaming turn persist failed (non-blocking)',
+          {
+            source: 'PhaseC.WebApi.Stream',
+            extra: { error: err instanceof Error ? err.message : String(err) },
+          },
+          err,
+        );
       }
 
       sendEvent('end', { turnId, sessionId, latencyMs });
@@ -342,7 +346,13 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         turnCount: sessions.turnCount,
       })
       .from(sessions)
-      .where(and(eq(sessions.userId, session.userId), eq(sessions.isPrivate, false), gt(sessions.turnCount, 0)))
+      .where(
+        and(
+          eq(sessions.userId, session.userId),
+          eq(sessions.isPrivate, false),
+          gt(sessions.turnCount, 0),
+        ),
+      )
       .orderBy(desc(sessions.lastTurnAt))
       .limit(200);
 
@@ -464,7 +474,10 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
 
     const fullName =
       typeof u.profileFlags === 'object' && u.profileFlags !== null && 'fullName' in u.profileFlags
-        ? String((u.profileFlags as { fullName?: unknown }).fullName ?? '')
+        ? (() => {
+            const v = (u.profileFlags as { fullName?: unknown }).fullName;
+            return typeof v === 'string' ? v : '';
+          })()
         : '';
 
     return reply.send({
@@ -480,8 +493,18 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
 
   // PATCH /api/profile -------------------------------------------------
   const KNOWN_PRACTICES = new Set([
-    'Purpose', 'Integrity', 'Accountability', 'Dignity', 'Empathy', 'Inclusion',
-    'Assets', 'Innovation', 'Prosperity', 'Humility', 'Peace', 'Democracy',
+    'Purpose',
+    'Integrity',
+    'Accountability',
+    'Dignity',
+    'Empathy',
+    'Inclusion',
+    'Assets',
+    'Innovation',
+    'Prosperity',
+    'Humility',
+    'Peace',
+    'Democracy',
   ]);
 
   app.patch<{
@@ -509,7 +532,9 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         .where(eq(users.id, session.userId))
         .limit(1);
       const existing =
-        row[0] !== undefined && typeof row[0].profileFlags === 'object' && row[0].profileFlags !== null
+        row[0] !== undefined &&
+        typeof row[0].profileFlags === 'object' &&
+        row[0].profileFlags !== null
           ? (row[0].profileFlags as Record<string, unknown>)
           : {};
       update['profileFlags'] = { ...existing, fullName: req.body.fullName };

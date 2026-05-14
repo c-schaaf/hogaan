@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-05-14T19:36:41.138Z",
+  "testId": "phase-10/bpmn-coverage/process-2/E9_MessageRejected",
+  "controlId": "T2.Process2.E9_MessageRejected",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #2 E9_MessageRejected is referenced in 1 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "CoachingConversation",
+    "endEvent": "E9_MessageRejected",
+    "coveringFiles": [
+      "tests\\phase-10\\bpmn-coverage-process-2.test.ts"
+    ],
+    "hits": 1
+  }
+}

@@ -4,28 +4,28 @@
 
 :root {
   /* Backgrounds */
-  --hogaan-bg: #FAF6F1;           /* cream — primary background */
-  --hogaan-bg-card: #FFFFFF;       /* white — cards on cream */
-  --hogaan-bg-sunken: #F3EDE4;     /* slightly deeper cream — input fields, inset */
+  --hogaan-bg: #faf6f1; /* cream — primary background */
+  --hogaan-bg-card: #ffffff; /* white — cards on cream */
+  --hogaan-bg-sunken: #f3ede4; /* slightly deeper cream — input fields, inset */
 
   /* Text */
-  --hogaan-text: #0A1F4D;          /* deep navy — primary text + structure */
-  --hogaan-text-mute: #6B6B7A;     /* warm gray — secondary text */
-  --hogaan-text-soft: #9090A0;     /* even softer — captions, timestamps */
+  --hogaan-text: #0a1f4d; /* deep navy — primary text + structure */
+  --hogaan-text-mute: #6b6b7a; /* warm gray — secondary text */
+  --hogaan-text-soft: #9090a0; /* even softer — captions, timestamps */
 
   /* Accents */
-  --hogaan-accent: #C49B4A;        /* gold — CTAs, highlights, active states */
-  --hogaan-accent-light: #E8D5A8;  /* gold tint — chip backgrounds */
-  --hogaan-accent-tint: #F5EAD0;   /* very pale gold — subtle hover */
+  --hogaan-accent: #c49b4a; /* gold — CTAs, highlights, active states */
+  --hogaan-accent-light: #e8d5a8; /* gold tint — chip backgrounds */
+  --hogaan-accent-tint: #f5ead0; /* very pale gold — subtle hover */
 
   /* Hamse Warfa parent brand (used sparingly) */
-  --hw-navy: #00004D;              /* parent-brand navy — almost identical to hogaan-text, used in lineage moments */
-  --hw-blue: #0086FF;              /* parent-brand blue — only in attribution footer links */
+  --hw-navy: #00004d; /* parent-brand navy — almost identical to hogaan-text, used in lineage moments */
+  --hw-blue: #0086ff; /* parent-brand blue — only in attribution footer links */
 
   /* Semantic */
-  --status-ok: #2E7D5F;            /* muted green — for status indicators */
-  --status-warn: #C97A2E;          /* muted amber — warnings */
-  --status-error: #B5394A;         /* muted red — errors */
+  --status-ok: #2e7d5f; /* muted green — for status indicators */
+  --status-warn: #c97a2e; /* muted amber — warnings */
+  --status-error: #b5394a; /* muted red — errors */
 
   /* Shadows */
   --shadow-card: 0 2px 8px rgba(10, 31, 77, 0.06);

@@ -10,9 +10,10 @@ test.describe('Bottom navigation (mobile)', () => {
   });
 
   test('Sessions tab navigates to sessions screen', async ({ page }) => {
-    const sessionsTab = page.locator('[class*="nav"] button', { hasText: /sessions/i })
+    const sessionsTab = page
+      .locator('[class*="nav"] button', { hasText: /sessions/i })
       .or(page.locator('[aria-label*="sessions" i]'));
-    if (await sessionsTab.count() > 0) {
+    if ((await sessionsTab.count()) > 0) {
       await sessionsTab.first().click();
       await expect(page.locator('[class*="ses-"]')).toBeVisible({ timeout: 5000 });
     } else {
@@ -23,9 +24,10 @@ test.describe('Bottom navigation (mobile)', () => {
   });
 
   test('Profile tab navigates to profile screen', async ({ page }) => {
-    const profileTab = page.locator('[class*="nav"] button', { hasText: /profile/i })
+    const profileTab = page
+      .locator('[class*="nav"] button', { hasText: /profile/i })
       .or(page.locator('[aria-label*="profile" i]'));
-    if (await profileTab.count() > 0) {
+    if ((await profileTab.count()) > 0) {
       await profileTab.first().click();
       await expect(page.locator('[class*="pr-"]')).toBeVisible({ timeout: 5000 });
     } else {

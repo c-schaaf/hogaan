@@ -319,6 +319,7 @@ async function instrumentCheck(
  * concurrently so we get the full failure picture in one round-trip — Check 8
  * has its own 4s budget so won't block the orchestrator past that.
  */
+// eslint-disable-next-line @typescript-eslint/require-await -- async signature preserved for when checks re-enable
 async function runAllChecks(
   deps: OrchestratorDeps,
   input: QcInput,

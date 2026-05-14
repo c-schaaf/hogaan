@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-05-10T20:31:35.740Z",
+  "testId": "phase-10/bpmn-coverage/process-1/E4_OnboardingDormantParked",
+  "controlId": "T2.Process1.E4_OnboardingDormantParked",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #1 E4_OnboardingDormantParked is referenced in 1 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "Onboarding",
+    "endEvent": "E4_OnboardingDormantParked",
+    "coveringFiles": [
+      "tests\\onboarding\\end-events.test.ts"
+    ],
+    "hits": 1
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-05-14T19:36:41.215Z",
+  "testId": "phase-10/bpmn-coverage/process-9/E5_MalformedInput",
+  "controlId": "T2.Process9.E5_MalformedInput",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #9 E5_MalformedInput is referenced in 1 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "PromptAssembly",
+    "endEvent": "E5_MalformedInput",
+    "coveringFiles": [
+      "tests\\prompt-assembly\\end-events.test.ts"
+    ],
+    "hits": 1
+  }
+}

@@ -36,7 +36,6 @@ function configWithKey(key: string | undefined): AppConfig {
     betterstackHeartbeatUrl: undefined,
     resendApiKey: undefined,
     resendFromEmail: undefined,
-    sponsorPortalBaseUrl: undefined,
     supabaseUrl: undefined,
     supabaseAnonKey: undefined,
   };

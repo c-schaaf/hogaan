@@ -99,7 +99,9 @@ describe('validateInputPayload', () => {
     );
   });
 
-  it('requires practiceTag for FullCoachingResponse', () => {
+  // practiceTag enforcement removed 2026-05-13 (coaching_v0_unified short-circuits
+  // the practice framing block; tagger is also stubbed). Tag is informational only.
+  it.skip('requires practiceTag for FullCoachingResponse', () => {
     const bad = { ...baseFullCoaching, practiceTag: undefined } as unknown as InputPayload;
     expect(() => validateInputPayload(bad)).toThrow(PromptAssemblyError);
   });
@@ -115,7 +117,8 @@ describe('validateInputPayload', () => {
     expect(() => validateInputPayload(ok)).not.toThrow();
   });
 
-  it('rejects unknown practiceTag', () => {
+  // practiceTag enforcement removed 2026-05-13 — unknown values now pass through.
+  it.skip('rejects unknown practiceTag', () => {
     const bad = { ...baseFullCoaching, practiceTag: 'fortitude' } as unknown as InputPayload;
     expect(() => validateInputPayload(bad)).toThrow(PromptAssemblyError);
   });

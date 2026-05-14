@@ -115,6 +115,7 @@ export async function llmTriage(config: AppConfig, body: string): Promise<Triage
  *
  * Synchronous fast-path first; LLM only when nothing fast-path-decidable.
  */
+// eslint-disable-next-line @typescript-eslint/require-await -- async signature preserved for llmTriage re-enable
 export async function triage(
   config: AppConfig,
   body: string,
@@ -148,4 +149,3 @@ export async function triage(
   // ╚════════════════════════════════════════════════════════════════════╝
   return { status: 'valid', reason: 'triage-llm-disabled-2026-05-13', intent: 'Coaching' };
 }
-

@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-05-10T20:31:36.074Z",
+  "testId": "phase-10/bpmn-coverage/process-12/E10_IdentityServiceUnavailable",
+  "controlId": "T2.Process12.E10_IdentityServiceUnavailable",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #12 E10_IdentityServiceUnavailable is referenced in 1 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "Identity",
+    "endEvent": "E10_IdentityServiceUnavailable",
+    "coveringFiles": [
+      "tests\\identity\\end-events.test.ts"
+    ],
+    "hits": 1
+  }
+}

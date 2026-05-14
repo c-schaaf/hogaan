@@ -28,9 +28,8 @@ const testConfig: AppConfig = {
   betterstackHeartbeatUrl: undefined,
   resendApiKey: undefined,
   resendFromEmail: undefined,
-  sponsorPortalBaseUrl: undefined,
-    supabaseUrl: undefined,
-    supabaseAnonKey: undefined,
+  supabaseUrl: undefined,
+  supabaseAnonKey: undefined,
 };
 
 describe('app', () => {

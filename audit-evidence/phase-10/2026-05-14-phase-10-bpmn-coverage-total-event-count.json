@@ -1,0 +1,21 @@
+{
+  "recordedAt": "2026-05-14T19:36:42.225Z",
+  "testId": "phase-10/bpmn-coverage/total-event-count",
+  "controlId": "T2.BPMNCoverage.TotalEventCount",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Total declared end events across the six BPMN processes: 48",
+  "phase": "phase-10",
+  "details": {
+    "totalEndEvents": 48,
+    "masterPlanCount": 57,
+    "notes": "Master plan §10.1 cites 57 (Process #9 uses 4 happy-path modes); actual catalog is 63 (Process #9 has 10 entries inc. failure modes).",
+    "perProcess": {
+      "Onboarding": 8,
+      "CoachingConversation": 11,
+      "PromptAssembly": 10,
+      "QualityCheck": 8,
+      "Identity": 11
+    }
+  }
+}

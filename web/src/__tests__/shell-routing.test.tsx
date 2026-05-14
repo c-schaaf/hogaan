@@ -6,7 +6,7 @@
  * existing test suite — which covered only the backend. Each test below maps
  * to a bug that was found by the CU audit agent and fixed on this branch.
  */
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Shell } from '../Shell';
 
@@ -53,7 +53,18 @@ vi.mock('../lib/auth-errors', () => ({ readAuthErrorFromUrl: () => null }));
 // Stub all phase components — routing tests only care which phase is active
 vi.mock('../phases/Login', () => ({ Login: () => <div data-testid="phase-login" /> }));
 vi.mock('../phases/Signup', () => ({ Signup: () => <div data-testid="phase-signup" /> }));
-vi.mock('../phases/Home', () => ({ Home: () => <div data-testid="phase-home" /> }));
+vi.mock('../phases/Home', () => ({
+  Home: ({ onNav }: { onNav?: (t: string) => void }) => (
+    <div data-testid="phase-home">
+      <button data-testid="nav-sessions" onClick={() => onNav?.('sessions')}>
+        Sessions
+      </button>
+      <button data-testid="nav-profile" onClick={() => onNav?.('profile')}>
+        Profile
+      </button>
+    </div>
+  ),
+}));
 vi.mock('../phases/Sessions', () => ({
   Sessions: () => <div data-testid="phase-sessions" />,
 }));
@@ -79,6 +90,9 @@ const ONBOARDED_PROFILE = {
 
 beforeEach(() => {
   sessionStorage.clear();
+  // Reset jsdom URL — replaceState() persists across tests otherwise, and the
+  // production Shell.tsx writes /sessions, /profile to the URL when phase changes.
+  window.history.replaceState({}, '', '/');
   vi.clearAllMocks(); // reset call counts; preserves mock implementations
   mockProfileGet.mockResolvedValue(ONBOARDED_PROFILE);
 });
@@ -159,6 +173,99 @@ describe('F5 phase restore', () => {
     });
 
     await waitFor(() => screen.getByTestId('phase-profile'));
+  });
+
+  it('navigating to sessions via onNav writes sessions to sessionStorage', async () => {
+    render(<Shell />);
+    act(() => {
+      fireAuth('INITIAL_SESSION', { access_token: 'tok-1' });
+    });
+    await waitFor(() => screen.getByTestId('phase-home'));
+
+    fireEvent.click(screen.getByTestId('nav-sessions'));
+
+    await waitFor(() => expect(sessionStorage.getItem('shell-phase')).toBe('sessions'));
+  });
+
+  it('navigating to profile via onNav writes profile to sessionStorage', async () => {
+    render(<Shell />);
+    act(() => {
+      fireAuth('INITIAL_SESSION', { access_token: 'tok-1' });
+    });
+    await waitFor(() => screen.getByTestId('phase-home'));
+
+    fireEvent.click(screen.getByTestId('nav-profile'));
+
+    await waitFor(() => expect(sessionStorage.getItem('shell-phase')).toBe('profile'));
+  });
+
+  it('full cycle: nav to sessions → remount → restores sessions (not home)', async () => {
+    // Step 1: land on home, navigate to sessions
+    const { unmount } = render(<Shell />);
+    act(() => {
+      fireAuth('INITIAL_SESSION', { access_token: 'tok-1' });
+    });
+    await waitFor(() => screen.getByTestId('phase-home'));
+
+    fireEvent.click(screen.getByTestId('nav-sessions'));
+    await waitFor(() => screen.getByTestId('phase-sessions'));
+
+    // sessionStorage must have been written by the time phase renders
+    expect(sessionStorage.getItem('shell-phase')).toBe('sessions');
+
+    // Step 2: simulate F5 — unmount without clearing sessionStorage, then remount
+    unmount();
+    render(<Shell />);
+    act(() => {
+      fireAuth('INITIAL_SESSION', { access_token: 'tok-2' });
+    });
+
+    // Must land on sessions, not home
+    await waitFor(() => screen.getByTestId('phase-sessions'));
+    expect(screen.queryByTestId('phase-home')).toBeNull();
+  });
+
+  it('full cycle: nav to profile → remount → restores profile (not home)', async () => {
+    const { unmount } = render(<Shell />);
+    act(() => {
+      fireAuth('INITIAL_SESSION', { access_token: 'tok-1' });
+    });
+    await waitFor(() => screen.getByTestId('phase-home'));
+
+    fireEvent.click(screen.getByTestId('nav-profile'));
+    await waitFor(() => screen.getByTestId('phase-profile'));
+
+    expect(sessionStorage.getItem('shell-phase')).toBe('profile');
+
+    unmount();
+    render(<Shell />);
+    act(() => {
+      fireAuth('INITIAL_SESSION', { access_token: 'tok-2' });
+    });
+
+    await waitFor(() => screen.getByTestId('phase-profile'));
+    expect(screen.queryByTestId('phase-home')).toBeNull();
+  });
+
+  it('concurrent SIGNED_IN during routeAuthed does not reset phase to home', async () => {
+    render(<Shell />);
+    act(() => {
+      fireAuth('INITIAL_SESSION', { access_token: 'tok-1' });
+    });
+    await waitFor(() => screen.getByTestId('phase-home'));
+
+    fireEvent.click(screen.getByTestId('nav-sessions'));
+    await waitFor(() => screen.getByTestId('phase-sessions'));
+
+    // Simulate a background token refresh firing SIGNED_IN with new token
+    act(() => {
+      fireAuth('SIGNED_IN', { access_token: 'tok-new' });
+    });
+    await new Promise((r) => setTimeout(r, 80));
+
+    // Must stay on sessions, not bounce to home
+    expect(screen.getByTestId('phase-sessions')).toBeTruthy();
+    expect(screen.queryByTestId('phase-home')).toBeNull();
   });
 });
 

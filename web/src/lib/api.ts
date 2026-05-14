@@ -185,8 +185,7 @@ export const api = {
   sessions: {
     list: () => call<{ sessions: SessionSummary[] }>('/api/sessions'),
     get: (id: string) => call<SessionDetail>(`/api/sessions/${id}`),
-    del: (id: string) =>
-      call<{ ok: true }>(`/api/sessions/${id}`, { method: 'DELETE' }),
+    del: (id: string) => call<{ ok: true }>(`/api/sessions/${id}`, { method: 'DELETE' }),
   },
   profile: {
     get: () => call<MeResponse>('/api/profile'),

@@ -8,7 +8,13 @@ test.describe('Open and continue a session', () => {
   test.beforeEach(async ({ page }) => {
     await loginAs(page);
     await mockSessionsList(page, [
-      { id: SESSION_ID, title: 'Past Coaching Session', when: '3 days ago', turnCount: 2, group: 'This week' },
+      {
+        id: SESSION_ID,
+        title: 'Past Coaching Session',
+        when: '3 days ago',
+        turnCount: 2,
+        group: 'This week',
+      },
     ]);
     await mockSessionDetail(page, SESSION_ID, {
       title: 'Past Coaching Session',

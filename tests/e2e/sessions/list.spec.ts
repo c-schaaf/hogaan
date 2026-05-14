@@ -6,8 +6,20 @@ test.describe('Sessions list', () => {
   test('shows grouped sessions', async ({ page }) => {
     await loginAs(page);
     await mockSessionsList(page, [
-      { id: 's1', title: 'Team Leadership Discussion', when: '2 days ago', turnCount: 5, group: 'This week' },
-      { id: 's2', title: 'Conflict Resolution Strategy', when: '15 days ago', turnCount: 3, group: 'Earlier this month' },
+      {
+        id: 's1',
+        title: 'Team Leadership Discussion',
+        when: '2 days ago',
+        turnCount: 5,
+        group: 'This week',
+      },
+      {
+        id: 's2',
+        title: 'Conflict Resolution Strategy',
+        when: '15 days ago',
+        turnCount: 3,
+        group: 'Earlier this month',
+      },
     ]);
 
     await page.waitForSelector('[class*="hm-"]', { timeout: 8000 });
@@ -29,7 +41,9 @@ test.describe('Sessions list', () => {
     await page.reload();
     await page.waitForSelector('[class*="ses-"]', { timeout: 8000 });
 
-    await expect(page.getByText(/saved conversations will live here/i)).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(/saved conversations will live here/i)).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('search filters sessions by title', async ({ page }) => {

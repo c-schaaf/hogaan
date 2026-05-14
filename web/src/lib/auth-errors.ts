@@ -54,9 +54,7 @@ export function humanizeAuthError(err: AuthError | Error | SupabaseErrorLike): s
  * Read URL params for the case where Supabase redirects back with an error
  * (e.g. expired confirmation link). Both query and hash variants exist.
  */
-export function readAuthErrorFromUrl():
-  | { code: string; description: string }
-  | null {
+export function readAuthErrorFromUrl(): { code: string; description: string } | null {
   if (typeof window === 'undefined') return null;
   const fromQuery = readErrorParams(new URLSearchParams(window.location.search));
   if (fromQuery) return fromQuery;

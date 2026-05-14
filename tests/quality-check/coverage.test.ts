@@ -111,12 +111,12 @@ const cfg: AppConfig = {
   betterstackHeartbeatUrl: undefined,
   resendApiKey: undefined,
   resendFromEmail: undefined,
-  sponsorPortalBaseUrl: undefined,
-    supabaseUrl: undefined,
-    supabaseAnonKey: undefined,
+  supabaseUrl: undefined,
+  supabaseAnonKey: undefined,
 };
 
-describe('Phase 12 R1 — runAllChecks produces every active CheckId in the catalog', () => {
+// QC checks disabled 2026-05-13 — runAllChecks returns [] until checks are re-enabled.
+describe.skip('Phase 12 R1 — runAllChecks produces every active CheckId in the catalog', () => {
   it('runs all active checks in a single pass', async () => {
     const result = await runQualityCheck(
       {

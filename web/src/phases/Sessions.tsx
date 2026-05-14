@@ -58,7 +58,15 @@ function SessionsEmpty({ onHome }: { onHome: () => void }) {
     <div className="ses-empty">
       <div className="ses-empty-mark" aria-hidden="true">
         <svg viewBox="0 0 96 96" width="96" height="96" fill="none">
-          <rect x="14" y="22" width="68" height="56" rx="10" stroke="currentColor" strokeWidth="1.5" />
+          <rect
+            x="14"
+            y="22"
+            width="68"
+            height="56"
+            rx="10"
+            stroke="currentColor"
+            strokeWidth="1.5"
+          />
           <path
             d="M22 36h52M22 46h36M22 56h44"
             stroke="currentColor"
@@ -71,8 +79,8 @@ function SessionsEmpty({ onHome }: { onHome: () => void }) {
       </div>
       <h2 className="ses-empty-h">Your saved conversations will live here.</h2>
       <p className="ses-empty-sub">
-        When you talk with Hogaan, sessions get a title and the practices you worked through — so you
-        can pick up where you left off.
+        When you talk with Hogaan, sessions get a title and the practices you worked through — so
+        you can pick up where you left off.
       </p>
       <button type="button" className="ses-empty-cta" onClick={onHome}>
         ← Back to Home

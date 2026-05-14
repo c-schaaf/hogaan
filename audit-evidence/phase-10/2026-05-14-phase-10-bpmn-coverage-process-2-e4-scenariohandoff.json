@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-05-14T19:36:41.114Z",
+  "testId": "phase-10/bpmn-coverage/process-2/E4_ScenarioHandoff",
+  "controlId": "T2.Process2.E4_ScenarioHandoff",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #2 E4_ScenarioHandoff is referenced in 1 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "CoachingConversation",
+    "endEvent": "E4_ScenarioHandoff",
+    "coveringFiles": [
+      "tests\\phase-10\\bpmn-coverage-process-2.test.ts"
+    ],
+    "hits": 1
+  }
+}

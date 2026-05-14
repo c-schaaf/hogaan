@@ -12,10 +12,7 @@ vi.mock('../../src/incident-handling/index.js', () => ({
 
 const SESSION_ID = 'sess-0000-0000-0000-000000000001';
 
-function buildDb(opts: {
-  existingTitle?: string | null;
-  updateSpy?: ReturnType<typeof vi.fn>;
-}) {
+function buildDb(opts: { existingTitle?: string | null; updateSpy?: ReturnType<typeof vi.fn> }) {
   const { existingTitle = null, updateSpy = vi.fn().mockResolvedValue([]) } = opts;
 
   return {
@@ -64,10 +61,17 @@ describe('generateSessionTitle', () => {
     const updateSpy = vi.fn().mockResolvedValue([]);
     const db = buildDb({ existingTitle: null, updateSpy });
 
-    await generateSessionTitle(fakeConfig(), db as never, SESSION_ID, 'How do I lead my remote team?');
+    await generateSessionTitle(
+      fakeConfig(),
+      db as never,
+      SESSION_ID,
+      'How do I lead my remote team?',
+    );
 
     expect(vi.mocked(chat)).toHaveBeenCalledOnce();
-    expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ title: 'Managing Remote Team Dynamics' }));
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Managing Remote Team Dynamics' }),
+    );
   });
 
   it('strips leading and trailing quotes from LLM response', async () => {
@@ -79,7 +83,9 @@ describe('generateSessionTitle', () => {
 
     await generateSessionTitle(fakeConfig(), db as never, SESSION_ID, 'empathy question');
 
-    expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ title: 'Leading With Empathy' }));
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Leading With Empathy' }),
+    );
   });
 
   it('saves fallback when LLM throws', async () => {
@@ -91,7 +97,9 @@ describe('generateSessionTitle', () => {
 
     await generateSessionTitle(fakeConfig(), db as never, SESSION_ID, 'some message');
 
-    expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ title: 'Personal reflection' }));
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Personal reflection' }),
+    );
   });
 
   it('saves fallback when LLM returns > 120 chars', async () => {
@@ -103,7 +111,9 @@ describe('generateSessionTitle', () => {
 
     await generateSessionTitle(fakeConfig(), db as never, SESSION_ID, 'long title message');
 
-    expect(updateSpy).toHaveBeenCalledWith(expect.objectContaining({ title: 'Personal reflection' }));
+    expect(updateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Personal reflection' }),
+    );
   });
 
   it('saves title to sessions table via DB update', async () => {

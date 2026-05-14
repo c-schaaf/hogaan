@@ -52,7 +52,11 @@ export const PRACTICES: Practice[] = [
     gloss: 'Collaborate on concepts that produce tangible solutions',
   },
   { group: 'Organization', name: 'Prosperity', gloss: 'Accelerate growth toward ethical outcomes' },
-  { group: 'Community', name: 'Humility', gloss: 'Form courage through embracing your vulnerability' },
+  {
+    group: 'Community',
+    name: 'Humility',
+    gloss: 'Form courage through embracing your vulnerability',
+  },
   { group: 'Community', name: 'Peace', gloss: 'Promote belonging in response to conflict' },
   { group: 'Community', name: 'Democracy', gloss: 'Practice building power with people' },
 ];

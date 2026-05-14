@@ -13,10 +13,14 @@ test.describe('Private mode', () => {
   });
 
   test('toggling private mode shows privacy banner', async ({ page }) => {
-    const toggle = page.locator('[class*="privacy"], [class*="priv"], [aria-label*="private" i]').first();
+    const toggle = page
+      .locator('[class*="privacy"], [class*="priv"], [aria-label*="private" i]')
+      .first();
     if (await toggle.isVisible()) {
       await toggle.click();
-      await expect(page.getByText(/private|nothing.*saved|not.*saved/i)).toBeVisible({ timeout: 3000 });
+      await expect(page.getByText(/private|nothing.*saved|not.*saved/i)).toBeVisible({
+        timeout: 3000,
+      });
     } else {
       test.skip();
     }

@@ -27,7 +27,6 @@ describe('handleConsentReply', () => {
   });
 });
 
-
 // Khadija UX Reframe — handleGoalReply now finalizes onboarding (newStep=7).
 // Single-message ack + FIRST_COACHING_PROMPT replaces the old experience-band
 // hand-off. Experience and location no longer asked during onboarding.

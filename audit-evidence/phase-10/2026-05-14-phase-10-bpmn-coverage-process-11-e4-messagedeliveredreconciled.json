@@ -1,0 +1,18 @@
+{
+  "recordedAt": "2026-05-14T11:36:49.588Z",
+  "testId": "phase-10/bpmn-coverage/process-11/E4_MessageDeliveredReconciled",
+  "controlId": "T2.Process11.E4_MessageDeliveredReconciled",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Process #11 E4_MessageDeliveredReconciled is referenced in 2 test file(s)",
+  "phase": "phase-10",
+  "details": {
+    "process": "WhatsAppDelivery",
+    "endEvent": "E4_MessageDeliveredReconciled",
+    "coveringFiles": [
+      "tests\\whatsapp-delivery\\end-events.test.ts",
+      "tests\\whatsapp-delivery\\reconcile-status.test.ts"
+    ],
+    "hits": 2
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T21:02:37.288Z",
+  "testId": "audit/R-04-unknown-error-rethrown",
+  "controlId": "T3.Audit.R04_UnknownErrorRethrown",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "R-04 negative control: a generic Error from assemblePrompt must NOT be caught by the new try/catch. The orchestrator preserves bug-report semantics for unknown failures.",
+  "phase": "phase-12"
+}

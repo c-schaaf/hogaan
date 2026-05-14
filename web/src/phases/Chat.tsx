@@ -10,7 +10,6 @@ import {
 } from '../components/Icons';
 import { api, type SessionSummary } from '../lib/api';
 
-
 interface BotParagraph {
   paras: ReactNode[];
   chips: string[];
@@ -24,7 +23,8 @@ interface BotParagraph {
 function renderResponse(text: string): BotParagraph {
   const trimmed = text.replace(/\r\n/g, '\n').trim();
   const paragraphs = trimmed.split(/\n{2,}|\n(?=[A-Z])/).filter((p) => p.trim().length > 0);
-  const leadRegex = /^(An insight|A first move|Here's a first move|First move|Insight|Action|Story|Reflection)\s*:\s*/i;
+  const leadRegex =
+    /^(An insight|A first move|Here's a first move|First move|Insight|Action|Story|Reflection)\s*:\s*/i;
   const nodes: ReactNode[] = paragraphs.map((p, i) => {
     const m = leadRegex.exec(p);
     if (m === null) return <Fragment key={i}>{p}</Fragment>;
@@ -296,12 +296,7 @@ export function Chat({
           >
             <ChatIconMenu />
           </button>
-          <button
-            type="button"
-            className="ch-back"
-            onClick={onBack}
-            aria-label="Back to home"
-          >
+          <button type="button" className="ch-back" onClick={onBack} aria-label="Back to home">
             <ChatIconBack />
           </button>
           <div className="ch-title-wrap">
@@ -399,7 +394,12 @@ export function Chat({
               if (e.key === 'Enter' && !e.altKey && !e.metaKey) void sendText(draft);
             }}
           />
-          <button type="button" className="ch-send" onClick={() => sendText(draft)} aria-label="Send">
+          <button
+            type="button"
+            className="ch-send"
+            onClick={() => sendText(draft)}
+            aria-label="Send"
+          >
             <ChatIconSend />
           </button>
         </div>

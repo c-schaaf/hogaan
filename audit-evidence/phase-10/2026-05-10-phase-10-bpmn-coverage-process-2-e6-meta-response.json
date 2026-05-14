@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T20:31:29.110Z",
+  "testId": "phase-10/bpmn-coverage/process-2/e6-meta-response",
+  "controlId": "T2.Process2.E6_MetaResponse",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Triage classifies intent=MetaQuestion (\"are you AI?\"). Orchestrator routes to runTemplatedResponse(META_TEMPLATE) and finalizes with E6_MetaResponse. No coaching pipeline triggered.",
+  "phase": "phase-10"
+}

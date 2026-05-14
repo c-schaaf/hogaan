@@ -49,8 +49,8 @@ test.describe('Send message', () => {
     await input.press('Enter');
 
     // Thinking indicator or bot bubble should appear
-    await expect(
-      page.locator('[class*="thinking"], [class*="ch-bot"]').first()
-    ).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[class*="thinking"], [class*="ch-bot"]').first()).toBeVisible({
+      timeout: 5000,
+    });
   });
 });

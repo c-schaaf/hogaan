@@ -40,7 +40,13 @@ describe('retrieveMemories', () => {
 
     const now = new Date('2026-05-01T10:00:00Z');
     const db = buildDb([
-      { id: 'mem-1', content: 'User leads a team of 12', metadata: { kind: 'turn' }, similarity: '0.92', created_at: now },
+      {
+        id: 'mem-1',
+        content: 'User leads a team of 12',
+        metadata: { kind: 'turn' },
+        similarity: '0.92',
+        created_at: now,
+      },
     ]);
 
     const results = await retrieveMemories(fakeConfig(), db as never, USER_ID, 'team size');
@@ -57,7 +63,15 @@ describe('retrieveMemories', () => {
 
   it('returns empty array when topN=0 without calling embedQuery', async () => {
     const { embedQuery } = await import('../../src/shared/embeddings/index.js');
-    const db = buildDb([{ id: 'mem-1', content: 'anything', metadata: null, similarity: '0.9', created_at: new Date() }]);
+    const db = buildDb([
+      {
+        id: 'mem-1',
+        content: 'anything',
+        metadata: null,
+        similarity: '0.9',
+        created_at: new Date(),
+      },
+    ]);
 
     const results = await retrieveMemories(fakeConfig(), db as never, USER_ID, 'query', 0);
 
@@ -71,7 +85,13 @@ describe('retrieveMemories', () => {
 
     const isoString = '2026-04-15T08:30:00.000Z';
     const db = buildDb([
-      { id: 'mem-2', content: 'something', metadata: null, similarity: '0.8', created_at: isoString },
+      {
+        id: 'mem-2',
+        content: 'something',
+        metadata: null,
+        similarity: '0.8',
+        created_at: isoString,
+      },
     ]);
 
     const results = await retrieveMemories(fakeConfig(), db as never, USER_ID, 'something');

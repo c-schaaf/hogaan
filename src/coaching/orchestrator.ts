@@ -544,7 +544,7 @@ export async function runCoachingTurn(
       practiceTag: tags.practiceTag,
       levelTag: tags.levelTag,
       latencyMs: Date.now() - t0,
-      reason: `delivery failed: ${delivery.reason}`,
+      reason: 'delivery failed',
       sessionId: session.sessionId,
       turnId: null,
     });
@@ -556,42 +556,41 @@ export async function runCoachingTurn(
   // Step 2 but is marked is_private=true by the web-api caller; the list
   // endpoint filters those out.
   const turnLatency = Date.now() - t0;
-  const postTurn = inbound.isPrivate === true
-    ? { turnId: null as TurnId | null }
-    : await persistPostTurn(
-        { config: deps.config, db: deps.db },
-        {
-          userId: inbound.userId,
-          sessionId: session.sessionId,
-          userMessage: inbound.body,
-          responseText,
-          intent,
-          practiceTag: tags.practiceTag,
-          levelTag: tags.levelTag,
-          secondaryPracticeTag: tags.secondaryPracticeTag,
-          secondaryLevelTag: tags.secondaryLevelTag,
-          taggerConfidence: tags.confidence,
-          responseMode: 'FullCoachingResponse',
-          modelUsed: chatResp.modelUsed,
-          fallbackPath: chatResp.fallbackPath,
-          qaOutcome: qc.endEvent,
-          retryCount: qc.retryCount,
-          latencyMs: turnLatency,
-          degradationFlags: {
-            memoryTruncated: promptBundle.degradationFlags.memoryTruncated,
-            sessionTruncated: promptBundle.degradationFlags.sessionTruncated,
-            culturalFramingDropped: promptBundle.degradationFlags.culturalFramingDropped,
-            fallbackModelUsed: chatResp.fallbackPath !== 'none',
-            contextFetchPartial: ctx.partialFailure,
+  const postTurn =
+    inbound.isPrivate === true
+      ? { turnId: null as TurnId | null }
+      : await persistPostTurn(
+          { config: deps.config, db: deps.db },
+          {
+            userId: inbound.userId,
+            sessionId: session.sessionId,
+            userMessage: inbound.body,
+            responseText,
+            intent,
+            practiceTag: tags.practiceTag,
+            levelTag: tags.levelTag,
+            secondaryPracticeTag: tags.secondaryPracticeTag,
+            secondaryLevelTag: tags.secondaryLevelTag,
+            taggerConfidence: tags.confidence,
+            responseMode: 'FullCoachingResponse',
+            modelUsed: chatResp.modelUsed,
+            fallbackPath: chatResp.fallbackPath,
+            qaOutcome: qc.endEvent,
+            retryCount: qc.retryCount,
+            latencyMs: turnLatency,
+            degradationFlags: {
+              memoryTruncated: promptBundle.degradationFlags.memoryTruncated,
+              sessionTruncated: promptBundle.degradationFlags.sessionTruncated,
+              culturalFramingDropped: promptBundle.degradationFlags.culturalFramingDropped,
+              fallbackModelUsed: chatResp.fallbackPath !== 'none',
+              contextFetchPartial: ctx.partialFailure,
+            },
+            libraryVersions: promptBundle.libraryVersions,
+            determinismHash: promptBundle.determinismHash,
+            deliveryReceipt: {},
+            terminalEvent: 'pending',
           },
-          libraryVersions: promptBundle.libraryVersions,
-          determinismHash: promptBundle.determinismHash,
-          deliveryReceipt: {
-            ...(delivery.waMessageId !== undefined ? { waMessageId: delivery.waMessageId } : {}),
-          },
-          terminalEvent: 'pending',
-        },
-      );
+        );
 
   // ---- Step 13: continuation decision --------------------------------
   const continuation = decideContinuation(inbound.body);
@@ -661,7 +660,6 @@ export async function runCoachingTurn(
   return {
     endEvent,
     responseText,
-    ...(delivery.waMessageId !== undefined ? { waMessageId: delivery.waMessageId } : {}),
     practiceTag: tags.practiceTag,
     levelTag: tags.levelTag,
     latencyMs: turnLatency,
@@ -744,7 +742,7 @@ async function runTemplatedResponse(
   t0: number,
   intent: string = 'Coaching',
 ): Promise<CoachingTurnResult> {
-  const delivery = await sendBody(deps, inbound, body, callerSubId);
+  await sendBody(deps, inbound, body, callerSubId);
   const latencyMs = Date.now() - t0;
 
   // Phase 12 R20+R21 — persist a lightweight turn row + memory entry so the
@@ -763,9 +761,7 @@ async function runTemplatedResponse(
       intent,
       terminalEvent: endEvent,
       latencyMs,
-      deliveryReceipt: {
-        ...(delivery.waMessageId !== undefined ? { waMessageId: delivery.waMessageId } : {}),
-      },
+      deliveryReceipt: {},
     },
   );
 
@@ -778,7 +774,6 @@ async function runTemplatedResponse(
     reason: `templated ${callerSubId}`,
     sessionId,
     turnId: persisted.turnId,
-    ...(delivery.waMessageId !== undefined ? { waMessageId: delivery.waMessageId } : {}),
   });
 }
 

@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-11T07:18:48.309Z",
+  "testId": "audit/R-01-greeting-mid-session-falls-through",
+  "controlId": "T3.Audit.R01_GreetingMidSessionFallsThrough",
+  "tier": "T3",
+  "outcome": "pass",
+  "description": "R-01: Greeting intent on a non-new session (turnCount > 0) must engage coaching path. Reproduces screenshot Bug 1.",
+  "phase": "phase-12"
+}

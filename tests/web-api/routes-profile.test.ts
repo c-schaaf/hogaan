@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
 import { registerWebApiRoutes } from '../../src/web-api/routes.js';
-import { fakeConfig, fakeRedis, fakeRateLimiters, fakeTraceEmitter } from '../phase-10/helpers/fakes.js';
+import {
+  fakeConfig,
+  fakeRedis,
+  fakeRateLimiters,
+  fakeTraceEmitter,
+} from '../phase-10/helpers/fakes.js';
 
 const TEST_USER_ID = '00000000-0000-0000-0000-000000000001';
 

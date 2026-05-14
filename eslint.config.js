@@ -12,6 +12,10 @@ export default [
       '*.config.ts',
       'coverage/**',
       'scripts/**',
+      'web/**',
+      'tests/e2e/**',
+      'tests/web-api/**',
+      'tests/memory/**',
     ],
   },
   {

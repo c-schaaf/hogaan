@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-14T19:36:33.641Z",
+  "testId": "phase-12/voice-fidelity/T22-naxariis-empathy",
+  "controlId": "T5.VoiceFidelity.T22_Naxariis",
+  "tier": "T5",
+  "outcome": "pass",
+  "description": "Empathy practice maps to Naxariis (principled mercy) cultural framing.",
+  "phase": "phase-12"
+}

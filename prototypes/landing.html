@@ -1,207 +1,307 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Hogaan — Your leadership companion</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            hogaan: {
-              bg: '#FAF6F1', card: '#FFFFFF', sunken: '#F3EDE4',
-              text: '#0A1F4D', mute: '#6B6B7A', soft: '#9090A0',
-              accent: '#C49B4A', 'accent-light': '#E8D5A8', 'accent-tint': '#F5EAD0',
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hogaan — Your leadership companion</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              hogaan: {
+                bg: '#FAF6F1',
+                card: '#FFFFFF',
+                sunken: '#F3EDE4',
+                text: '#0A1F4D',
+                mute: '#6B6B7A',
+                soft: '#9090A0',
+                accent: '#C49B4A',
+                'accent-light': '#E8D5A8',
+                'accent-tint': '#F5EAD0',
+              },
+              hw: { navy: '#00004D', blue: '#0086FF' },
             },
-            hw: { navy: '#00004D', blue: '#0086FF' },
-          },
-          fontFamily: {
-            display: ['Fraunces', 'serif'],
-            body: ['Inter', 'sans-serif'],
-          },
-          boxShadow: {
-            card: '0 2px 8px rgba(10, 31, 77, 0.06)',
-            'card-lg': '0 4px 16px rgba(10, 31, 77, 0.08)',
+            fontFamily: {
+              display: ['Fraunces', 'serif'],
+              body: ['Inter', 'sans-serif'],
+            },
+            boxShadow: {
+              card: '0 2px 8px rgba(10, 31, 77, 0.06)',
+              'card-lg': '0 4px 16px rgba(10, 31, 77, 0.08)',
+            },
           },
         },
-      },
-    };
-  </script>
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    .font-display { font-family: 'Fraunces', serif; }
-    .wordmark-underline { position: relative; display: inline-block; }
-    .wordmark-underline::after {
-      content: ''; position: absolute; bottom: -6px; left: 12%; right: 12%; height: 3px;
-      background: #C49B4A; border-radius: 2px;
-    }
-  </style>
-</head>
-<body class="bg-hogaan-bg text-hogaan-text">
-
-  <!-- Top nav -->
-  <header class="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <span class="font-display text-2xl font-semibold tracking-tight wordmark-underline">Hogaan</span>
-    </div>
-    <nav class="flex items-center gap-6 text-sm">
-      <a href="#how-it-works" class="text-hogaan-mute hover:text-hogaan-text transition">How it works</a>
-      <a href="#practices" class="text-hogaan-mute hover:text-hogaan-text transition">The 12 practices</a>
-      <a href="signup.html" class="font-medium text-hogaan-text hover:text-hogaan-accent transition">Sign in</a>
-    </nav>
-  </header>
-
-  <!-- Hero -->
-  <section class="max-w-6xl mx-auto px-6 pt-12 pb-20 md:pt-20 md:pb-32">
-    <div class="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
-      <div>
-        <p class="text-hogaan-accent font-medium text-sm uppercase tracking-wider mb-5">Your leadership companion</p>
-        <h1 class="font-display text-5xl md:text-6xl font-medium leading-[1.05] mb-6 text-hogaan-text">
-          A coaching companion for the leaders we need next.
-        </h1>
-        <p class="text-lg text-hogaan-mute leading-relaxed mb-8 max-w-xl">
-          Hogaan is a coaching presence in Hamse Warfa's voice, anchored in his
-          12 Practices of Transformational Leadership. Built for leaders shaping
-          themselves, their teams, their organizations, and their communities.
-        </p>
-
-        <form class="flex flex-col sm:flex-row gap-3 max-w-md">
-          <input type="email" placeholder="your.email@work.com"
-                 class="flex-1 px-4 py-3.5 bg-hogaan-card rounded-xl border border-transparent shadow-card text-hogaan-text placeholder:text-hogaan-soft focus:outline-none focus:border-hogaan-accent transition" />
-          <button type="submit"
-                  class="px-6 py-3.5 bg-hogaan-text text-white rounded-xl font-medium hover:bg-hogaan-text/90 transition whitespace-nowrap">
-            Start your first session
-          </button>
-        </form>
-        <p class="mt-4 text-sm text-hogaan-soft">Free for sponsor-cohort users. Text-only, on the web and WhatsApp.</p>
+      };
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      .font-display {
+        font-family: 'Fraunces', serif;
+      }
+      .wordmark-underline {
+        position: relative;
+        display: inline-block;
+      }
+      .wordmark-underline::after {
+        content: '';
+        position: absolute;
+        bottom: -6px;
+        left: 12%;
+        right: 12%;
+        height: 3px;
+        background: #c49b4a;
+        border-radius: 2px;
+      }
+    </style>
+  </head>
+  <body class="bg-hogaan-bg text-hogaan-text">
+    <!-- Top nav -->
+    <header class="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="font-display text-2xl font-semibold tracking-tight wordmark-underline"
+          >Hogaan</span
+        >
       </div>
+      <nav class="flex items-center gap-6 text-sm">
+        <a href="#how-it-works" class="text-hogaan-mute hover:text-hogaan-text transition"
+          >How it works</a
+        >
+        <a href="#practices" class="text-hogaan-mute hover:text-hogaan-text transition"
+          >The 12 practices</a
+        >
+        <a
+          href="signup.html"
+          class="font-medium text-hogaan-text hover:text-hogaan-accent transition"
+          >Sign in</a
+        >
+      </nav>
+    </header>
 
-      <!-- Chat preview -->
-      <div class="relative">
-        <div class="bg-hogaan-card rounded-3xl shadow-card-lg p-6 max-w-md mx-auto md:ml-auto">
-          <div class="flex items-center gap-2 mb-4 pb-4 border-b border-hogaan-sunken">
-            <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
-            <span class="text-sm text-hogaan-mute">Coaching session</span>
-            <div class="ml-auto flex items-center gap-1.5 text-xs text-hogaan-soft">
-              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
-              Private
-            </div>
-          </div>
+    <!-- Hero -->
+    <section class="max-w-6xl mx-auto px-6 pt-12 pb-20 md:pt-20 md:pb-32">
+      <div class="grid md:grid-cols-2 gap-12 md:gap-16 items-center">
+        <div>
+          <p class="text-hogaan-accent font-medium text-sm uppercase tracking-wider mb-5">
+            Your leadership companion
+          </p>
+          <h1
+            class="font-display text-5xl md:text-6xl font-medium leading-[1.05] mb-6 text-hogaan-text"
+          >
+            A coaching companion for the leaders we need next.
+          </h1>
+          <p class="text-lg text-hogaan-mute leading-relaxed mb-8 max-w-xl">
+            Hogaan is a coaching presence in Hamse Warfa's voice, anchored in his 12 Practices of
+            Transformational Leadership. Built for leaders shaping themselves, their teams, their
+            organizations, and their communities.
+          </p>
 
-          <div class="space-y-4">
-            <div class="flex justify-end">
-              <div class="bg-hogaan-text text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] text-sm leading-relaxed">
-                My team isn't communicating and I think I'm part of the problem.
+          <form class="flex flex-col sm:flex-row gap-3 max-w-md">
+            <input
+              type="email"
+              placeholder="your.email@work.com"
+              class="flex-1 px-4 py-3.5 bg-hogaan-card rounded-xl border border-transparent shadow-card text-hogaan-text placeholder:text-hogaan-soft focus:outline-none focus:border-hogaan-accent transition"
+            />
+            <button
+              type="submit"
+              class="px-6 py-3.5 bg-hogaan-text text-white rounded-xl font-medium hover:bg-hogaan-text/90 transition whitespace-nowrap"
+            >
+              Start your first session
+            </button>
+          </form>
+          <p class="mt-4 text-sm text-hogaan-soft">
+            Free for sponsor-cohort users. Text-only, on the web and WhatsApp.
+          </p>
+        </div>
+
+        <!-- Chat preview -->
+        <div class="relative">
+          <div class="bg-hogaan-card rounded-3xl shadow-card-lg p-6 max-w-md mx-auto md:ml-auto">
+            <div class="flex items-center gap-2 mb-4 pb-4 border-b border-hogaan-sunken">
+              <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+              <span class="text-sm text-hogaan-mute">Coaching session</span>
+              <div class="ml-auto flex items-center gap-1.5 text-xs text-hogaan-soft">
+                <svg
+                  class="w-3.5 h-3.5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <rect x="5" y="11" width="14" height="10" rx="2" />
+                  <path d="M8 11V7a4 4 0 018 0v4" />
+                </svg>
+                Private
               </div>
             </div>
 
-            <div class="flex gap-3">
-              <div class="w-8 h-8 rounded-full bg-hogaan-accent flex items-center justify-center text-white font-display font-semibold flex-shrink-0">H</div>
-              <div class="bg-hogaan-sunken rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] text-sm leading-relaxed text-hogaan-text">
-                Naming yourself as part of the problem is already half the work — most leaders never get there.
+            <div class="space-y-4">
+              <div class="flex justify-end">
+                <div
+                  class="bg-hogaan-text text-white rounded-2xl rounded-tr-md px-4 py-3 max-w-[85%] text-sm leading-relaxed"
+                >
+                  My team isn't communicating and I think I'm part of the problem.
+                </div>
+              </div>
 
-                <span class="block mt-2">When communication breaks down, it's rarely about the words. It's about the room…</span>
+              <div class="flex gap-3">
+                <div
+                  class="w-8 h-8 rounded-full bg-hogaan-accent flex items-center justify-center text-white font-display font-semibold flex-shrink-0"
+                >
+                  H
+                </div>
+                <div
+                  class="bg-hogaan-sunken rounded-2xl rounded-tl-md px-4 py-3 max-w-[85%] text-sm leading-relaxed text-hogaan-text"
+                >
+                  Naming yourself as part of the problem is already half the work — most leaders
+                  never get there.
+
+                  <span class="block mt-2"
+                    >When communication breaks down, it's rarely about the words. It's about the
+                    room…</span
+                  >
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- How it works -->
-  <section id="how-it-works" class="bg-hogaan-card border-y border-hogaan-sunken">
-    <div class="max-w-6xl mx-auto px-6 py-20">
+    <!-- How it works -->
+    <section id="how-it-works" class="bg-hogaan-card border-y border-hogaan-sunken">
+      <div class="max-w-6xl mx-auto px-6 py-20">
+        <div class="text-center mb-14">
+          <p class="text-hogaan-accent font-medium text-sm uppercase tracking-wider mb-3">
+            How it works
+          </p>
+          <h2 class="font-display text-4xl font-medium text-hogaan-text">
+            Three turns to the first real conversation.
+          </h2>
+        </div>
+        <div class="grid md:grid-cols-3 gap-10">
+          <div>
+            <div class="font-display text-5xl text-hogaan-accent font-medium mb-3">01</div>
+            <h3 class="font-display text-xl font-medium mb-2">Sign in with email</h3>
+            <p class="text-hogaan-mute leading-relaxed">
+              One magic link, no password. Your conversations are yours — sponsors only see
+              aggregate engagement.
+            </p>
+          </div>
+          <div>
+            <div class="font-display text-5xl text-hogaan-accent font-medium mb-3">02</div>
+            <h3 class="font-display text-xl font-medium mb-2">Pick your practices</h3>
+            <p class="text-hogaan-mute leading-relaxed">
+              Choose two or three from the 12 practices that fit where you're working right now.
+              Change them anytime.
+            </p>
+          </div>
+          <div>
+            <div class="font-display text-5xl text-hogaan-accent font-medium mb-3">03</div>
+            <h3 class="font-display text-xl font-medium mb-2">Bring a challenge</h3>
+            <p class="text-hogaan-mute leading-relaxed">
+              A hard conversation, a stuck team, a decision under pressure. Hogaan responds with
+              story, insight, and a concrete next move.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 12 practices -->
+    <section id="practices" class="max-w-6xl mx-auto px-6 py-20">
       <div class="text-center mb-14">
-        <p class="text-hogaan-accent font-medium text-sm uppercase tracking-wider mb-3">How it works</p>
-        <h2 class="font-display text-4xl font-medium text-hogaan-text">Three turns to the first real conversation.</h2>
+        <p class="text-hogaan-accent font-medium text-sm uppercase tracking-wider mb-3">
+          Anchored in 12 practices
+        </p>
+        <h2 class="font-display text-4xl font-medium text-hogaan-text">
+          Hamse Warfa's framework, structured across four levels.
+        </h2>
       </div>
-      <div class="grid md:grid-cols-3 gap-10">
-        <div>
-          <div class="font-display text-5xl text-hogaan-accent font-medium mb-3">01</div>
-          <h3 class="font-display text-xl font-medium mb-2">Sign in with email</h3>
-          <p class="text-hogaan-mute leading-relaxed">One magic link, no password. Your conversations are yours — sponsors only see aggregate engagement.</p>
+
+      <div class="grid md:grid-cols-4 gap-6">
+        <div class="bg-hogaan-card rounded-2xl shadow-card p-6">
+          <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">Self</p>
+          <ul class="space-y-1.5 text-hogaan-text font-display text-lg">
+            <li>Integrity</li>
+            <li>Purpose</li>
+            <li>Accountability</li>
+          </ul>
         </div>
-        <div>
-          <div class="font-display text-5xl text-hogaan-accent font-medium mb-3">02</div>
-          <h3 class="font-display text-xl font-medium mb-2">Pick your practices</h3>
-          <p class="text-hogaan-mute leading-relaxed">Choose two or three from the 12 practices that fit where you're working right now. Change them anytime.</p>
+        <div class="bg-hogaan-card rounded-2xl shadow-card p-6">
+          <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">Team</p>
+          <ul class="space-y-1.5 text-hogaan-text font-display text-lg">
+            <li>Dignity</li>
+            <li>Empathy</li>
+            <li>Inclusion</li>
+          </ul>
         </div>
-        <div>
-          <div class="font-display text-5xl text-hogaan-accent font-medium mb-3">03</div>
-          <h3 class="font-display text-xl font-medium mb-2">Bring a challenge</h3>
-          <p class="text-hogaan-mute leading-relaxed">A hard conversation, a stuck team, a decision under pressure. Hogaan responds with story, insight, and a concrete next move.</p>
+        <div class="bg-hogaan-card rounded-2xl shadow-card p-6">
+          <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">
+            Organization
+          </p>
+          <ul class="space-y-1.5 text-hogaan-text font-display text-lg">
+            <li>Assets</li>
+            <li>Innovation</li>
+            <li>Prosperity</li>
+          </ul>
+        </div>
+        <div class="bg-hogaan-card rounded-2xl shadow-card p-6">
+          <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">
+            Community
+          </p>
+          <ul class="space-y-1.5 text-hogaan-text font-display text-lg">
+            <li>Humility</li>
+            <li>Democracy</li>
+            <li>Peace</li>
+          </ul>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- 12 practices -->
-  <section id="practices" class="max-w-6xl mx-auto px-6 py-20">
-    <div class="text-center mb-14">
-      <p class="text-hogaan-accent font-medium text-sm uppercase tracking-wider mb-3">Anchored in 12 practices</p>
-      <h2 class="font-display text-4xl font-medium text-hogaan-text">Hamse Warfa's framework, structured across four levels.</h2>
-    </div>
-
-    <div class="grid md:grid-cols-4 gap-6">
-      <div class="bg-hogaan-card rounded-2xl shadow-card p-6">
-        <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">Self</p>
-        <ul class="space-y-1.5 text-hogaan-text font-display text-lg">
-          <li>Integrity</li><li>Purpose</li><li>Accountability</li>
-        </ul>
+    <!-- Final CTA -->
+    <section class="bg-hogaan-text text-white">
+      <div class="max-w-3xl mx-auto px-6 py-20 text-center">
+        <h2 class="font-display text-4xl md:text-5xl font-medium mb-5 leading-tight">
+          The first move is always one you make on yourself.
+        </h2>
+        <p class="text-lg text-white/70 mb-8">Bring a question. We'll work it through together.</p>
+        <a
+          href="#"
+          class="inline-block px-7 py-4 bg-hogaan-accent text-white rounded-xl font-medium hover:bg-hogaan-accent/90 transition"
+        >
+          Start your first session
+        </a>
       </div>
-      <div class="bg-hogaan-card rounded-2xl shadow-card p-6">
-        <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">Team</p>
-        <ul class="space-y-1.5 text-hogaan-text font-display text-lg">
-          <li>Dignity</li><li>Empathy</li><li>Inclusion</li>
-        </ul>
-      </div>
-      <div class="bg-hogaan-card rounded-2xl shadow-card p-6">
-        <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">Organization</p>
-        <ul class="space-y-1.5 text-hogaan-text font-display text-lg">
-          <li>Assets</li><li>Innovation</li><li>Prosperity</li>
-        </ul>
-      </div>
-      <div class="bg-hogaan-card rounded-2xl shadow-card p-6">
-        <p class="text-xs uppercase tracking-wider text-hogaan-accent font-semibold mb-3">Community</p>
-        <ul class="space-y-1.5 text-hogaan-text font-display text-lg">
-          <li>Humility</li><li>Democracy</li><li>Peace</li>
-        </ul>
-      </div>
-    </div>
-  </section>
+    </section>
 
-  <!-- Final CTA -->
-  <section class="bg-hogaan-text text-white">
-    <div class="max-w-3xl mx-auto px-6 py-20 text-center">
-      <h2 class="font-display text-4xl md:text-5xl font-medium mb-5 leading-tight">
-        The first move is always one you make on yourself.
-      </h2>
-      <p class="text-lg text-white/70 mb-8">Bring a question. We'll work it through together.</p>
-      <a href="#" class="inline-block px-7 py-4 bg-hogaan-accent text-white rounded-xl font-medium hover:bg-hogaan-accent/90 transition">
-        Start your first session
-      </a>
-    </div>
-  </section>
-
-  <!-- Footer -->
-  <footer class="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-hogaan-soft">
-    <div class="flex items-center gap-3">
-      <span class="font-display font-semibold text-hogaan-text">Hogaan</span>
-      <span>·</span>
-      <span>A <a href="https://hamsewarfa.com" class="text-hw-blue hover:underline">Hamse Warfa</a> product</span>
-    </div>
-    <div class="flex items-center gap-6">
-      <a href="#" class="hover:text-hogaan-text transition">Privacy</a>
-      <a href="#" class="hover:text-hogaan-text transition">Terms</a>
-      <a href="#" class="hover:text-hogaan-text transition">Contact</a>
-    </div>
-  </footer>
-
-</body>
+    <!-- Footer -->
+    <footer
+      class="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-hogaan-soft"
+    >
+      <div class="flex items-center gap-3">
+        <span class="font-display font-semibold text-hogaan-text">Hogaan</span>
+        <span>·</span>
+        <span
+          >A
+          <a href="https://hamsewarfa.com" class="text-hw-blue hover:underline">Hamse Warfa</a>
+          product</span
+        >
+      </div>
+      <div class="flex items-center gap-6">
+        <a href="#" class="hover:text-hogaan-text transition">Privacy</a>
+        <a href="#" class="hover:text-hogaan-text transition">Terms</a>
+        <a href="#" class="hover:text-hogaan-text transition">Contact</a>
+      </div>
+    </footer>
+  </body>
 </html>

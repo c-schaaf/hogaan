@@ -18,11 +18,40 @@ test.describe('Deep-link URL routing', () => {
     await expect(page.locator('[class*="pr-"]')).toBeVisible({ timeout: 8000 });
   });
 
-  test('refreshing on /sessions stays on sessions screen', async ({ page }) => {
+  test('clicking Sessions tab then refreshing stays on sessions (not bounced to home)', async ({
+    page,
+  }) => {
     await loginAs(page);
     await page.waitForSelector('[class*="hm-"]', { timeout: 8000 });
-    await page.evaluate(() => sessionStorage.setItem('shell-phase', 'sessions'));
+
+    // Click the ACTUAL Sessions nav tab — lets the app write to sessionStorage naturally
+    await page
+      .locator('.hm-nav-tab, .hm-side-tab', { hasText: /sessions/i })
+      .first()
+      .click();
+    await expect(page.locator('[class*="ses-"]')).toBeVisible({ timeout: 5000 });
+
+    // Hard refresh — must stay on Sessions, not bounce to Home
     await page.reload();
     await expect(page.locator('[class*="ses-"]')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('[class*="hm-chip"], [class*="hm-greet"]')).not.toBeVisible();
+  });
+
+  test('clicking Profile tab then refreshing stays on profile (not bounced to home)', async ({
+    page,
+  }) => {
+    await loginAs(page);
+    await page.waitForSelector('[class*="hm-"]', { timeout: 8000 });
+
+    // Click the ACTUAL Profile nav tab
+    await page
+      .locator('.hm-nav-tab, .hm-side-tab', { hasText: /profile/i })
+      .first()
+      .click();
+    await expect(page.locator('[class*="pr-"]')).toBeVisible({ timeout: 5000 });
+
+    // Hard refresh — must stay on Profile, not bounce to Home
+    await page.reload();
+    await expect(page.locator('[class*="pr-"]')).toBeVisible({ timeout: 8000 });
   });
 });

@@ -1,0 +1,9 @@
+{
+  "recordedAt": "2026-05-10T20:31:29.096Z",
+  "testId": "phase-10/bpmn-coverage/process-2/e5-profile-ack",
+  "controlId": "T2.Process2.E5_ProfileAck",
+  "tier": "T2",
+  "outcome": "pass",
+  "description": "Triage classifies intent=ProfileUpdate. Orchestrator routes to runTemplatedResponse(PROFILE_ACK_TEMPLATE) and finalizes with E5_ProfileAck. No full coaching prompt assembly or LLM call.",
+  "phase": "phase-10"
+}

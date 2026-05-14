@@ -46,7 +46,9 @@
   padding: 6px 10px 6px 8px;
   border-radius: 999px;
   cursor: pointer;
-  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease),
+  transition:
+    background var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
     box-shadow var(--dur-fast) var(--ease);
   color: var(--ink-2);
 }
@@ -231,9 +233,7 @@
     min-width: 0;
     align-items: center;
     justify-content: center;
-    background:
-      var(--ambient-stripes),
-      var(--hero-gradient);
+    background: var(--ambient-stripes), var(--hero-gradient);
     padding: 72px;
     position: relative;
     overflow: hidden;
@@ -377,7 +377,9 @@
     font-weight: 500;
     letter-spacing: 0.005em;
     text-align: left;
-    transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+    transition:
+      background var(--dur-fast) var(--ease),
+      color var(--dur-fast) var(--ease);
   }
   .hm-side-tab:hover {
     background: rgba(0, 0, 77, 0.04);
