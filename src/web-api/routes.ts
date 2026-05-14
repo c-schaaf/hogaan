@@ -308,7 +308,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         reportP2('streaming turn persist failed (non-blocking)', {
           source: 'PhaseC.WebApi.Stream',
           extra: { error: err instanceof Error ? err.message : String(err) },
-        });
+        }, err);
       }
 
       sendEvent('end', { turnId, sessionId, latencyMs });
