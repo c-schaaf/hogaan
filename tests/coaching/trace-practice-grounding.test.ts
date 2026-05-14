@@ -201,7 +201,7 @@ describe('Batch P Piece 4 — TurnTrace verdicts', () => {
     vi.mocked(qcMod.runQualityCheck).mockResolvedValue({
       endEvent: 'E1_ApprovedFirstAttempt',
       responseText: 'Coaching response.',
-      crisisDetected: false,
+
       retryCount: 0,
       degraded: false,
       checks: [
@@ -233,7 +233,7 @@ describe('Batch P Piece 4 — TurnTrace verdicts', () => {
     vi.mocked(qcMod.runQualityCheck).mockResolvedValue({
       endEvent: 'E2_ApprovedRegenerated',
       responseText: 'Coaching response.',
-      crisisDetected: false,
+
       retryCount: 1,
       degraded: false,
       checks: [
@@ -264,7 +264,7 @@ describe('Batch P Piece 4 — TurnTrace verdicts', () => {
     vi.mocked(qcMod.runQualityCheck).mockResolvedValue({
       endEvent: 'E2_ApprovedRegenerated',
       responseText: 'Coaching response.',
-      crisisDetected: false,
+
       retryCount: 1,
       degraded: false,
       checks: [

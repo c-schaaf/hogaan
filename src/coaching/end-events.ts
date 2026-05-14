@@ -1,10 +1,9 @@
 /**
- * Process #2 has 12 terminal end events. Every coaching turn lands at exactly
+ * Process #2 has 11 terminal end events. Every coaching turn lands at exactly
  * one. The trace emitter records this verbatim per Phase 1.4 §TurnTrace.
  *
  * Success: E1 (turn done), E2 (turn done + session closed).
  * Branched: E4 scenario, E5 profile, E6 meta, E10 clarifying question.
- * Safety: E7 crisis (overrides everything else).
  * Soft fail: E3 degraded quality, E8 media not supported, E9 rejected,
  *            E11 service unavailable, E12 silent drop on empty input.
  */
@@ -15,7 +14,6 @@ export const COACHING_END_EVENTS = [
   'E4_ScenarioHandoff',
   'E5_ProfileAck',
   'E6_MetaResponse',
-  'E7_Crisis',
   'E8_MediaNotSupported',
   'E9_MessageRejected',
   'E10_ClarifyingQuestionSent',
@@ -27,8 +25,4 @@ export type CoachingEndEvent = (typeof COACHING_END_EVENTS)[number];
 
 export function isCoachingTurnSuccess(event: CoachingEndEvent): boolean {
   return event === 'E1_TurnCompleted' || event === 'E2_TurnCompletedSessionClosed';
-}
-
-export function isCrisisRouted(event: CoachingEndEvent): boolean {
-  return event === 'E7_Crisis';
 }

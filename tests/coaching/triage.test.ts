@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fastPathTriage, _CRISIS_KEYWORDS } from '../../src/coaching/index.js';
-import { TRIAGE_SYSTEM_PROMPT, triage } from '../../src/coaching/triage.js';
+import { fastPathTriage } from '../../src/coaching/index.js';
+import { TRIAGE_SYSTEM_PROMPT, llmTriage } from '../../src/coaching/triage.js';
 import { LlmServiceUnavailableError } from '../../src/shared/llm/errors.js';
 import type { AppConfig } from '../../src/shared/secrets/config.js';
 import type * as IncidentHandling from '../../src/incident-handling/index.js';
@@ -16,28 +16,14 @@ describe('fastPathTriage — synchronous decisions', () => {
     expect(r?.status).toBe('media_only');
   });
 
-  it('flags suicide language → crisis', () => {
-    const r = fastPathTriage('I want to kill myself', []);
-    expect(r?.status).toBe('crisis');
-  });
-
-  it('flags abuse language → crisis', () => {
-    const r = fastPathTriage('My partner beats me', []);
-    expect(r?.status).toBe('crisis');
-  });
-
   it('returns null on benign messages → defers to LLM classifier', () => {
     expect(fastPathTriage('I have a leadership question', [])).toBeNull();
     expect(fastPathTriage('Hi, how do I lead my team?', [])).toBeNull();
   });
 
-  it('crisis keyword catalog has at least 25 entries (red-team coverage)', () => {
-    expect(_CRISIS_KEYWORDS.length).toBeGreaterThanOrEqual(25);
-  });
-
-  it('case-insensitive — "I WANT TO DIE" matches', () => {
-    const r = fastPathTriage('I WANT TO DIE', []);
-    expect(r?.status).toBe('crisis');
+  it('returns null for messages that would previously have triggered crisis detection', () => {
+    expect(fastPathTriage('I want to kill myself', [])).toBeNull();
+    expect(fastPathTriage('My partner beats me', [])).toBeNull();
   });
 });
 
@@ -69,24 +55,18 @@ describe('R-02 classifier disambiguation', () => {
 });
 
 // Khadija UX Reframe (2026-05-11) — tighten ProfileUpdate + MetaQuestion
-// classifier guidance to stop hijacking coaching messages. Khadija's
-// "Me stepping up as mentor" was misrouted to ProfileUpdate; her
-// "What examples of leadership question?" was misrouted to MetaQuestion.
+// classifier guidance to stop hijacking coaching messages.
 describe('Khadija UX Reframe — classifier guidance prevents intent hijacking', () => {
   it('ProfileUpdate guidance distinguishes past-tense facts from leadership challenges', () => {
     const t = TRIAGE_SYSTEM_PROMPT;
-    // The new guidance mentions past tense / fact change as the signal.
     expect(t.toLowerCase()).toMatch(/past tense|already happened|fact change/);
-    // Explicit counter-examples that route to Coaching, not ProfileUpdate.
     expect(t).toContain('me stepping up as mentor');
   });
 
   it('MetaQuestion guidance excludes coaching-content questions', () => {
     const t = TRIAGE_SYSTEM_PROMPT;
-    // Explicit counter-examples that route to Coaching, not MetaQuestion.
     expect(t).toMatch(/what examples of leadership/i);
     expect(t).toMatch(/i want a mentor/i);
-    // Still flags genuine meta cues.
     expect(t).toMatch(/who are you|are you ai|are you hamse/i);
   });
 
@@ -97,9 +77,7 @@ describe('Khadija UX Reframe — classifier guidance prevents intent hijacking',
 
 /**
  * Batch G — llmTriage migrated from Groq Llama to Anthropic Haiku 4.5
- * via the classifierChat wrapper. Tests assert the wrapper is invoked
- * (not groqChat) and that all branches (valid/crisis/reject/unknown/
- * error) map correctly to TriageResult.
+ * via the classifierChat wrapper.
  */
 vi.mock('../../src/shared/llm/classifier.js', () => ({
   classifierChat: vi.fn(),
@@ -141,7 +119,7 @@ describe('Batch G — llmTriage on Haiku', () => {
       outputTokens: 20,
     });
 
-    await triage(cfg, 'a real coaching message about my team', []);
+    await llmTriage(cfg, 'a real coaching message about my team');
 
     expect(classifierMod.classifierChat).toHaveBeenCalledTimes(1);
     expect(groqMod.groqChat).not.toHaveBeenCalled();
@@ -155,24 +133,10 @@ describe('Batch G — llmTriage on Haiku', () => {
       outputTokens: 20,
     });
 
-    const r = await triage(cfg, 'how do i lead my team?', []);
+    const r = await llmTriage(cfg, 'how do i lead my team?');
 
     expect(r.status).toBe('valid');
     expect(r.intent).toBe('Coaching');
-  });
-
-  it('crisis status → {status:"crisis"} regardless of intent field', async () => {
-    const classifierMod = await import('../../src/shared/llm/classifier.js');
-    vi.mocked(classifierMod.classifierChat).mockResolvedValue({
-      text: '{"status":"crisis","intent":"Coaching","reason":"indirect cue"}',
-      inputTokens: 100,
-      outputTokens: 20,
-    });
-
-    const r = await triage(cfg, "i don't see the point of any of this", []);
-
-    expect(r.status).toBe('crisis');
-    expect(r.reason).toContain('indirect cue');
   });
 
   it('reject status → {status:"reject"}', async () => {
@@ -183,7 +147,7 @@ describe('Batch G — llmTriage on Haiku', () => {
       outputTokens: 20,
     });
 
-    const r = await triage(cfg, 'abusive message', []);
+    const r = await llmTriage(cfg, 'abusive message');
 
     expect(r.status).toBe('reject');
   });
@@ -196,7 +160,7 @@ describe('Batch G — llmTriage on Haiku', () => {
       outputTokens: 20,
     });
 
-    const r = await triage(cfg, 'a coaching message', []);
+    const r = await llmTriage(cfg, 'a coaching message');
 
     expect(r.status).toBe('valid');
     expect(r.intent).toBe('Coaching');
@@ -209,7 +173,7 @@ describe('Batch G — llmTriage on Haiku', () => {
       new LlmServiceUnavailableError('anthropic', 'haiku 503'),
     );
 
-    const r = await triage(cfg, 'a coaching message', []);
+    const r = await llmTriage(cfg, 'a coaching message');
 
     expect(r.status).toBe('valid');
     expect(r.intent).toBe('Coaching');

@@ -184,7 +184,7 @@ Return strict JSON {"status": "pass"|"soft_fail"|"crisis"|"hard_fail", "reason":
         outcome = { status: 'soft_fail', reason: reason || 'safety borderline' };
         break;
       case 'crisis':
-        outcome = { status: 'crisis', reason: reason || 'crisis detected in user message' };
+        outcome = { status: 'hard_fail', reason: reason || 'safety hard fail' };
         break;
       case 'hard_fail':
         outcome = { status: 'hard_fail', reason: reason || 'safety hard fail' };

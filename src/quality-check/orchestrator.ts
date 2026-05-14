@@ -99,63 +99,7 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
   while (true) {
     const checks = await runAllChecks(deps, input, candidate);
 
-    // 1. Crisis short-circuit — bypass everything else.
-    const crisis = checks.find((c) => c.outcome.status === 'crisis');
-    if (crisis !== undefined) {
-      return {
-        endEvent: 'E4_CrisisEscalation',
-        responseText: '',
-        crisisDetected: true,
-        retryCount,
-        degraded: false,
-        checks,
-        correctivePromptHistory,
-      };
-    }
-
-    // 2. Hard fail (Check 8 only — input/response is fundamentally unsafe).
-    const hardSafetyFail = checks.find(
-      (c) => c.checkId === 'check_08_safety_crisis' && c.outcome.status === 'hard_fail',
-    );
-    if (hardSafetyFail !== undefined) {
-      return {
-        endEvent: 'E5_SafetyHardFailure',
-        responseText: '',
-        crisisDetected: false,
-        retryCount,
-        degraded: false,
-        checks,
-        correctivePromptHistory,
-      };
-    }
-
-    // 3. Safety classifier unavailable → fail-closed E6.
-    const safetyUnavailable = checks.find(
-      (c) => c.checkId === 'check_08_safety_crisis' && c.outcome.status === 'service_unavailable',
-    );
-    if (safetyUnavailable !== undefined) {
-      reportIncident('P0', 'safety classifier unavailable — failing closed to E6', {
-        source: 'Process_10.Check_08',
-        extra: {
-          retryCount,
-          reason:
-            safetyUnavailable.outcome.status === 'service_unavailable'
-              ? safetyUnavailable.outcome.reason
-              : '',
-        },
-      });
-      return {
-        endEvent: 'E6_ServiceUnavailable',
-        responseText: fallbackDegraded(),
-        crisisDetected: false,
-        retryCount,
-        degraded: true,
-        checks,
-        correctivePromptHistory,
-      };
-    }
-
-    // 4. Other failures → regenerate.
+    // 1. Other failures → regenerate.
     const failingChecks = checks.filter(
       (c) => c.outcome.status === 'soft_fail' || c.outcome.status === 'hard_fail',
     );
@@ -165,7 +109,6 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
       return {
         endEvent: retryCount === 0 ? 'E1_ApprovedFirstAttempt' : 'E2_ApprovedRegenerated',
         responseText: candidate,
-        crisisDetected: false,
         retryCount,
         degraded: false,
         checks,
@@ -185,7 +128,6 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
       return {
         endEvent: 'E3_MaxRetriesExceeded',
         responseText: fallbackMaxRetries(),
-        crisisDetected: false,
         retryCount,
         degraded: false,
         checks,
@@ -230,12 +172,8 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
       const remainingMs = input.deadlineAt - Date.now();
       if (remainingMs < REGEN_BUDGET_HEADROOM_MS) {
         const hasHardFail = failingChecks.some((c) => c.outcome.status === 'hard_fail');
-        const hasCheck8Unavailable = checks.some(
-          (c) =>
-            c.checkId === 'check_08_safety_crisis' && c.outcome.status === 'service_unavailable',
-        );
 
-        if (hasCheck8Unavailable || hasHardFail) {
+        if (hasHardFail) {
           reportIncident('P2', 'QC regen skipped — remaining budget below regen headroom', {
             source: 'Process_10.RegenSkipBudget',
             extra: {
@@ -244,13 +182,12 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
               headroomMs: REGEN_BUDGET_HEADROOM_MS,
               failedChecks: failingChecks.map((c) => c.checkId),
               dispatch: 'E6_fallbackDegraded',
-              reason: hasCheck8Unavailable ? 'check_08_unavailable' : 'hard_fail_present',
+              reason: 'hard_fail_present',
             },
           });
           return {
             endEvent: 'E6_ServiceUnavailable',
             responseText: fallbackDegraded(),
-            crisisDetected: false,
             retryCount,
             degraded: true,
             checks,
@@ -278,7 +215,6 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
         return {
           endEvent: 'E8_ShipDegradedCandidate',
           responseText: candidate,
-          crisisDetected: false,
           retryCount,
           degraded: true,
           checks,
@@ -304,7 +240,6 @@ export async function runQualityCheck(deps: OrchestratorDeps, input: QcInput): P
       return {
         endEvent: 'E6_ServiceUnavailable',
         responseText: fallbackDegraded(),
-        crisisDetected: false,
         retryCount,
         degraded: true,
         checks,

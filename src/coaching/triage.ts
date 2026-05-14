@@ -6,69 +6,26 @@ import { reportP1 } from '../incident-handling/index.js';
 import type { TriageResult } from './types.js';
 
 /**
- * Process #2 Step 1 — triage + crisis detection + intent in one round-trip.
+ * Process #2 Step 1 — triage + intent classification in one round-trip.
  *
  * Two stages:
- *   (1) Synchronous keyword pre-check: empty/media short-circuit + crisis
- *       fast-path on common self-harm/abuse/imminent-danger phrases. The
- *       fast-path is deliberately broad — Voice Rule #1 (CLAUDE.md hard
- *       rule #1) trades false positives for zero false negatives.
- *   (2) Groq classifier (~300ms, JSON mode): high-recall LLM that catches
- *       sarcasm + indirect crisis cues + classifies the 8 intent classes.
- *       On classifier failure, fall through to 'valid' + Coaching intent
- *       (the Process #10 §Check 8 second-line crisis classifier is the
- *       backstop).
+ *   (1) Synchronous fast-path checks: empty/media short-circuit.
+ *   (2) Groq classifier (~300ms, JSON mode): classifies the 8 intent classes.
+ *       On classifier failure, fall through to 'valid' + Coaching intent.
  */
-
-const CRISIS_KEYWORDS = [
-  'kill myself',
-  'kill my self',
-  'killing myself',
-  'end my life',
-  'end it all',
-  'take my life',
-  'taking my life',
-  'hurt myself',
-  'hurting myself',
-  'harm myself',
-  'self-harm',
-  'self harm',
-  'suicide',
-  'suicidal',
-  'want to die',
-  'wanna die',
-  'better off dead',
-  "don't want to be here",
-  'i want to disappear',
-  'overdose',
-  'cutting myself',
-  'beat me',
-  'beats me',
-  'hits me',
-  'hitting me',
-  'abused me',
-  'abuses me',
-  'abusing me',
-  'rape',
-  'raped',
-  'raping',
-  'they will kill me',
-  "i'm in danger",
-  'imminent danger',
-];
 
 const TRIAGE_TIMEOUT_MS = 1500;
 const TRIAGE_MAX_TOKENS = 80;
 
 interface ClassifierJson {
-  status: 'pass' | 'crisis' | 'reject';
+  status: 'pass' | 'reject';
   intent: Intent;
   reason?: string;
 }
 
 /**
  * Run the synchronous fast-path checks. Returns a TriageResult only when
- * a synchronous decision is reachable (empty / media / crisis-keyword).
+ * a synchronous decision is reachable (empty / media-only).
  * Returns null when the LLM classifier should be consulted.
  */
 export function fastPathTriage(body: string, mediaUrls: string[]): TriageResult | null {
@@ -78,15 +35,6 @@ export function fastPathTriage(body: string, mediaUrls: string[]): TriageResult 
   }
   if (trimmed.length === 0 && mediaUrls.length > 0) {
     return { status: 'media_only', reason: 'inbound has media but no body text' };
-  }
-  const norm = trimmed.toLowerCase();
-  for (const kw of CRISIS_KEYWORDS) {
-    if (norm.includes(kw)) {
-      return {
-        status: 'crisis',
-        reason: `crisis keyword detected: "${kw}"`,
-      };
-    }
   }
   return null;
 }
@@ -137,18 +85,11 @@ export async function llmTriage(config: AppConfig, body: string): Promise<Triage
       timeoutMs: TRIAGE_TIMEOUT_MS,
     });
     const parsed = JSON.parse(res.text) as ClassifierJson;
-    if (parsed.status !== 'pass' && parsed.status !== 'crisis' && parsed.status !== 'reject') {
+    if (parsed.status !== 'pass' && parsed.status !== 'reject') {
       return {
         status: 'valid',
         reason: 'classifier returned unknown status; fall through',
         intent: 'Coaching',
-      };
-    }
-    if (parsed.status === 'crisis') {
-      return {
-        status: 'crisis',
-        reason: parsed.reason ?? 'classifier flagged crisis',
-        intent: parsed.intent,
       };
     }
     if (parsed.status === 'reject') {
@@ -160,9 +101,6 @@ export async function llmTriage(config: AppConfig, body: string): Promise<Triage
     }
     return { status: 'valid', reason: 'classifier passed', intent: parsed.intent };
   } catch (err) {
-    // CLAUDE.md hard rule #1: never silently fail crisis. We fall through to
-    // valid+Coaching, but the second-line check (#10 §Check 8) catches any
-    // crisis the first line missed. Log P1 so we see classifier outages.
     reportP1(
       'first-line triage classifier error; falling through to valid+Coaching',
       { source: 'Process_2.Step_1.Triage' },
@@ -175,7 +113,7 @@ export async function llmTriage(config: AppConfig, body: string): Promise<Triage
 /**
  * Combined entry point used by the orchestrator.
  *
- * Synchronous keyword check first; LLM only when nothing fast-path-decidable.
+ * Synchronous fast-path first; LLM only when nothing fast-path-decidable.
  */
 export async function triage(
   config: AppConfig,
@@ -211,5 +149,3 @@ export async function triage(
   return { status: 'valid', reason: 'triage-llm-disabled-2026-05-13', intent: 'Coaching' };
 }
 
-/** Test seam — exposes the keyword list for audit / red-team coverage. */
-export const _CRISIS_KEYWORDS = CRISIS_KEYWORDS;

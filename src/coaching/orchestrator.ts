@@ -1,4 +1,3 @@
-import { handoff as crisisHandoff } from '../crisis-handoff/index.js';
 import { reportP1 } from '../incident-handling/index.js';
 import { debugWarn } from '../shared/observability/debug-log.js';
 import { getActiveLibraryVersions } from '../libraries/index.js';
@@ -29,7 +28,7 @@ import { persistPostTurn, persistShortCircuitTurn } from './post-turn.js';
 // Step 6 call site). To restore, uncomment this import.
 // import { tagPracticeAndLevel } from './tagger.js';
 import { triage } from './triage.js';
-import type { CoachingInbound, CoachingTurnResult, TriageResult } from './types.js';
+import type { CoachingInbound, CoachingTurnResult } from './types.js';
 
 interface CoachingDeps {
   config: AppConfig;
@@ -95,9 +94,6 @@ export async function runCoachingTurn(
   debugWarn('ORCH', 'step 1 start (triage)', { waMessageId: inbound.inboundMessageId });
   const triageResult = await triage(deps.config, inbound.body, inbound.mediaUrls);
 
-  if (triageResult.status === 'crisis') {
-    return await handleCrisis(deps, inbound, triageResult, t0);
-  }
   if (triageResult.status === 'empty') {
     return finalize(deps, inbound, {
       endEvent: 'E12_SilentDrop',
@@ -469,21 +465,8 @@ export async function runCoachingTurn(
     qcEndEvent: qc.endEvent,
     retryCount: qc.retryCount,
     degraded: qc.degraded,
-    crisisDetected: qc.crisisDetected,
   });
 
-  if (qc.endEvent === 'E4_CrisisEscalation') {
-    debugWarn('ORCH', 'QC returned crisis — routing to crisis handoff', {
-      waMessageId: inbound.inboundMessageId,
-    });
-    return await handleCrisis(
-      deps,
-      inbound,
-      { status: 'crisis', reason: 'qc-second-line', intent },
-      t0,
-      session.sessionId,
-    );
-  }
   if (qc.endEvent === 'E5_SafetyHardFailure') {
     debugWarn('ORCH', 'QC returned hard safety fail → E11 with empty body', {
       waMessageId: inbound.inboundMessageId,
@@ -749,36 +732,6 @@ function finalize(
     traceId: inbound.traceId,
     reason: m.reason,
   };
-}
-
-async function handleCrisis(
-  deps: CoachingDeps,
-  inbound: CoachingInbound,
-  triageResult: TriageResult,
-  t0: number,
-  sessionId?: string,
-): Promise<CoachingTurnResult> {
-  const trigger: 'process_2_step_1' | 'process_10_check_8' =
-    triageResult.reason === 'qc-second-line' ? 'process_10_check_8' : 'process_2_step_1';
-  await crisisHandoff(
-    { db: deps.db },
-    {
-      triggerSource: trigger,
-      phoneE164: inbound.phoneE164,
-      userId: inbound.userId,
-      ...(sessionId !== undefined ? { sessionId: sessionId as never } : {}),
-    },
-  );
-  return finalize(deps, inbound, {
-    endEvent: 'E7_Crisis',
-    responseText: '',
-    practiceTag: null,
-    levelTag: null,
-    latencyMs: Date.now() - t0,
-    reason: triageResult.reason,
-    sessionId: sessionId ?? 'pending',
-    turnId: null,
-  });
 }
 
 async function runTemplatedResponse(

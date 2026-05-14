@@ -56,8 +56,6 @@ export type CheckOutcome =
   | { status: 'not_required' }
   /** Soft failure — caller will regenerate with a corrective prompt. */
   | { status: 'soft_fail'; reason: string }
-  /** Process #10 §8 crisis branch — bypass all downstream checks. */
-  | { status: 'crisis'; reason: string }
   /** Hard failure — DO NOT regenerate (input-side issue). */
   | { status: 'hard_fail'; reason: string }
   /** Internal LLM/service error — for safety check, this means fail-closed. */
@@ -70,10 +68,8 @@ export interface CheckResult {
 
 export interface QcResult {
   endEvent: QcEndEvent;
-  /** Final approved or fallback text the caller should ship to the user. Empty when E5/E7. */
+  /** Final approved or fallback text the caller should ship to the user. Empty when E5. */
   responseText: string;
-  /** Process #10 §8 crisis: the original input is forwarded to Crisis Handoff by the caller. */
-  crisisDetected: boolean;
   /** Number of regeneration attempts made (0 = first attempt approved or non-regeneration outcome). */
   retryCount: number;
   /** True for E6 + E8 — caller should treat the response as a degraded variant. */

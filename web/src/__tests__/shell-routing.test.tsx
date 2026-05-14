@@ -7,7 +7,7 @@
  * to a bug that was found by the CU audit agent and fixed on this branch.
  */
 import { act, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Shell } from '../Shell';
 
 // vi.mock factories are hoisted before const declarations. Variables referenced
@@ -172,5 +172,85 @@ describe('unauthenticated boot', () => {
 
     await waitFor(() => screen.getByTestId('phase-login'));
     expect(mockProfileGet).not.toHaveBeenCalled();
+  });
+});
+
+describe('SIGNED_OUT routing', () => {
+  it('routes to login when SIGNED_OUT event fires while on authed page', async () => {
+    render(<Shell />);
+
+    act(() => {
+      fireAuth('INITIAL_SESSION', { access_token: 'tok-1' });
+    });
+    await waitFor(() => screen.getByTestId('phase-home'));
+
+    act(() => {
+      fireAuth('SIGNED_OUT', null);
+    });
+
+    await waitFor(() => screen.getByTestId('phase-login'));
+  });
+
+  it('does not re-route to login when SIGNED_OUT fires while already on login', async () => {
+    render(<Shell />);
+
+    act(() => {
+      fireAuth('INITIAL_SESSION', null);
+    });
+    await waitFor(() => screen.getByTestId('phase-login'));
+
+    // SIGNED_OUT on login page — should stay on login, not crash
+    act(() => {
+      fireAuth('SIGNED_OUT', null);
+    });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByTestId('phase-login')).toBeTruthy();
+  });
+
+  it('PASSWORD_RECOVERY event routes to reset phase', async () => {
+    render(<Shell />);
+
+    act(() => {
+      fireAuth('PASSWORD_RECOVERY', { access_token: 'tok-pw' });
+    });
+
+    await waitFor(() => screen.getByTestId('phase-reset'));
+  });
+});
+
+describe('URL deep-link routing', () => {
+  const origLocation = window.location;
+
+  afterEach(() => {
+    Object.defineProperty(window, 'location', { configurable: true, value: origLocation });
+  });
+
+  it('routes to sessions when pathname is /sessions', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { href: 'http://localhost/sessions', pathname: '/sessions', search: '', hash: '' },
+    });
+    render(<Shell />);
+
+    act(() => {
+      fireAuth('INITIAL_SESSION', { access_token: 'tok-1' });
+    });
+
+    await waitFor(() => screen.getByTestId('phase-sessions'));
+  });
+
+  it('routes to profile when pathname is /profile', async () => {
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { href: 'http://localhost/profile', pathname: '/profile', search: '', hash: '' },
+    });
+    render(<Shell />);
+
+    act(() => {
+      fireAuth('INITIAL_SESSION', { access_token: 'tok-1' });
+    });
+
+    await waitFor(() => screen.getByTestId('phase-profile'));
   });
 });

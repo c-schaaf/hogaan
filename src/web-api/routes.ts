@@ -113,13 +113,10 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       void generateSessionTitle(opts.config, opts.db, result.sessionId, message);
     }
 
-    const crisis = result.endEvent === 'E7_Crisis';
-
     return reply.send({
       responseText: result.responseText,
       sessionId: result.sessionId,
       turnId: result.turnId,
-      crisis,
       endEvent: result.endEvent,
     });
   });
@@ -128,7 +125,6 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   // Streaming variant of /api/chat/turn. Returns Server-Sent Events:
   //   event: start   data: { sessionId }
   //   event: delta   data: { text }            (one per token chunk)
-  //   event: crisis  data: { resources... }    (instead of stream, on fast-path crisis)
   //   event: end     data: { turnId, sessionId, latencyMs }
   //   event: error   data: { message }         (on any failure mid-stream)
   //
@@ -173,22 +169,8 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     };
 
     try {
-      // ---- Fast-path triage (regex, no LLM) --------------------------
+      // ---- Fast-path triage (no LLM) ---------------------------------
       const sync = fastPathTriage(message, []);
-      if (sync !== null && sync.status === 'crisis') {
-        sendEvent('crisis', {
-          reason: sync.reason,
-          resources: {
-            '988': 'Suicide & Crisis Lifeline — call or text 988',
-            '741741': 'Crisis Text Line — text HOME to 741741',
-            '911': 'Emergency — 911 if there is immediate danger',
-            international: 'findahelpline.com',
-          },
-        });
-        sendEvent('end', { turnId: null, sessionId: null, latencyMs: Date.now() - t0 });
-        reply.raw.end();
-        return reply;
-      }
       // empty/media_only on the streaming endpoint shouldn't happen (web
       // sends text-only), but if it does just emit the templated copy.
       if (sync !== null && sync.status === 'media_only') {

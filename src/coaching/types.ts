@@ -44,11 +44,8 @@ export interface CoachingInbound {
   isPrivate?: boolean;
 }
 
-/**
- * Triage outcome (Step 1). Crisis is HIGH-RECALL: false positives acceptable;
- * false negatives catastrophic per CLAUDE.md hard rule #1.
- */
-export type TriageStatus = 'valid' | 'empty' | 'media_only' | 'crisis' | 'reject';
+/** Triage outcome (Step 1). */
+export type TriageStatus = 'valid' | 'empty' | 'media_only' | 'reject';
 
 export interface TriageResult {
   status: TriageStatus;

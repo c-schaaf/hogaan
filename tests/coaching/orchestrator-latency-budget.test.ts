@@ -219,7 +219,6 @@ beforeEach(async () => {
   vi.mocked(qcMod.runQualityCheck).mockResolvedValue({
     endEvent: 'E1_ApprovedFirstAttempt',
     responseText: 'A coaching response would go here.',
-    crisisDetected: false,
     retryCount: 0,
     degraded: false,
     checks: [],
