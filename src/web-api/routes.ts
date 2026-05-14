@@ -231,9 +231,28 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       sendEvent('start', { sessionId });
 
       // ---- Stream the response ---------------------------------------
+      // Pass prior turns as proper conversation messages, not as flattened
+      // text in the system prompt. The assembler still embeds them in the
+      // assembledPrompt (acceptable duplication for now — ~150 token cost),
+      // but the model's conversation-tracking attention only fires on the
+      // messages array. Chunk-2 audit (2026-05-13) showed the model
+      // hallucinated "I'm coming in mid-conversation" and lost mentor
+      // identity / past-tense / cultural specifics when prior turns lived
+      // only in the system text. Skip turns with null/empty responseText to
+      // preserve the alternating user/assistant invariant the API requires.
+      const priorMessages = ctx.sessionTurns.flatMap((t) => {
+        if (t.responseText === null || t.responseText === '') {
+          return [];
+        }
+        return [
+          { role: 'user' as const, content: t.userMessage },
+          { role: 'assistant' as const, content: t.responseText },
+        ];
+      });
+
       const stream = chatStream(opts.config, {
         systemPrompt: promptBundle.assembledPrompt,
-        messages: [{ role: 'user', content: message }],
+        messages: [...priorMessages, { role: 'user', content: message }],
         maxTokens: 600,
         temperature: 0.7,
       });
