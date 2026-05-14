@@ -238,6 +238,7 @@ interface Props {
   seed?: string | null;
   onBack: () => void;
   forceCrisis?: boolean;
+  openSessionId?: string | null;
 }
 
 function dividerLabel(): string {
@@ -254,6 +255,7 @@ export function Chat({
   seed,
   onBack,
   forceCrisis,
+  openSessionId,
 }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [items, setItems] = useState<ChatItem[]>(() => [
@@ -297,6 +299,28 @@ export function Chat({
       setItems((prev) => [...prev, { kind: 'crisis' }]);
     }
   }, [forceCrisis]);
+
+  useEffect(() => {
+    if (!openSessionId) return;
+    void (async () => {
+      try {
+        const detail = await api.sessions.get(openSessionId);
+        setSessionId(detail.session.id);
+        if (detail.session.title) setCurrentTitle(detail.session.title);
+        const hydrated: ChatItem[] = [{ kind: 'divider', label: dividerLabel() }];
+        for (const t of detail.turns) {
+          hydrated.push({ kind: 'user', text: t.userMessage });
+          if (t.responseText) {
+            const r = renderResponse(t.responseText);
+            hydrated.push({ kind: 'bot', paras: r.paras, chips: r.chips });
+          }
+        }
+        setItems(hydrated);
+      } catch (err) {
+        console.error('failed to load session', err);
+      }
+    })();
+  }, [openSessionId]);
 
   const sendText = async (text: string) => {
     const t = text.trim();

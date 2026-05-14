@@ -46,6 +46,7 @@ export function Shell() {
   const [verifyMode, setVerifyMode] = useState<'signup' | 'login'>('signup');
   const [pendingEmail, setPendingEmail] = useState<{ name?: string; email: string } | null>(null);
   const [chatSeed, setChatSeed] = useState<string | null>(null);
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const initialUrl = useRef(new URL(window.location.href));
   const [linkError, setLinkError] = useState<string | null>(null);
 
@@ -249,6 +250,7 @@ export function Shell() {
           practices={me?.mappedPractices ?? []}
           onCompose={(seed) => {
             setChatSeed(seed);
+            setOpenSessionId(null);
             setPhase('chat');
           }}
           onNav={onNav}
@@ -256,7 +258,13 @@ export function Shell() {
       );
       break;
     case 'sessions':
-      body = <Sessions onBack={() => setPhase('home')} onOpen={() => setPhase('chat')} onNav={onNav} />;
+      body = (
+        <Sessions
+          onBack={() => setPhase('home')}
+          onOpen={(id) => { setOpenSessionId(id); setChatSeed(null); setPhase('chat'); }}
+          onNav={onNav}
+        />
+      );
       break;
     case 'profile':
       body = (
@@ -277,7 +285,8 @@ export function Shell() {
               : ['Integrity', 'Empathy', 'Peace']
           }
           seed={chatSeed}
-          onBack={() => setPhase('home')}
+          openSessionId={openSessionId}
+          onBack={() => { setOpenSessionId(null); setPhase('home'); }}
         />
       );
       break;

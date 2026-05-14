@@ -83,7 +83,7 @@ function SessionsEmpty({ onHome }: { onHome: () => void }) {
 
 interface Props {
   onBack: () => void;
-  onOpen: () => void;
+  onOpen: (id: string) => void;
   onNav: (t: Tab) => void;
 }
 
@@ -170,7 +170,7 @@ export function Sessions({ onBack, onOpen, onNav }: Props) {
                       <h2 className="ses-group-h">{g}</h2>
                       <div className="ses-list">
                         {rows.map((s) => (
-                          <SessionRow key={s.id} s={s} onOpen={onOpen} />
+                          <SessionRow key={s.id} s={s} onOpen={() => onOpen(s.id)} />
                         ))}
                       </div>
                     </section>
