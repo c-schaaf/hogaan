@@ -159,7 +159,9 @@ export function Sessions({ onBack, onOpen, onNav }: Props) {
             {empty ? (
               <SessionsEmpty onHome={onBack} />
             ) : !hasAny ? (
-              <div className="ses-noresults">No sessions match "{query}".</div>
+              <div className="ses-noresults">
+                {query.trim().length > 0 ? `No sessions match "${query}".` : 'No sessions yet.'}
+              </div>
             ) : (
               <div className="ses-groups">
                 {ORDER.map((g) => {

@@ -1,4 +1,4 @@
-import { and, desc, eq, sql as drizzleSql } from 'drizzle-orm';
+import { and, desc, eq, gt, sql as drizzleSql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { fetchCoachingContext } from '../coaching/context-fetch.js';
 import { runCoachingTurn } from '../coaching/orchestrator.js';
@@ -360,7 +360,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         turnCount: sessions.turnCount,
       })
       .from(sessions)
-      .where(and(eq(sessions.userId, session.userId), eq(sessions.isPrivate, false)))
+      .where(and(eq(sessions.userId, session.userId), eq(sessions.isPrivate, false), gt(sessions.turnCount, 0)))
       .orderBy(desc(sessions.lastTurnAt))
       .limit(200);
 

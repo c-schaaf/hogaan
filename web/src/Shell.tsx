@@ -49,6 +49,7 @@ export function Shell() {
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const initialUrl = useRef(new URL(window.location.href));
   const [linkError, setLinkError] = useState<string | null>(null);
+  const lastAuthedTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (AUTHED_PHASES.has(phase)) sessionStorage.setItem('shell-phase', phase);
@@ -140,6 +141,9 @@ export function Shell() {
         return;
       }
       if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+        const token = session?.access_token ?? null;
+        if (token !== null && token === lastAuthedTokenRef.current) return;
+        lastAuthedTokenRef.current = token;
         void routeAuthed();
       }
     });

@@ -438,7 +438,7 @@ export function Chat({
             <ChatIconBack />
           </button>
           <div className="ch-title-wrap">
-            <div className="ch-title">Coaching session</div>
+            <div className="ch-title">{currentTitle}</div>
             <div className="ch-sub">Practices in focus · {practices.join(', ')}</div>
           </div>
           <PrivacyToggle on={privateMode} onChange={setPrivateMode} />
@@ -530,7 +530,7 @@ export function Chat({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') sendText(draft);
+              if (e.key === 'Enter' && !e.altKey && !e.metaKey) void sendText(draft);
             }}
           />
           <button type="button" className="ch-send" onClick={() => sendText(draft)} aria-label="Send">

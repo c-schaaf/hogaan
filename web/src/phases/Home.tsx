@@ -106,7 +106,7 @@ export function Home({ user, practices, showPracticeCaption = false, onCompose, 
                 onClick={(e) => e.stopPropagation()}
                 onChange={(e) => setComposeText(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') onCompose(composeText || null);
+                  if (e.key === 'Enter' && !e.altKey && !e.metaKey) onCompose(composeText || null);
                 }}
               />
               <span className="hm-compose-arrow">→</span>
