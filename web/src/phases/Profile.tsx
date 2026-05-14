@@ -35,9 +35,17 @@ function FieldRow({ label, value, action }: { label: string; value: string; acti
   );
 }
 
-function InlineButton({ children, icon }: { children: ReactNode; icon?: ReactNode }) {
+function InlineButton({
+  children,
+  icon,
+  onClick,
+}: {
+  children: ReactNode;
+  icon?: ReactNode;
+  onClick?: () => void;
+}) {
   return (
-    <button type="button" className="pr-inline">
+    <button type="button" className="pr-inline" onClick={onClick}>
       {icon}
       {children}
     </button>
@@ -100,6 +108,9 @@ interface Props {
 export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
   const [fullName, setFullName] = useState(user.name || '');
   const [email, setEmail] = useState(user.email || '');
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState(user.name || '');
+  const [savingName, setSavingName] = useState(false);
   const [livePractices, setLivePractices] = useState<string[]>(practices);
   const [editingPractices, setEditingPractices] = useState(false);
   const [draftPractices, setDraftPractices] = useState<string[]>(practices);
@@ -147,6 +158,19 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
     setEditingPractices(false);
   };
 
+  const saveName = async () => {
+    setSavingName(true);
+    try {
+      await api.profile.patch({ fullName: draftName });
+      setFullName(draftName);
+      setEditingName(false);
+    } catch (err) {
+      console.error('save name failed', err);
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   return (
     <div className="pr-page">
       <DesktopSidebar active="profile" onNav={onNav} />
@@ -165,11 +189,54 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
             <div className="pr-grid">
               <div className="pr-col pr-col--main">
                 <ProfileCard title="Account">
-                  <FieldRow
-                    label="Full name"
-                    value={fullName}
-                    action={<InlineButton icon={<PrIconEdit />}>Edit</InlineButton>}
-                  />
+                  {editingName ? (
+                    <div className="pr-field">
+                      <div className="pr-field-label">Full name</div>
+                      <div className="pr-field-value" style={{ gap: 8 }}>
+                        <input
+                          className="pr-name-input"
+                          value={draftName}
+                          maxLength={200}
+                          // eslint-disable-next-line jsx-a11y/no-autofocus
+                          autoFocus
+                          onChange={(e) => setDraftName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') void saveName();
+                            if (e.key === 'Escape') { setDraftName(fullName); setEditingName(false); }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="pr-card-action"
+                          onClick={() => void saveName()}
+                          disabled={savingName}
+                        >
+                          {savingName ? 'Saving…' : 'Save'}
+                        </button>
+                        <button
+                          type="button"
+                          className="pr-card-action"
+                          style={{ background: 'transparent', color: 'var(--ink-2)' }}
+                          onClick={() => { setDraftName(fullName); setEditingName(false); }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <FieldRow
+                      label="Full name"
+                      value={fullName}
+                      action={
+                        <InlineButton
+                          icon={<PrIconEdit />}
+                          onClick={() => { setDraftName(fullName); setEditingName(true); }}
+                        >
+                          Edit
+                        </InlineButton>
+                      }
+                    />
+                  )}
                   <FieldRow
                     label="Email"
                     value={email}

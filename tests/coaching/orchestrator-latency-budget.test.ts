@@ -64,10 +64,6 @@ vi.mock('../../src/coaching/context-fetch.js', () => ({
   ),
 }));
 
-vi.mock('../../src/whatsapp-delivery/orchestrator.js', () => ({
-  sendOutbound: vi.fn(),
-}));
-
 vi.mock('../../src/prompt-assembly/index.js', async () => {
   const actual = await vi.importActual<typeof PromptAssemblyModule>(
     '../../src/prompt-assembly/index.js',
@@ -172,14 +168,12 @@ function withFakeNow(elapsedAtCheckMs: number): () => void {
 beforeEach(async () => {
   const triageMod = await import('../../src/coaching/triage.js');
   const sessionMod = await import('../../src/session-lifecycle/index.js');
-  const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
   const llmMod = await import('../../src/shared/llm/chat.js');
   const paMod = await import('../../src/prompt-assembly/index.js');
   const qcMod = await import('../../src/quality-check/index.js');
 
   vi.mocked(triageMod.triage).mockReset();
   vi.mocked(sessionMod.resolveSession).mockReset();
-  vi.mocked(wppMod.sendOutbound).mockReset();
   vi.mocked(llmMod.chat).mockReset();
   vi.mocked(paMod.assemblePrompt).mockReset();
   vi.mocked(qcMod.runQualityCheck).mockReset();
@@ -195,13 +189,6 @@ beforeEach(async () => {
     turnCount: 1,
     lastTurnAt: new Date('2026-05-07T11:55:00Z'),
     metadata: null,
-  });
-  vi.mocked(wppMod.sendOutbound).mockResolvedValue({
-    endEvent: 'E1_MessageDispatched',
-    waMessageId: 'SMc',
-    dispatchPath: 'direct',
-    retryCount: 0,
-    queueLoops: 0,
   });
   vi.mocked(paMod.assemblePrompt).mockResolvedValue({
     assembledPrompt: 'system prompt',
@@ -261,20 +248,10 @@ describe('R-06 latency budget', () => {
       async () => {
         const restore = withFakeNow(16000); // 16s elapsed — over budget
         try {
-          const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
-          const sendSpy = vi.mocked(wppMod.sendOutbound);
-
           const result = await runCoachingTurn(deps(), buildInbound('I had a rough day'));
 
           expect(result.endEvent).toBe('E11_ServiceUnavailable');
           expect(result.responseText).toBe(FALLBACK_DEGRADED);
-          expect(sendSpy).toHaveBeenCalledTimes(1);
-          const sendArgs = sendSpy.mock.calls[0]![1] as {
-            body?: string;
-            callerProcessId: string;
-          };
-          expect(sendArgs.body).toBe(FALLBACK_DEGRADED);
-          expect(sendArgs.callerProcessId).toContain('budget-exceeded');
         } finally {
           restore();
         }
@@ -294,19 +271,10 @@ describe('R-06 latency budget', () => {
       async () => {
         const restore = withFakeNow(3500); // 3.5s elapsed — well under
         try {
-          const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
-          const sendSpy = vi.mocked(wppMod.sendOutbound);
-
           const result = await runCoachingTurn(deps(), buildInbound('coaching question'));
 
           expect(result.endEvent).toBe('E1_TurnCompleted');
           expect(result.responseText).toBe('A coaching response would go here.');
-          expect(sendSpy).toHaveBeenCalledTimes(1);
-          const sendArgs = sendSpy.mock.calls[0]![1] as {
-            body?: string;
-            callerProcessId: string;
-          };
-          expect(sendArgs.callerProcessId).toContain('coaching-response');
         } finally {
           restore();
         }

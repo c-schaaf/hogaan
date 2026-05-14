@@ -112,6 +112,8 @@ const cfg: AppConfig = {
   resendApiKey: undefined,
   resendFromEmail: undefined,
   sponsorPortalBaseUrl: undefined,
+    supabaseUrl: undefined,
+    supabaseAnonKey: undefined,
 };
 
 describe('Phase 12 R1 — runAllChecks produces every active CheckId in the catalog', () => {

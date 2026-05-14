@@ -27,27 +27,6 @@ describe('handleConsentReply', () => {
   });
 });
 
-// Khadija UX Reframe — pre-consent FAQ routes through handleConsentReply.
-describe('handleConsentReply — pre-consent FAQ', () => {
-  it('matches mentor pattern and replies with the FAQ text, staying on step 2', () => {
-    const r = handleConsentReply('I want a mentor, can i get a live mentor');
-    expect(r.newStep).toBe(2);
-    expect(r.outboundBody).toMatch(/mentor-matching service/i);
-    expect(r.outboundBody).toMatch(/yes\s*\/?\s*sow/i);
-  });
-
-  it('matches daily-prompts pattern', () => {
-    const r = handleConsentReply('What will the daily prompts be about');
-    expect(r.newStep).toBe(2);
-    expect(r.outboundBody).toMatch(/daily prompts? are/i);
-  });
-
-  it('matches scope pattern', () => {
-    const r = handleConsentReply('what is this?');
-    expect(r.newStep).toBe(2);
-    expect(r.outboundBody).toMatch(/leadership coach/i);
-  });
-});
 
 // Khadija UX Reframe — handleGoalReply now finalizes onboarding (newStep=7).
 // Single-message ack + FIRST_COACHING_PROMPT replaces the old experience-band

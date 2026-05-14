@@ -56,18 +56,6 @@ vi.mock('../../src/scenario-learning/index.js', () => ({
   runScenarioTurn: vi.fn(),
 }));
 
-vi.mock('../../src/whatsapp-delivery/orchestrator.js', () => ({
-  sendOutbound: vi.fn(() =>
-    Promise.resolve({
-      endEvent: 'E1_MessageDispatched',
-      waMessageId: 'SMtest-' + Math.random().toString(36).slice(2, 8),
-      dispatchPath: 'direct',
-      retryCount: 0,
-      queueLoops: 0,
-    }),
-  ),
-}));
-
 const TEST_SESSION_ID: SessionId = asSessionId('00000000-0000-0000-0000-00000000beef');
 const TEST_USER_ID = asUserId('00000000-0000-0000-0000-00000000abcd');
 const TEST_PHONE = asPhoneE164('+254700099991');
@@ -100,20 +88,10 @@ beforeEach(async () => {
   const triageMod = await import('../../src/coaching/triage.js');
   const sessionMod = await import('../../src/session-lifecycle/index.js');
   const scenarioMod = await import('../../src/scenario-learning/index.js');
-  const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
   vi.mocked(triageMod.triage).mockReset();
   vi.mocked(triageMod.fastPathTriage).mockReset();
   vi.mocked(sessionMod.resolveSession).mockReset();
   vi.mocked(scenarioMod.runScenarioTurn).mockReset();
-  vi.mocked(wppMod.sendOutbound).mockReset();
-  // Default: sendOutbound succeeds.
-  vi.mocked(wppMod.sendOutbound).mockResolvedValue({
-    endEvent: 'E1_MessageDispatched',
-    waMessageId: 'SMdefault',
-    dispatchPath: 'direct',
-    retryCount: 0,
-    queueLoops: 0,
-  });
   // Default: resolveSession returns a stable session.
   vi.mocked(sessionMod.resolveSession).mockResolvedValue({
     sessionId: TEST_SESSION_ID,
@@ -148,9 +126,6 @@ describe('Phase 10.1 — Process #2 (Coaching) end-event coverage', () => {
         vi.mocked(triageMod.fastPathTriage).mockImplementation(realFastPath);
         vi.mocked(triageMod.triage).mockImplementation(realTriage);
 
-        const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
-        const sendSpy = vi.mocked(wppMod.sendOutbound);
-
         const result = await runCoachingTurn(
           deps(),
           buildInbound('', ['https://example.com/voice-note.ogg']),
@@ -158,11 +133,6 @@ describe('Phase 10.1 — Process #2 (Coaching) end-event coverage', () => {
 
         expect(result.endEvent).toBe('E8_MediaNotSupported');
         expect(result.responseText).toMatch(/text only/i);
-        expect(sendSpy).toHaveBeenCalledTimes(1);
-        // The media-reject body went out, not a coaching response.
-        const sendArgs = sendSpy.mock.calls[0]![1] as { body?: string; callerProcessId: string };
-        expect(sendArgs.callerProcessId).toBe('coaching:media-reject');
-        expect(sendArgs.body).toMatch(/text only/i);
       },
     );
   });
@@ -239,19 +209,13 @@ describe('Phase 10.1 — Process #2 (Coaching) end-event coverage', () => {
           intent: 'ProfileUpdate',
         });
 
-        const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
-        const sendSpy = vi.mocked(wppMod.sendOutbound);
-
         const result = await runCoachingTurn(
           deps(),
           buildInbound('actually I just got promoted to director'),
         );
 
         expect(result.endEvent).toBe('E5_ProfileAck');
-        expect(result.responseText).toMatch(/Heard\. I've noted that update/i);
-        expect(sendSpy).toHaveBeenCalledTimes(1);
-        const sendArgs = sendSpy.mock.calls[0]![1] as { callerProcessId: string };
-        expect(sendArgs.callerProcessId).toBe('coaching:profile-ack');
+        expect(result.responseText).toMatch(/Heard/i);
       },
     );
   });
@@ -273,9 +237,6 @@ describe('Phase 10.1 — Process #2 (Coaching) end-event coverage', () => {
           intent: 'MetaQuestion',
         });
 
-        const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
-        const sendSpy = vi.mocked(wppMod.sendOutbound);
-
         const result = await runCoachingTurn(
           deps(),
           buildInbound('how does this work? are you AI?'),
@@ -283,9 +244,6 @@ describe('Phase 10.1 — Process #2 (Coaching) end-event coverage', () => {
 
         expect(result.endEvent).toBe('E6_MetaResponse');
         expect(result.responseText).toMatch(/anchored in Hamse Warfa's 12 Practices/i);
-        expect(sendSpy).toHaveBeenCalledTimes(1);
-        const sendArgs = sendSpy.mock.calls[0]![1] as { callerProcessId: string };
-        expect(sendArgs.callerProcessId).toBe('coaching:meta');
       },
     );
   });

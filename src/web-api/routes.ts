@@ -497,6 +497,11 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   });
 
   // PATCH /api/profile -------------------------------------------------
+  const KNOWN_PRACTICES = new Set([
+    'Purpose', 'Integrity', 'Accountability', 'Dignity', 'Empathy', 'Inclusion',
+    'Assets', 'Innovation', 'Prosperity', 'Humility', 'Peace', 'Democracy',
+  ]);
+
   app.patch<{
     Body: Partial<{
       fullName: string;
@@ -513,6 +518,8 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     const update: Record<string, unknown> = { updatedAt: new Date() };
 
     if (typeof req.body.fullName === 'string') {
+      if (req.body.fullName.length > 200)
+        return reply.code(400).send({ error: 'fullName_too_long' });
       // Merge into profileFlags JSON (full_name_encrypted writes come later).
       const row = await opts.db
         .select({ profileFlags: users.profileFlags })
@@ -527,7 +534,11 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     }
 
     if (Array.isArray(req.body.mappedPractices)) {
-      update['mappedPractices'] = req.body.mappedPractices.filter((p) => typeof p === 'string');
+      const incoming = req.body.mappedPractices.filter((p): p is string => typeof p === 'string');
+      const invalid = incoming.filter((p) => !KNOWN_PRACTICES.has(p));
+      if (invalid.length > 0)
+        return reply.code(400).send({ error: 'invalid_practice', values: invalid });
+      update['mappedPractices'] = incoming;
     }
     if (req.body.commStyle === 'direct' || req.body.commStyle === 'warm') {
       update['commStyle'] = req.body.commStyle;

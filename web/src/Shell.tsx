@@ -40,6 +40,11 @@ type Phase =
 
 const AUTHED_PHASES = new Set<Phase>(['home', 'chat', 'sessions', 'profile']);
 
+const URL_PATH_TO_PHASE: Partial<Record<string, Phase>> = {
+  '/sessions': 'sessions',
+  '/profile': 'profile',
+};
+
 export function Shell() {
   const [phase, setPhase] = useState<Phase>('boot');
   const [me, setMe] = useState<MeResponse | null>(null);
@@ -50,8 +55,14 @@ export function Shell() {
   const initialUrl = useRef(new URL(window.location.href));
   const [linkError, setLinkError] = useState<string | null>(null);
   const lastAuthedTokenRef = useRef<string | null>(null);
+  const phaseRef = useRef<Phase>('boot');
+  const urlPhaseRef = useRef<Phase | null>(
+    (URL_PATH_TO_PHASE[new URL(window.location.href).pathname] as Phase) ?? null,
+  );
+  const [chatOrigin, setChatOrigin] = useState<Phase>('home');
 
   useEffect(() => {
+    phaseRef.current = phase;
     if (AUTHED_PHASES.has(phase)) sessionStorage.setItem('shell-phase', phase);
   }, [phase]);
 
@@ -69,9 +80,13 @@ export function Shell() {
         return;
       }
       const stored = sessionStorage.getItem('shell-phase') as Phase | null;
-      const next: Phase = p.onboarded
+      let next: Phase = p.onboarded
         ? (stored !== null && AUTHED_PHASES.has(stored) ? stored : 'home')
         : 'onboarding';
+      if (p.onboarded && urlPhaseRef.current !== null) {
+        next = urlPhaseRef.current;
+        urlPhaseRef.current = null; // consume — only used on first boot
+      }
       console.log('[shell] routing to', next);
       setPhase(next);
     } catch (err) {
@@ -87,7 +102,12 @@ export function Shell() {
     }
   }, []);
 
-  // Boot: read session, route once, then subscribe to changes.
+  // Boot: subscribe to auth state changes. INITIAL_SESSION always fires
+  // immediately on subscription with the current session (or null) — it is
+  // the sole trigger for the initial route. Using a separate getSession()
+  // IIFE alongside onAuthStateChange creates an unwinnable race: the IIFE's
+  // await yields before lastAuthedTokenRef is stamped, so INITIAL_SESSION
+  // bypasses dedup and routeAuthed() fires twice, always landing on Home.
   useEffect(() => {
     // Supabase redirects back with ?error=...&error_code=... on failed
     // magic-link clicks (expired, invalid, etc). Show a banner on the
@@ -105,18 +125,6 @@ export function Shell() {
       clean.hash = '';
       window.history.replaceState({}, '', clean.toString());
     }
-
-    void (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session === null) {
-        setMe(null);
-        // Default unauthed landing = login. Signup is reachable via the
-        // "Create an account" link.
-        setPhase('login');
-        return;
-      }
-      await routeAuthed();
-    })();
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[shell] auth event:', event, 'session?', !!session);
@@ -140,12 +148,22 @@ export function Shell() {
         );
         return;
       }
-      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
         const token = session?.access_token ?? null;
         if (token !== null && token === lastAuthedTokenRef.current) return;
         lastAuthedTokenRef.current = token;
+        // SIGNED_IN fires for background token refreshes as well as genuine
+        // sign-ins. Only route on genuine sign-ins (unauthed phase → authed).
+        // If already on an authed page, or on forgot/reset, skip — re-routing
+        // here causes an infinite loop (routeAuthed → getSession → SIGNED_IN).
+        if (event === 'SIGNED_IN') {
+          const cur = phaseRef.current;
+          if (AUTHED_PHASES.has(cur) || cur === 'forgot' || cur === 'reset') return;
+        }
         void routeAuthed();
       }
+      // TOKEN_REFRESHED is intentionally not handled: a background token
+      // renewal must never re-route a user who is already on a page.
     });
     return () => sub.subscription.unsubscribe();
   }, [routeAuthed]);
@@ -255,6 +273,7 @@ export function Shell() {
           onCompose={(seed) => {
             setChatSeed(seed);
             setOpenSessionId(null);
+            setChatOrigin('home');
             setPhase('chat');
           }}
           onNav={onNav}
@@ -265,7 +284,7 @@ export function Shell() {
       body = (
         <Sessions
           onBack={() => setPhase('home')}
-          onOpen={(id) => { setOpenSessionId(id); setChatSeed(null); setPhase('chat'); }}
+          onOpen={(id) => { setOpenSessionId(id); setChatSeed(null); setChatOrigin('sessions'); setPhase('chat'); }}
           onNav={onNav}
         />
       );
@@ -290,7 +309,7 @@ export function Shell() {
           }
           seed={chatSeed}
           openSessionId={openSessionId}
-          onBack={() => { setOpenSessionId(null); setPhase('home'); }}
+          onBack={() => { setOpenSessionId(null); setPhase(chatOrigin); }}
         />
       );
       break;

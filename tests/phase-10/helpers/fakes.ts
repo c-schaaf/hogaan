@@ -40,6 +40,8 @@ export function fakeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     resendApiKey: undefined,
     resendFromEmail: undefined,
     sponsorPortalBaseUrl: undefined,
+    supabaseUrl: undefined,
+    supabaseAnonKey: undefined,
     ...overrides,
   };
 }

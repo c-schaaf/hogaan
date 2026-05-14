@@ -7,15 +7,6 @@
  * *onboarding intake*. Same author, similar voice — warm, brief, useful.
  */
 
-import { BRAND_FRAMEWORK_ATTRIBUTION, BRAND_TAGLINE } from '../shared/brand/constants.js';
-
-// Customer-feedback PR1 — trimmed from the older 380-char version. Drops
-// the sponsor-code line (surfaced separately if no code redemption fires)
-// to remove dead weight from the post-sandbox "what do I do?" moment.
-export const WELCOME_MESSAGE = `Welcome to Hogaan — *${BRAND_TAGLINE}*.
-
-I'm a coaching presence anchored in ${BRAND_FRAMEWORK_ATTRIBUTION} — here to be useful to you and the people you lead.`;
-
 // Phase 12 R16 — flowing prose, one bold ("aggregate"), zero headers/bullets.
 // Customer-feedback PR1 — final line is now a CTA on its own line so the
 // "Reply yes to begin" instruction is visually dominant after the disclosures.
@@ -137,12 +128,3 @@ export const LOCATION_PROMPT = `Where are you reaching me from? City and country
 (This helps me know what time of day to reach you and whether to anchor my responses in local context.)`;
 
 export const FIRST_COACHING_PROMPT = `Tell me — what is one leadership challenge you're sitting with this week?`;
-
-export const NUDGE_4H = `Still here whenever you have a moment. Pick up where we left off.`;
-export const NUDGE_48H = `Two days quiet. No pressure — when you're ready, send anything to continue.`;
-export const DORMANT_7D = `It's been a week. I've parked your spot. Send anything to pick back up — we'll resume right where you stopped.`;
-
-export const OPT_OUT_CONFIRMATION = `You're opted out. I won't message you again. If you ever want to come back, message this number and I'll reactivate.`;
-
-/** Re-engagement on a duplicate-number signup (Process #1 E8). */
-export const WELCOME_BACK_DUPLICATE = `You're already onboarded with me. Send any leadership question and I'll respond — that's where we are.`;

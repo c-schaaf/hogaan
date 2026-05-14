@@ -23,7 +23,6 @@ type OptionalKey =
   | 'BETTERSTACK_HEARTBEAT_URL'
   | 'RESEND_API_KEY'
   | 'RESEND_FROM_EMAIL'
-  | 'SPONSOR_PORTAL_BASE_URL'
   | 'SUPABASE_URL'
   | 'SUPABASE_ANON_KEY';
 
@@ -53,7 +52,6 @@ export interface AppConfig {
   betterstackHeartbeatUrl: string | undefined;
   resendApiKey: string | undefined;
   resendFromEmail: string | undefined;
-  sponsorPortalBaseUrl: string | undefined;
   supabaseUrl: string | undefined;
   supabaseAnonKey: string | undefined;
 }
@@ -129,7 +127,6 @@ export function loadConfig(): AppConfig {
     betterstackHeartbeatUrl: readOptional('BETTERSTACK_HEARTBEAT_URL'),
     resendApiKey: readOptional('RESEND_API_KEY'),
     resendFromEmail: readOptional('RESEND_FROM_EMAIL'),
-    sponsorPortalBaseUrl: readOptional('SPONSOR_PORTAL_BASE_URL'),
     supabaseUrl: readOptional('SUPABASE_URL'),
     supabaseAnonKey: readOptional('SUPABASE_ANON_KEY'),
   };

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { handoff as crisisHandoff } from '../crisis-handoff/index.js';
 import { reportP1 } from '../incident-handling/index.js';
 import { debugWarn } from '../shared/observability/debug-log.js';
@@ -22,9 +21,6 @@ import { BRAND_FRAMEWORK_ATTRIBUTION } from '../shared/brand/constants.js';
 import { hashPhone } from '../shared/db/encryption.js';
 import { emitTurnTrace, type TraceEmitter } from '../shared/trace/index.js';
 import { type LevelTag, type PracticeTag, type TurnId } from '../shared/types/index.js';
-import { sendOutbound } from '../whatsapp-delivery/orchestrator.js';
-import { sendChunkedBody } from '../whatsapp-delivery/chunk.js';
-import type { OutboundRequest } from '../whatsapp-delivery/types.js';
 import { fetchCoachingContext } from './context-fetch.js';
 import { decideContinuation } from './continuation.js';
 import type { CoachingEndEvent } from './end-events.js';
@@ -572,41 +568,47 @@ export async function runCoachingTurn(
   }
 
   // ---- Step 12: post-turn parallel persistence (fail-open) -----------
+  // Web "Private session" toggle: skip the turns/memory writes entirely
+  // so the conversation leaves no DB trace. Session row was created in
+  // Step 2 but is marked is_private=true by the web-api caller; the list
+  // endpoint filters those out.
   const turnLatency = Date.now() - t0;
-  const postTurn = await persistPostTurn(
-    { config: deps.config, db: deps.db },
-    {
-      userId: inbound.userId,
-      sessionId: session.sessionId,
-      userMessage: inbound.body,
-      responseText,
-      intent,
-      practiceTag: tags.practiceTag,
-      levelTag: tags.levelTag,
-      secondaryPracticeTag: tags.secondaryPracticeTag,
-      secondaryLevelTag: tags.secondaryLevelTag,
-      taggerConfidence: tags.confidence,
-      responseMode: 'FullCoachingResponse',
-      modelUsed: chatResp.modelUsed,
-      fallbackPath: chatResp.fallbackPath,
-      qaOutcome: qc.endEvent,
-      retryCount: qc.retryCount,
-      latencyMs: turnLatency,
-      degradationFlags: {
-        memoryTruncated: promptBundle.degradationFlags.memoryTruncated,
-        sessionTruncated: promptBundle.degradationFlags.sessionTruncated,
-        culturalFramingDropped: promptBundle.degradationFlags.culturalFramingDropped,
-        fallbackModelUsed: chatResp.fallbackPath !== 'none',
-        contextFetchPartial: ctx.partialFailure,
-      },
-      libraryVersions: promptBundle.libraryVersions,
-      determinismHash: promptBundle.determinismHash,
-      deliveryReceipt: {
-        ...(delivery.waMessageId !== undefined ? { waMessageId: delivery.waMessageId } : {}),
-      },
-      terminalEvent: 'pending',
-    },
-  );
+  const postTurn = inbound.isPrivate === true
+    ? { turnId: null as TurnId | null }
+    : await persistPostTurn(
+        { config: deps.config, db: deps.db },
+        {
+          userId: inbound.userId,
+          sessionId: session.sessionId,
+          userMessage: inbound.body,
+          responseText,
+          intent,
+          practiceTag: tags.practiceTag,
+          levelTag: tags.levelTag,
+          secondaryPracticeTag: tags.secondaryPracticeTag,
+          secondaryLevelTag: tags.secondaryLevelTag,
+          taggerConfidence: tags.confidence,
+          responseMode: 'FullCoachingResponse',
+          modelUsed: chatResp.modelUsed,
+          fallbackPath: chatResp.fallbackPath,
+          qaOutcome: qc.endEvent,
+          retryCount: qc.retryCount,
+          latencyMs: turnLatency,
+          degradationFlags: {
+            memoryTruncated: promptBundle.degradationFlags.memoryTruncated,
+            sessionTruncated: promptBundle.degradationFlags.sessionTruncated,
+            culturalFramingDropped: promptBundle.degradationFlags.culturalFramingDropped,
+            fallbackModelUsed: chatResp.fallbackPath !== 'none',
+            contextFetchPartial: ctx.partialFailure,
+          },
+          libraryVersions: promptBundle.libraryVersions,
+          determinismHash: promptBundle.determinismHash,
+          deliveryReceipt: {
+            ...(delivery.waMessageId !== undefined ? { waMessageId: delivery.waMessageId } : {}),
+          },
+          terminalEvent: 'pending',
+        },
+      );
 
   // ---- Step 13: continuation decision --------------------------------
   const continuation = decideContinuation(inbound.body);
@@ -759,12 +761,7 @@ async function handleCrisis(
   const trigger: 'process_2_step_1' | 'process_10_check_8' =
     triageResult.reason === 'qc-second-line' ? 'process_10_check_8' : 'process_2_step_1';
   await crisisHandoff(
-    {
-      config: deps.config,
-      db: deps.db,
-      redis: deps.redis,
-      rateLimiters: deps.rateLimiters,
-    },
+    { db: deps.db },
     {
       triggerSource: trigger,
       phoneE164: inbound.phoneE164,
@@ -832,60 +829,15 @@ async function runTemplatedResponse(
   });
 }
 
-async function sendBody(
-  deps: CoachingDeps,
-  inbound: CoachingInbound,
-  body: string,
-  callerSubId: string,
-): Promise<{ failed: boolean; waMessageId?: string; reason?: string }> {
-  const correlationIdPrefix = `coach-${inbound.userId.slice(0, 8)}-${callerSubId}-${randomUUID().slice(0, 6)}`;
-  const dispatcher = (request: OutboundRequest) =>
-    sendOutbound(
-      {
-        config: deps.config,
-        db: deps.db,
-        redis: deps.redis,
-        rateLimiters: deps.rateLimiters,
-        ownerId: 'coaching',
-      },
-      request,
-    );
-
-  const r = await sendChunkedBody(
-    dispatcher,
-    {
-      callerProcessId: `coaching:${callerSubId}`,
-      phoneE164: inbound.phoneE164,
-      userId: inbound.userId,
-      messageType: 'FreeForm',
-      priority: 'High',
-    },
-    body,
-    correlationIdPrefix,
-  );
-
-  // Aggregate result: succeeded iff at least one chunk reached the user.
-  // Per-chunk failures are logged inside sendChunkedBody (P2 incident +
-  // structured stdout), so the caller sees a single OK/FAIL outcome here.
-  // 2026-05-08 chunking fix: a 1734-char coaching response was being
-  // silently dropped by the Twilio sandbox; chunking into <=1500-char
-  // segments restores delivery. See src/whatsapp-delivery/chunk.ts.
-  if (r.successCount > 0) {
-    return {
-      failed: false,
-      ...(r.firstSuccessWaMessageId !== undefined
-        ? { waMessageId: r.firstSuccessWaMessageId }
-        : {}),
-    };
-  }
-  // All chunks failed — surface the first chunk's failure reason for the
-  // upstream trace.
-  const first = r.perChunkResults[0];
-  const reason =
-    first !== undefined
-      ? `${first.endEvent}: ${first.reason ?? 'unknown'}`
-      : 'chunked send produced no results';
-  return { failed: true, reason };
+// Response body is returned to the caller via the HTTP response
+// (web-api/routes.ts) — no outbound dispatch needed on the web channel.
+function sendBody(
+  _deps: CoachingDeps,
+  _inbound: CoachingInbound,
+  _body: string,
+  _callerSubId: string,
+): Promise<{ failed: boolean }> {
+  return Promise.resolve({ failed: false });
 }
 
 export const _internal = {

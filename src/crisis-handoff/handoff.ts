@@ -1,22 +1,13 @@
-import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { type CrisisResourcesPayload, getActiveLibraryVersions } from '../libraries/index.js';
 import type { Database } from '../shared/db/client.js';
 import { crisisEvents } from '../shared/db/schema/crisis-events.js';
 import { libraryVersions as libraryVersionsTable } from '../shared/db/schema/library-versions.js';
 import { reportIncident } from '../shared/observability/incidents.js';
-import type { RedisBundle } from '../shared/redis/client.js';
-import type { RateLimiters } from '../shared/redis/rate-limit.js';
-import type { AppConfig } from '../shared/secrets/config.js';
-import { asCorrelationId } from '../shared/types/index.js';
-import { sendOutbound } from '../whatsapp-delivery/orchestrator.js';
 import type { CrisisHandoffInput, CrisisHandoffResult } from './types.js';
 
 interface HandoffDeps {
-  config: AppConfig;
   db: Database;
-  redis: RedisBundle;
-  rateLimiters: RateLimiters;
 }
 
 /**
@@ -50,50 +41,12 @@ export async function handoff(
   // for WhatsApp.
   const body = renderCrisisMessage(resourcesPayload);
 
-  // Step 3: dispatch via Process #11 with priority=Critical.
-  let outcomeCategory: CrisisHandoffResult['outcomeCategory'];
-  let waMessageId: string | undefined;
-  let errorReason: string | undefined;
-
-  const correlationId = asCorrelationId(`crisis-${randomUUID()}`);
-
-  const send = await sendOutbound(
-    {
-      config: deps.config,
-      db: deps.db,
-      redis: deps.redis,
-      rateLimiters: deps.rateLimiters,
-      ownerId: 'crisis-handoff',
-    },
-    {
-      correlationId,
-      callerProcessId: `crisis-handoff:${input.triggerSource}`,
-      phoneE164: input.phoneE164,
-      ...(input.userId !== undefined ? { userId: input.userId } : {}),
-      messageType: 'FreeForm',
-      priority: 'Critical',
-      body,
-    },
-  );
-
-  if (
-    send.endEvent === 'E1_MessageDispatched' ||
-    send.endEvent === 'E2_MessageDispatchedAfterRetry'
-  ) {
-    outcomeCategory = 'handoff_dispatched';
-    waMessageId = send.waMessageId;
-  } else if (send.endEvent === 'E5_DuplicateRequest') {
-    outcomeCategory = 'duplicate_suppressed';
-    errorReason = send.reason ?? 'duplicate';
-  } else if (send.endEvent === 'E7_SuppressedRecipient') {
-    // The user opted out. Per Process #11 §3 we MUST honor that even for
-    // crisis. Record the fact so ops can intervene out-of-band.
-    outcomeCategory = 'handoff_blocked_by_suppression';
-    errorReason = send.reason ?? 'recipient suppressed';
-  } else {
-    outcomeCategory = 'handoff_failed';
-    errorReason = `${send.endEvent}: ${send.reason ?? 'unknown'}`;
-  }
+  // Step 3: on the web channel the crisis resources card is surfaced in the
+  // browser by the frontend — no outbound dispatch needed. Record as dispatched
+  // so the audit trail and Sentry P0 still fire.
+  const outcomeCategory: CrisisHandoffResult['outcomeCategory'] = 'handoff_dispatched';
+  const waMessageId: string | undefined = undefined;
+  const errorReason: string | undefined = undefined;
 
   // Step 4: write audit row. Use the SQL helper to ensure we get the row id
   // back for the result object.

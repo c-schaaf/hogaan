@@ -17,7 +17,6 @@ import {
   parseGoals,
   parseLocation,
 } from './parsers.js';
-import { detectPreConsentFaq } from './pre-consent-faq.js';
 import type { Database } from '../shared/db/client.js';
 import { users } from '../shared/db/schema/users.js';
 import type { UserId } from '../shared/types/index.js';
@@ -65,16 +64,7 @@ export function handleConsentReply(text: string): StepResult {
       terminalEvent: 'E3_ConsentDeclined',
     };
   }
-  // Ambiguous — try the pre-consent FAQ handler before falling through to a
-  // generic re-ask. Khadija field test 2026-05-11: users asked sensible
-  // pre-consent questions ("can I get a mentor?", "what are daily prompts?")
-  // and the bot just re-sent the consent prompt verbatim. FAQ-detected
-  // inbounds now get a one-line answer + a nudge back to "yes / sow."
-  const faq = detectPreConsentFaq(text);
-  if (faq !== null) {
-    return { outboundBody: faq.reply, newStep: 2, defaultsApplied: false };
-  }
-  // Truly unrecognized — fall back to existing re-ask behavior.
+  // Unrecognized — re-ask.
   return { outboundBody: CONSENT_PROMPT, newStep: 2, defaultsApplied: false };
 }
 

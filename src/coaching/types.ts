@@ -15,7 +15,8 @@ import type { CoachingEndEvent } from './end-events.js';
  */
 export interface CoachingInbound {
   userId: UserId;
-  /** Plaintext E.164 — the recipient on outbound responses. */
+  /** Plaintext E.164 — the recipient on outbound responses. For web users
+   *  pass a stable synthetic value (`web:<userId>`); dispatch is skipped. */
   phoneE164: PhoneE164;
   /** SHA-256 of phoneE164 — for trace + suppression checks. */
   phoneHash: string;
@@ -28,9 +29,18 @@ export interface CoachingInbound {
   receivedAt: Date;
   /** Trace ID — typically the Fastify request ID propagated from the webhook. */
   traceId: string;
-  /** Channel of origin — 'whatsapp' (default, Twilio webhook) or 'web' (in-browser SPA via /api/coaching/turn). Used by sendBody to short-circuit Twilio dispatch on 'web'. */
+  /**
+   * Delivery channel. Defaults to 'whatsapp' if undefined (preserves the
+   * pre-Phase-B webhook caller signature). When 'web', sendBody short-
+   * circuits the Twilio dispatch — the responseText is returned to the
+   * caller via HTTP instead.
+   */
   channel?: 'whatsapp' | 'web';
-  /** Web-only: when true, the session row is flagged as private and excluded from the user's session list. */
+  /**
+   * Web "Private session" toggle. When true, downstream persistence
+   * (post-turn writes, memory) is skipped for this turn. Ignored on
+   * whatsapp channel. See sessions.is_private column.
+   */
   isPrivate?: boolean;
 }
 

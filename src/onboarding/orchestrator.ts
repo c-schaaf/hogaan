@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import type { Database } from '../shared/db/client.js';
 import { users } from '../shared/db/schema/users.js';
@@ -6,16 +5,8 @@ import { reportP1 } from '../incident-handling/index.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
-import { asCorrelationId, asPhoneE164, type UserId } from '../shared/types/index.js';
-import { sendOutbound } from '../whatsapp-delivery/orchestrator.js';
+import { type UserId } from '../shared/types/index.js';
 import { tryRedeemCode } from './code-redemption.js';
-import {
-  CONSENT_PROMPT,
-  FIRST_COACHING_PROMPT,
-  OPT_OUT_CONFIRMATION,
-  WELCOME_BACK_DUPLICATE,
-  WELCOME_MESSAGE,
-} from './messages.js';
 import type { OnboardingEndEvent } from './end-events.js';
 import { isOptOutMessage, recordOptOut } from './opt-out.js';
 import {
@@ -58,7 +49,6 @@ export async function handleOnboardingMessage(
   // ---- Pre-step: global opt-out
   if (isOptOutMessage(event.body)) {
     await recordOptOut(deps.db, deps.redis, event.userId, event.phoneHash);
-    await dispatch(deps, event, OPT_OUT_CONFIRMATION, 'opt-out-confirm');
     return {
       endEvent: 'E5_OnboardingAbandoned',
       newLastCompletedStep: 0,
@@ -87,7 +77,6 @@ export async function handleOnboardingMessage(
 
   // ---- Already-onboarded short-circuit (Process #1 §Gateway User Status).
   if (user.status === 'onboarded') {
-    await dispatch(deps, event, WELCOME_BACK_DUPLICATE, 'welcome-back-duplicate');
     return {
       endEvent: 'E8_DuplicateNumber',
       newLastCompletedStep: 7,
@@ -168,8 +157,7 @@ async function runStep00to02(
     cohortId = redeem.existingCohortId;
   }
 
-  // Send welcome + consent prompt back-to-back.
-  await dispatch(deps, event, `${WELCOME_MESSAGE}\n\n${CONSENT_PROMPT}`, 'welcome+consent');
+  // Persist step 2 so the next message routes to consent handling.
   await applyDataUpdate(deps.db, event.userId, 2, undefined);
   return {
     endEvent: 'IN_PROGRESS',
@@ -274,7 +262,6 @@ async function runStaleStateCatchUp(
   event: OnboardingInboundEvent,
   isResumed: boolean,
 ): Promise<OnboardingResult> {
-  await dispatch(deps, event, FIRST_COACHING_PROMPT, 'stale-state-catch-up');
   await finalizeOnboarded(deps.db, event.userId);
   return {
     endEvent: isResumed ? 'E2_CompletedAfterResume' : 'E1_CompletedFirstTry',
@@ -299,44 +286,15 @@ async function finalizeOnboarded(db: Database, userId: UserId): Promise<void> {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Onboarding responses are delivered via the web UI — no outbound dispatch.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function dispatch(
-  deps: OrchestratorDeps,
-  event: OnboardingInboundEvent,
-  body: string,
-  callerSubId: string,
+  _deps: OrchestratorDeps,
+  _event: OnboardingInboundEvent,
+  _body: string,
+  _callerSubId: string,
 ): Promise<void> {
-  const correlationId = asCorrelationId(
-    `onb-${event.userId.slice(0, 8)}-${callerSubId}-${randomUUID().slice(0, 8)}`,
-  );
-  const result = await sendOutbound(
-    {
-      config: deps.config,
-      db: deps.db,
-      redis: deps.redis,
-      rateLimiters: deps.rateLimiters,
-      ownerId: CALLER,
-    },
-    {
-      correlationId,
-      callerProcessId: `${CALLER}:${callerSubId}`,
-      phoneE164: asPhoneE164(event.phoneE164),
-      userId: event.userId,
-      messageType: 'FreeForm',
-      priority: 'High',
-      body,
-    },
-  );
-  if (
-    result.endEvent !== 'E1_MessageDispatched' &&
-    result.endEvent !== 'E2_MessageDispatchedAfterRetry' &&
-    result.endEvent !== 'E5_DuplicateRequest'
-  ) {
-    reportP1('onboarding outbound did not dispatch cleanly', {
-      source: `Process_1.${callerSubId}`,
-      tags: { endEvent: result.endEvent },
-      extra: { reason: result.reason ?? 'unknown' },
-    });
-  }
+  // no-op on web channel
 }
 
 async function persistAttempt(

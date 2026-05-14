@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 import { recordEvidence } from '../../src/shared/audit-evidence/index.js';
 import { COACHING_END_EVENTS } from '../../src/coaching/end-events.js';
 import { ONBOARDING_END_EVENTS } from '../../src/onboarding/end-events.js';
-import { WHATSAPP_END_EVENTS } from '../../src/whatsapp-delivery/end-events.js';
 import { IDENTITY_END_EVENTS } from '../../src/identity/end-events.js';
 import { QC_END_EVENTS } from '../../src/quality-check/end-events.js';
 import { PROMPT_ASSEMBLY_END_EVENTS } from '../../src/prompt-assembly/end-events.js';
@@ -35,7 +34,7 @@ const TEST_DIRS = [path.join(REPO_ROOT, 'tests')];
 
 interface ProcessSpec {
   /** Process number per BPMN. */
-  id: '1' | '2' | '9' | '10' | '11' | '12';
+  id: '1' | '2' | '9' | '10' | '12';
   /** Process name in code. */
   name: string;
   /** Tier 2 control prefix. */
@@ -74,13 +73,6 @@ const PROCESSES: ProcessSpec[] = [
     controlPrefix: 'T2.Process10',
     endEvents: QC_END_EVENTS,
     testGlobHints: ['quality-check/'],
-  },
-  {
-    id: '11',
-    name: 'WhatsAppDelivery',
-    controlPrefix: 'T2.Process11',
-    endEvents: WHATSAPP_END_EVENTS,
-    testGlobHints: ['whatsapp-delivery/'],
   },
   {
     id: '12',
@@ -222,6 +214,6 @@ describe('Phase 10.1 — BPMN end-event coverage manifest', () => {
         perProcess: Object.fromEntries(PROCESSES.map((p) => [p.name, p.endEvents.length])),
       },
     });
-    expect(total).toBeGreaterThanOrEqual(57);
+    expect(total).toBeGreaterThanOrEqual(40);
   });
 });

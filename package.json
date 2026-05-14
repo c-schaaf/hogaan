@@ -19,6 +19,8 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:web": "vitest run --config web/vitest.config.ts",
+    "test:web:watch": "vitest --config web/vitest.config.ts",
     "test:bpmn": "vitest run --dir tests/bpmn",
     "lint": "eslint . --ext .ts,.tsx && prettier --check .",
     "lint:fix": "eslint . --ext .ts,.tsx --fix && prettier --write .",
@@ -55,6 +57,8 @@
     "twilio": "^6.0.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^22.9.0",
     "@types/opossum": "^8.1.9",
     "@types/react": "^18.3.12",
@@ -66,6 +70,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.14.0",
     "eslint-config-prettier": "^9.1.0",
+    "jsdom": "^29.1.1",
     "pino-pretty": "^11.3.0",
     "prettier": "^3.3.3",
     "tsx": "^4.19.2",

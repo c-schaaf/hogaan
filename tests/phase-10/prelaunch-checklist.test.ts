@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { reportP0, reportP1, reportP2 } from '../../src/incident-handling/index.js';
-import {
-  isSuppressed,
-  requireSegmentSize,
-  SEGMENT_SIZE_FLOOR,
-  SEGMENT_SUPPRESSED_COPY,
-} from '../../src/sponsor-portal/aggregation/privacy.js';
 import { recordEvidence } from '../../src/shared/audit-evidence/index.js';
 import { withEvidence } from './helpers/evidence.js';
 
@@ -45,31 +39,6 @@ describe('Phase 10.8 — Pre-launch checklist', () => {
         // No new assertion — the audit row is the artifact; the proving tests
         // run in their own files. We just want the evidence binder to show
         // T1.AccessControl.AuditLogFailClosed as carried-forward = pass.
-      },
-    );
-  });
-
-  it('carry-forward: ≥30-user privacy floor enforced (Phase 9A.6)', async () => {
-    await withEvidence(
-      {
-        testId: 'phase-10/checklist/privacy-floor-30',
-        controlId: 'T3.PrivacyControls.SegmentSizeFloor',
-        tier: 'T3',
-        description:
-          'requireSegmentSize() returns the locked sentinel copy when distinct user count < 30. Proven by tests/sponsor-portal/privacy.test.ts and verify-phase-9.ts live verification (10/10 PASS, 29-user subsegment correctly suppressed).',
-        details: {
-          floor: SEGMENT_SIZE_FLOOR,
-          sentinelCopy: SEGMENT_SUPPRESSED_COPY,
-          provingTests: ['tests/sponsor-portal/privacy.test.ts'],
-          provingScripts: ['scripts/verify-phase-9.ts'],
-        },
-      },
-      () => {
-        // Defensive in-file check so this test produces both carry-forward
-        // evidence AND a fresh assertion.
-        const result = requireSegmentSize(29, { hello: 'world' });
-        expect(isSuppressed(result)).toBe(true);
-        expect(result.suppressed).toBe(true);
       },
     );
   });

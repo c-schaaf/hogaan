@@ -52,10 +52,6 @@ vi.mock('../../src/coaching/context-fetch.js', () => ({
   ),
 }));
 
-vi.mock('../../src/whatsapp-delivery/orchestrator.js', () => ({
-  sendOutbound: vi.fn(),
-}));
-
 vi.mock('../../src/prompt-assembly/index.js', async () => {
   const actual = await vi.importActual<typeof PromptAssemblyModule>(
     '../../src/prompt-assembly/index.js',
@@ -106,13 +102,11 @@ const deps = (): Parameters<typeof runCoachingTurn>[0] => ({
 beforeEach(async () => {
   const triageMod = await import('../../src/coaching/triage.js');
   const sessionMod = await import('../../src/session-lifecycle/index.js');
-  const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
   const llmMod = await import('../../src/shared/llm/chat.js');
   const paMod = await import('../../src/prompt-assembly/index.js');
 
   vi.mocked(triageMod.triage).mockReset();
   vi.mocked(sessionMod.resolveSession).mockReset();
-  vi.mocked(wppMod.sendOutbound).mockReset();
   vi.mocked(llmMod.chat).mockReset();
   vi.mocked(paMod.assemblePrompt).mockReset();
 
@@ -127,13 +121,6 @@ beforeEach(async () => {
     turnCount: 1,
     lastTurnAt: new Date('2026-05-07T11:55:00Z'),
     metadata: null,
-  });
-  vi.mocked(wppMod.sendOutbound).mockResolvedValue({
-    endEvent: 'E1_MessageDispatched',
-    waMessageId: 'SMr04',
-    dispatchPath: 'direct',
-    retryCount: 0,
-    queueLoops: 0,
   });
 });
 
@@ -153,18 +140,14 @@ describe('R-04 prompt-assembly failure', () => {
           new PromptAssemblyError('library missing', 'E6_LibraryUnavailable'),
         );
 
-        const wppMod = await import('../../src/whatsapp-delivery/orchestrator.js');
-        const sendSpy = vi.mocked(wppMod.sendOutbound);
         const llmMod = await import('../../src/shared/llm/chat.js');
         const chatSpy = vi.mocked(llmMod.chat);
 
         const result = await runCoachingTurn(deps(), buildInbound('I had a rough day today'));
 
         expect(result.endEvent).toBe('E11_ServiceUnavailable');
+        expect(result.responseText).toMatch(/Something on my end isn't responding/);
         expect(chatSpy).not.toHaveBeenCalled();
-        expect(sendSpy).toHaveBeenCalledTimes(1);
-        const sendArgs = sendSpy.mock.calls[0]![1] as { body?: string; callerProcessId: string };
-        expect(sendArgs.body).toMatch(/Something on my end isn't responding/);
       },
     );
   });

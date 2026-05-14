@@ -158,7 +158,7 @@ export function Sessions({ onBack, onOpen, onNav }: Props) {
 
             {empty ? (
               <SessionsEmpty onHome={onBack} />
-            ) : !hasAny ? (
+            ) : loading ? null : !hasAny ? (
               <div className="ses-noresults">
                 {query.trim().length > 0 ? `No sessions match "${query}".` : 'No sessions yet.'}
               </div>

@@ -115,6 +115,8 @@ const cfg: AppConfig = {
   resendApiKey: undefined,
   resendFromEmail: undefined,
   sponsorPortalBaseUrl: undefined,
+    supabaseUrl: undefined,
+    supabaseAnonKey: undefined,
 };
 
 // Candidate is well below the FullCoachingResponse 120-word minimum, so

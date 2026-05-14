@@ -2,10 +2,8 @@ import 'dotenv/config';
 import { buildApp } from './app.js';
 import { loadConfig } from './shared/secrets/config.js';
 import { initSentry, shutdownSentry, startHeartbeat } from './shared/observability/index.js';
-import { wireSponsorPortalRoutes } from './sponsor-portal/setup.js';
 import { wireWebApiRoutes } from './web-api/setup.js';
 import { wireWebStatic } from './web-static/setup.js';
-import { wireWhatsAppDeliveryRoutes } from './whatsapp-delivery/setup.js';
 
 // DEBUG INSTRUMENTATION — startup probes. Bypass pino entirely (writes
 // to stderr via console.warn) so we localize WHERE on Render startup
@@ -36,22 +34,6 @@ async function main(): Promise<void> {
 
   const app = await buildApp(config);
   startupProbe('buildApp() returned');
-  const wired = await wireWhatsAppDeliveryRoutes(app, config);
-  startupProbe(
-    `wireWhatsAppDeliveryRoutes() returned (registered=${wired.registered}, reason=${wired.reason ?? 'ok'})`,
-  );
-  app.log.info(
-    { whatsappRoutes: wired.registered, reason: wired.reason ?? 'ok' },
-    'whatsapp delivery routes',
-  );
-  const portalWired = await wireSponsorPortalRoutes(app, config);
-  startupProbe(
-    `wireSponsorPortalRoutes() returned (registered=${portalWired.registered}, reason=${portalWired.reason ?? 'ok'})`,
-  );
-  app.log.info(
-    { sponsorPortalRoutes: portalWired.registered, reason: portalWired.reason ?? 'ok' },
-    'sponsor portal routes',
-  );
   // End-user web auth is handled by Supabase Auth in the browser. The
   // backend just validates the `Authorization: Bearer <supabase-token>`
   // header on /api/* via web-api/supabase-session.ts middleware.

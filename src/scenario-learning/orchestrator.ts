@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { reportP1, reportP2 } from '../incident-handling/index.js';
 import { getActiveLibraryVersions } from '../libraries/index.js';
 import type { Scenario, ScenarioStep } from '../libraries/types.js';
@@ -11,12 +10,10 @@ import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import {
-  asCorrelationId,
   type PhoneE164,
   type SessionId,
   type UserId,
 } from '../shared/types/index.js';
-import { sendOutbound } from '../whatsapp-delivery/orchestrator.js';
 import { selectScenario } from './select.js';
 import {
   abandonScenario,
@@ -371,44 +368,14 @@ function composeStepUserMessage(
   return lines.join('\n');
 }
 
-async function sendBody(
-  deps: ScenarioDeps,
-  inbound: ScenarioInbound,
-  body: string,
-  callerSubId: string,
-): Promise<{ failed: boolean; waMessageId?: string; reason?: string }> {
-  const correlationId = asCorrelationId(
-    `scen-${inbound.userId.slice(0, 8)}-${callerSubId.slice(0, 24)}-${randomUUID().slice(0, 6)}`,
-  );
-  const r = await sendOutbound(
-    {
-      config: deps.config,
-      db: deps.db,
-      redis: deps.redis,
-      rateLimiters: deps.rateLimiters,
-      ownerId: 'scenario-learning',
-    },
-    {
-      correlationId,
-      callerProcessId: callerSubId,
-      phoneE164: inbound.phoneE164,
-      userId: inbound.userId,
-      messageType: 'FreeForm',
-      priority: 'High',
-      body,
-    },
-  );
-  if (
-    r.endEvent === 'E1_MessageDispatched' ||
-    r.endEvent === 'E2_MessageDispatchedAfterRetry' ||
-    r.endEvent === 'E5_DuplicateRequest'
-  ) {
-    return {
-      failed: false,
-      ...(r.waMessageId !== undefined ? { waMessageId: r.waMessageId } : {}),
-    };
-  }
-  return { failed: true, reason: `${r.endEvent}: ${r.reason ?? 'unknown'}` };
+// Response is returned via HTTP on the web channel — no outbound dispatch.
+function sendBody(
+  _deps: ScenarioDeps,
+  _inbound: ScenarioInbound,
+  _body: string,
+  _callerSubId: string,
+): Promise<{ failed: boolean }> {
+  return Promise.resolve({ failed: false });
 }
 
 function containsAny(haystack: string, needles: readonly string[]): boolean {
