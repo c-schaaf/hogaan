@@ -1,80 +1,182 @@
 # Hogaan — Project Guide for Claude
 
-WhatsApp-native leadership coaching app. Delivers Hamse Warfa's twelve-practice framework to Somali professionals. Sponsor-funded (no end-user payments). Home-market MVP: Mogadishu and Hargeisa, English-only v1.
+Hogaan Leadership is an AI-powered leadership coaching product founded by
+Hamse Warfa (former U.S. State Department senior advisor). It delivers a
+twelve-practice transformational leadership framework spanning four arenas:
+
+- **Self** — purpose, integrity, accountability
+- **Team** — dignity, empathy, inclusion
+- **Organization** — assets, innovation, prosperity
+- **Community** — humility, peace, democracy
+
+Positioning: a pocket coach for the moments leadership programs miss — hard
+conversations, stalled decisions, team dynamics. Audience: managers, founders,
+and team leads who lack access to elite human coaching budgets.
+
+End users sign in at hogaanai.com, complete onboarding, and converse with the
+coach in the browser. **Leadership coaching only — not therapy, not crisis
+support.** The AI disclaimer covers safety framing.
+
+## What's shipped vs. on the roadmap
+
+**Shipped today:**
+
+- Web signup + email verification (Supabase Auth + Resend)
+- Onboarding (first name, years of leadership, 12-practice selection, consent)
+- On-demand text coaching (streaming single LLM call)
+- Past sessions list + continue past session + delete
+- Profile management
+
+**On the roadmap (NOT in code yet — do not assume these exist):**
+
+- Voice coaching
+- Daily coaching prompts
+- Paid tiers ($9–$19/month premium with personalized tracks)
+- Cohort / certification offering
+- User-facing rehearsal of difficult conversations (`src/scenario-learning/`
+  exists as a state machine but isn't wired to the UI yet)
 
 ## Read before changing behavior
 
-| When working on... | Read first |
+| When working on… | Read first |
 |---|---|
-| First session in this repo | `docs/Hogaan_PRD_v1.docx` — Exec Summary + Section 1 |
-| A specific process | the matching BPMN file (see below) |
-| Voice or coaching content | PRD Section 7 (Voice Rules + Cultural Framing) |
-| Architecture decisions | PRD Section 6 |
-| Scope boundaries | PRD Section 3 |
-| Sponsor / business logic | PRD Section 8 |
+| First session in this repo | This file + `docs/README.md` |
+| A specific process | The matching BPMN under `docs/bpmn/` |
+| Voice or coaching content | `src/libraries/seed/` (Hamse-owned) |
 
-BPMN files are the engineering contract — **open the BPMN before writing code for a process**. They live at `docs/bpmn/`:
-
-- `Process_01_UserOnboarding.bpmn`
-- `Process_02_CoachingConversation.bpmn` *(primary inbound message handler)*
-- `Process_09_PromptAssembly.bpmn`
-- `Process_10_ResponseQualityCheck.bpmn`
-- `Process_11_WhatsAppMessageDelivery.bpmn`
-- `Process_12_UserAuthIdentity.bpmn`
+BPMNs are **living contracts** — updated in the same PR that changes the
+process. A code change to a process without its BPMN diff fails gate G5.
 
 ## Stack (locked — do not suggest alternatives)
 
-Node 22 LTS · TypeScript strict · Fastify · Render (host) · Supabase Postgres + pgvector · Upstash Redis · Anthropic Claude Haiku 4.5 (coaching LLM) · Llama 3.3 70B on Groq (intent classifier + fallback) · Voyage `voyage-3-lite` (embeddings, 1024-dim) · Twilio WhatsApp Business API (+254 sender) · Sentry · Axiom · BetterStack.
+Node 22 LTS · TypeScript strict · Fastify · React 18 + Vite · Render (host) ·
+Supabase Postgres + pgvector · Supabase Auth · Upstash Redis · Anthropic Claude
+Haiku 4.5 (coaching) · Llama 3.3 70B on Groq (fallback) · Voyage
+`voyage-3-lite` (embeddings, 1024-dim) · Resend (transactional email) · Sentry
+· Axiom · BetterStack.
 
-**Never use Baileys or any reverse-engineered WhatsApp library.** Account-ban risk; non-negotiable.
-
-## Module layout (modular monolith)
+## Module layout
 
 ```
 src/
-├── onboarding/        # Process #1
-├── coaching/          # Process #2 — inbound message entry point
-├── prompt-assembly/   # Process #9
-├── quality-check/     # Process #10
-├── whatsapp-delivery/ # Process #11 + Twilio webhook receiver
-├── identity/          # Process #12 — audit log is fail-CLOSED
+├── web-api/           # HTTP routes (chat, sessions, profile) — entry point for the browser app
+├── onboarding/        # First-name, years, practice selection, consent
+├── coaching/          # Legacy non-streaming orchestrator (vestigial; streaming path bypasses it)
+├── prompt-assembly/   # Build the LLM prompt from libraries + session context
+├── scenario-learning/ # Multi-step guided exercises (not user-facing yet)
+├── session-lifecycle/ # Active/idle/archive + continue-past-session
+├── identity/          # Supabase JWT validation + audit log (fail-CLOSED)
 ├── memory/            # pgvector read/write
-├── sponsor-portal/    # web admin UI (sponsors + ops)
-└── shared/            # types, LLM wrappers, observability, secrets
+├── libraries/         # Voice rules + framework content (Hamse-owned)
+└── shared/            # LLM wrappers, DB, Redis, observability, types, trace
+
+web/src/               # React SPA — auth, onboarding, chat, profile, sessions
 ```
+
+### The coaching turn (today)
+
+`POST /api/chat/turn/stream`:
+
+1. **Auth** — Supabase JWT validated by `requireSupabaseSession`.
+2. **Resolve session** — `session-lifecycle/` (new vs continue).
+3. **Assemble prompt** — `prompt-assembly/` builds the prompt from the active
+   unified library template + memory + session + profile + user message.
+4. **LLM stream** — single Haiku 4.5 streaming call via `shared/llm/chat.ts`.
+5. **Persist** — turn + session row updated; session title generated async.
+6. **Respond** — SSE chunks back to the browser.
+
+No triage. No quality check. No tagger. The pre-2026-05-13 multi-step pipeline
+was removed to cut p99 turn latency from ~6 s to under 3 s.
+
+## The Pipeline — 8 gates
+
+Every Jira ticket flows through these gates. **Stop after each gate; wait for
+the user's explicit go.** Never chain stages without approval.
+
+| # | Stage | Agent produces | User's gate question |
+|---|---|---|---|
+| G1 | Ticket intake | Restated AC, scope boundary, files/processes touched, BPMN(s) affected | Right scope? Right BPMN(s)? |
+| G2 | Design | Plan: files, reusable functions, regression risk, proposed BPMN diff if process changes | Approach correct? Regressions covered? |
+| G3 | Implementation | Uncommitted diff | Code matches plan? No scope creep? |
+| G4 | Local verification | `pnpm typecheck`, `lint`, `test`, `test:routes`, `test:e2e` all green; manual UI smoke if relevant | All green? Hard Rules respected? |
+| G4.5 | Risk audit *(conditional — see triggers below)* | Audit table | Residual risks acceptable? |
+| G5 | PR open | Branch + PR per convention; AC checklist; BPMN delta; rollback note; CLAUDE.md delta if conventions changed | PR self-contained? Living docs updated in same PR? |
+| G6 | Merge | GitHub CI all green; squash-merge | Ready to deploy? |
+| G7 | Deploy verification | Render deploy succeeded; Sentry quiet 10 min; smoke check on hogaanai.com; turn-latency p99 still ≤ 3s | Production healthy? |
+| G8 | Close | Jira moved to Done, AC ticked, learnings → CLAUDE.md if pipeline-relevant | Done done? |
+
+If any gate fails, loop back — never bypass. Never use `--no-verify` or skip
+hooks.
+
+## G4.5 — Risk audit (conditional)
+
+**Run G4.5 if the ticket touches any of:**
+
+- `src/identity/` or any auth flow (trust boundary)
+- Database migrations or schema changes
+- `src/libraries/` (prompt / voice content)
+- PII handling, encryption, or audit-log code
+- Jira labels: `launch-blocker`, `needs-decision`, `legal`
+
+**Audit table columns:** Risks · Implications · Audit Objectives · Audit
+Procedures · Audit Questions · Audit Evidence · Control Recommendations.
+*If no evidence exists for a control, the control is a hope, not a control.*
+
+## Hard Rules — checked at G4 and G4.5
+
+1. **Latency budget is a product requirement.** Total turn time p99 ≤ 3000 ms.
+   No multi-step orchestration that breaches this.
+2. **Voice Rules and library content are Hamse-owned.** Do not edit
+   `src/libraries/seed/` content without his sign-off. Every change is a new
+   library version, logged per-prompt for traceability.
+3. **PII discipline.** Email and identifiers hashed for IDs; plaintext stored
+   encrypted at column level. No PII beyond first name reaches LLM providers.
+   Audit-log writes in `src/identity/` are fail-closed.
+4. **No therapy / no crisis routing.** Leadership coaching only. The AI
+   disclaimer covers safety framing. Do not add diagnostic, therapeutic, or
+   crisis-detection features in code.
+5. **Email idempotency.** Every outbound transactional email goes through
+   `src/shared/email/` with idempotency. Never add a new outbound path that
+   bypasses it.
+
+## Code conventions
+
+- TypeScript strict mode; `any` requires a justifying comment.
+- LLM calls go through `src/shared/llm/`. Don't call providers directly.
+- Every turn emits a structured trace via `src/shared/trace/`. Use it.
+- Fail-open vs fail-closed is per-process and deliberate — see the matching
+  BPMN before changing failure semantics.
+- **Every ticket's AC names the new test(s) that prove the change.** Choose
+  the lowest layer that catches the regression (unit > integration > E2E);
+  add higher layers only when the lower one can't see the bug. G1 catches
+  missing test specs and updates the ticket in-flight before any code is
+  written.
+
+## Branch + PR convention
+
+- Branch: `<type>/<SCRUM-key>-<short-slug>` → e.g. `feat/SCRUM-44-session-id-honor`
+- PR title: `<type>(<scope>): <imperative> (SCRUM-XX)`
+- Types: `feat` `fix` `chore` `docs` `refactor` `test`
+- Squash-merge to `main` → Render auto-deploys.
 
 ## Common commands
 
 ```bash
 pnpm install
-pnpm dev              # hot-reload dev server
-pnpm test             # all tests
-pnpm test:bpmn        # BPMN process integration tests
+pnpm dev              # hot-reload backend + web
+pnpm test             # vitest unit (backend + frontend)
+pnpm test:routes      # vitest integration (web-api routes)
+pnpm test:e2e         # Playwright e2e
+pnpm test:all         # all of the above
 pnpm lint             # ESLint + Prettier
 pnpm typecheck        # tsc --noEmit
-pnpm db:migrate       # Supabase migrations
+pnpm db:migrate       # Supabase / Drizzle migrations
 pnpm build            # production build
 ```
 
-## Hard rules
-
-1. **Crisis routing supersedes everything.** Process #2 Step 1 + Process #10 Check 6. False positives are acceptable; false negatives are catastrophic. Never bypass for cost, latency, or convenience.
-2. **Latency budget is a product requirement.** Total turn time p99 ≤ 6000ms. Primary LLM hard cap 5000ms, then fallback path. Don't add features that breach this without redesigning the budget.
-3. **Voice Rules and Cultural Framing libraries are Hamse-owned.** Do not edit content under `src/coaching/libraries/` without his sign-off. Every change is a new library version (logged per-prompt for traceability).
-4. **PII discipline.** Phone numbers hashed for IDs; plaintext stored encrypted at column level. No PII beyond first name reaches LLM providers. Audit-log writes in Process #12 are fail-closed.
-5. **Sponsors never see individual user data.** Aggregate-only reporting, minimum 30 active users per segment.
-6. **WhatsApp idempotency on every outbound.** Process #11 enforces a triple check — never add a new outbound path that bypasses it.
-
-## Code conventions
-
-- TypeScript strict mode; `any` requires a justifying comment.
-- LLM calls go through `src/shared/llm/` (timeout + retry + fallback wrappers). Don't call providers directly.
-- Every turn emits a structured trace via `src/shared/trace/`. Use it; don't invent ad hoc logging.
-- Fail-open vs fail-closed is per-process and deliberate — see the BPMN. Don't change failure semantics without re-reading the BPMN.
-
 ## Ask before doing
 
-- Feature not in PRD scope (Section 3) → confirm scope before building
-- Schema change → migration + review
-- Prompt template structure or library content change → Hamse's call, not engineering's
-- Anything touching the +254 WhatsApp sender registration → operational decision
+- Feature not in the current Jira backlog → confirm scope before building.
+- Schema change → migration + G4.5 audit.
+- Library content change → Hamse's call.
+- Launch-blocker ticket without explicit Jira green-light.
