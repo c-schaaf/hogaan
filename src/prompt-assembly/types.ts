@@ -86,11 +86,25 @@ export interface OutputBundle {
   assembledPrompt: string;
   /** SHA-256 over structural elements only. Identical structural inputs → identical hash. */
   determinismHash: string;
+  /**
+   * Observational only — chars/3.5 estimate of the assembled prompt. Never
+   * gates execution (the 4000-token budget was removed in SCRUM-55 once we
+   * confirmed Haiku 4.5's 200k context dwarfs any realistic prompt). Kept on
+   * the bundle so trace + prompt_logs + orchestrator debug surfaces still
+   * have a token figure to log.
+   */
   tokenCount: number;
+  /**
+   * SCRUM-55 — token-budget degradations (memory/session truncation, cultural
+   * framing drop) are no longer set from prompt-assembly; this is always
+   * `noDegradation()`. The field is preserved because `src/coaching/`
+   * orchestrator reads `memoryTruncated` / `sessionTruncated` /
+   * `culturalFramingDropped` into the trace + turns row, and because the
+   * remaining two flags (`fallbackModelUsed`, `contextFetchPartial`) are
+   * still meaningful for downstream stages.
+   */
   degradationFlags: DegradationFlags;
   libraryVersions: LibraryVersionSet;
-  /** Step 12 might have degraded (or refused). When endEvent==E9, prompt is unsafe to send. */
-  oversize: boolean;
   /** True when the async prompt-log write failed (E10) — caller may retry the log. */
   logWriteFailed: boolean;
   practiceTag: PracticeTag | null;

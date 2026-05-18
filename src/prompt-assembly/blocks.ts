@@ -124,41 +124,7 @@ function formatExperienceBand(band: string): string {
   return band;
 }
 
-/** Step 12 helpers — half-truncate memory, last-1-or-2-only session, drop framing. */
-export function truncateMemoryHalf(block: string): string {
-  if (!block.startsWith('## Memory\n')) {
-    return block;
-  }
-  const lines = block.split('\n');
-  const header = lines[0]!;
-  const items = lines.slice(1);
-  if (items.length <= 1) {
-    return block;
-  }
-  const keep = Math.max(1, Math.floor(items.length / 2));
-  return [header, ...items.slice(0, keep)].join('\n');
-}
-
-export function truncateSessionToLastTurns(block: string, keepTurns: number = 1): string {
-  if (!block.startsWith('## Recent session context\n')) {
-    return block;
-  }
-  const lines = block.split('\n');
-  // Each turn is "User: ..." + (optional "Assistant: ...") + blank line, but we
-  // preserved trimEnd, so blank lines may be missing. Walk from the end finding
-  // `keepTurns` "User:" entries.
-  const userIndices: number[] = [];
-  for (let i = lines.length - 1; i >= 1; i--) {
-    if (lines[i]!.startsWith('User:')) {
-      userIndices.unshift(i);
-      if (userIndices.length === keepTurns) {
-        break;
-      }
-    }
-  }
-  if (userIndices.length === 0) {
-    return block;
-  }
-  const startIdx = userIndices[0]!;
-  return ['## Recent session context (truncated)', ...lines.slice(startIdx)].join('\n');
-}
+// Truncation helpers (truncateMemoryHalf, truncateSessionToLastTurns) removed
+// with SCRUM-55. They existed to feed the 4000-token budget cascade in
+// token-budget.ts. Haiku 4.5's 200k context made the cascade unnecessary; the
+// helpers are no longer called anywhere.

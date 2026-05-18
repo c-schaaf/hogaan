@@ -66,7 +66,6 @@ token-by-token, within p99 ≤ 3 s.
 | Auth | Missing / invalid JWT | 401 before any LLM call |
 | Resolve session | DB error | 5xx; Sentry P2 |
 | Assemble prompt | Library load failure (E6) | Throw `PromptAssemblyError`; route returns templated fallback copy |
-| Assemble prompt | Token-budget oversize (E9) | **Demo-breaking; ticket SCRUM-46 removes the budget** |
 | LLM stream | Anthropic 5xx / timeout | Stream emits `event: error`; client renders fallback copy |
 | LLM stream | Token limit / context error | Same as above |
 | Persist turn | DB error | Stream still emits `event: end` if response was complete; failure traced |
@@ -83,8 +82,6 @@ token-by-token, within p99 ≤ 3 s.
 
 - **SCRUM-44** — `resolveSession` ignores client `sessionId`; "Continue past
   session" silently creates duplicate sessions. Fix in flight.
-- **SCRUM-46** — 4000-token prompt budget kneecaps normal traffic. Removed in
-  the linked ticket.
 - **SCRUM-48** — Selected practices, comm style, response depth not piped into
   the LLM prompt. Personalization gap.
 - **SCRUM-50** — Active prompt includes a crisis-protocol section. To be

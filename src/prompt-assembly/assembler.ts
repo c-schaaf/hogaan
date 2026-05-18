@@ -29,7 +29,6 @@ import {
 } from './framings.js';
 import { writePromptLog } from './log.js';
 import { selectSystemTemplate } from './template.js';
-import { enforceTokenBudget } from './token-budget.js';
 import {
   PromptAssemblyError,
   type InputPayload,
@@ -154,9 +153,11 @@ export async function assemblePrompt(
     userMessageText,
   };
 
-  // Step 12: token budget
-  const budgetResult = enforceTokenBudget(initial, noDegradation());
-  const finalPrompt = budgetResult.prompt;
+  // SCRUM-55 — the Step 12 token-budget cascade was removed. Haiku 4.5's
+  // 200k context makes the 4000-token cap (which was tripping on normal
+  // multi-day sessions) obsolete. `finalPrompt` is therefore just `initial`;
+  // no degradation flags ever flip from the budget path.
+  const finalPrompt = initial;
 
   // Step 13: determinism hash (over STRUCTURAL inputs only — independent of
   // dynamic memory/session/user-message content)
@@ -176,24 +177,23 @@ export async function assemblePrompt(
   // Step 15: assemble final text in canonical block order
   const assembledPrompt = canonicalAssemble(finalPrompt);
 
-  // Map to terminal end event (E1–E4 / E9 / E10)
-  if (budgetResult.oversize) {
-    throw new PromptAssemblyError(
-      `prompt over budget after all degradation strategies (${budgetResult.tokenCount} tokens)`,
-      'E9_PromptOversize',
-    );
-  }
-  const terminal = pickTerminalMode(validated.responseMode, budgetResult.flags);
+  // Map to terminal end event (E1 / E3 / E4 / E10 — E2 + E9 were removed
+  // with SCRUM-55 along with the budget cascade).
+  const terminal = pickTerminalMode(validated.responseMode);
+
+  // tokenCount stays on the bundle for observability (Process #2 trace +
+  // prompt-logs row + orchestrator debug log all consume it). Computed
+  // post-assembly purely as a metric — never gates execution.
+  const tokenCount = Math.ceil(assembledPrompt.length / 3.5);
 
   const bundleBase: OutputBundle = {
     endEvent: terminal,
     responseMode: validated.responseMode,
     assembledPrompt,
     determinismHash,
-    tokenCount: budgetResult.tokenCount,
-    degradationFlags: budgetResult.flags,
+    tokenCount,
+    degradationFlags: noDegradation(),
     libraryVersions: versionSet,
-    oversize: false,
     logWriteFailed: false,
     practiceTag: validated.practiceTag ?? null,
     levelTag: validated.levelTag ?? null,
@@ -222,10 +222,7 @@ export async function assemblePrompt(
   return bundleBase;
 }
 
-function pickTerminalMode(
-  mode: ResponseMode,
-  flags: ReturnType<typeof noDegradation>,
-): OutputBundle['endEvent'] {
+function pickTerminalMode(mode: ResponseMode): OutputBundle['endEvent'] {
   if (mode === 'ClarifyingQuestion') {
     return 'E3_PromptAssembledClarifyMode';
   }
@@ -233,9 +230,9 @@ function pickTerminalMode(
     return 'E4_PromptAssembledMetaMode';
   }
   // FullCoachingResponse, ProfileUpdateAcknowledgment, ScenarioRolePlay all
-  // share the Normal/Degraded distinction.
-  const degraded = flags.memoryTruncated || flags.sessionTruncated || flags.culturalFramingDropped;
-  return degraded ? 'E2_PromptAssembledWithDegradation' : 'E1_PromptAssembledNormal';
+  // land on E1 now that the budget-driven Normal/Degraded distinction is gone
+  // (SCRUM-55).
+  return 'E1_PromptAssembledNormal';
 }
 
 /**
