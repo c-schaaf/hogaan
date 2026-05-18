@@ -16,3 +16,12 @@ coverage/
 drizzle/meta/
 
 *.tsbuildinfo
+
+# Claude Code session artifacts (background-agent worktrees, scratch state)
+.claude/
+
+# Test output artifacts (do not commit; regenerated each run)
+audit-evidence/phase-10/
+audit-evidence/phase-12/
+test-results/
+playwright-report/

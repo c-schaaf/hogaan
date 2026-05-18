@@ -2,60 +2,26 @@ import { describe, expect, it } from 'vitest';
 import {
   crisisResourcesV1,
   crisisResourcesV2,
-  culturalFramingV1,
-  promptTemplatesV1,
+  promptTemplatesV2Unified,
   scenariosV1,
-  voiceRulesV1,
 } from '../../src/libraries/index.js';
-import { LEVEL_TAGS, PRACTICE_TAGS, RESPONSE_MODES } from '../../src/shared/types/index.js';
+import { PRACTICE_TAGS, RESPONSE_MODES } from '../../src/shared/types/index.js';
 
 describe('library seed content invariants', () => {
-  it('voice_rules has exactly 11 rules with stable ids (Phase 12 R3: Rule 11 promoted)', () => {
-    expect(voiceRulesV1.rules).toHaveLength(11);
-    const ids = voiceRulesV1.rules.map((r) => r.id);
-    expect(new Set(ids).size).toBe(11);
-  });
-
-  it('voice_rules ships hero-phrase flags + useful-to-society anchor patterns', () => {
-    expect(voiceRulesV1.heroPhraseFlags.length).toBeGreaterThan(0);
-    expect(voiceRulesV1.usefulToSocietyPatterns.length).toBeGreaterThan(0);
-  });
-
-  it('cultural_framing has exactly 16 framings with unique concepts (Phase 12 R7-9: Xil added)', () => {
-    expect(culturalFramingV1.framings).toHaveLength(16);
-    const concepts = culturalFramingV1.framings.map((f) => f.concept);
-    expect(new Set(concepts).size).toBe(16);
-  });
-
-  it('cultural_framing every framing has at least one applicableWhen + examplePhrasings', () => {
-    for (const f of culturalFramingV1.framings) {
-      expect(f.applicableWhen.length).toBeGreaterThan(0);
-      expect(f.examplePhrasings.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('prompt_templates has 5 templates, one per response mode', () => {
-    expect(promptTemplatesV1.templates).toHaveLength(RESPONSE_MODES.length);
-    const modes = new Set(promptTemplatesV1.templates.map((t) => t.responseMode));
+  it('prompt_templates v2 unified has one entry per response mode, all pointing at coaching_v0_unified', () => {
+    expect(promptTemplatesV2Unified.templates).toHaveLength(RESPONSE_MODES.length);
+    const modes = new Set(promptTemplatesV2Unified.templates.map((t) => t.responseMode));
     for (const m of RESPONSE_MODES) {
       expect(modes.has(m)).toBe(true);
     }
-  });
-
-  it('prompt_templates has 12 practice framings, one per practice', () => {
-    expect(promptTemplatesV1.practiceFraming).toHaveLength(PRACTICE_TAGS.length);
-    const practices = new Set(promptTemplatesV1.practiceFraming.map((f) => f.practice));
-    for (const p of PRACTICE_TAGS) {
-      expect(practices.has(p)).toBe(true);
+    for (const t of promptTemplatesV2Unified.templates) {
+      expect(t.id).toBe('coaching_v0_unified');
     }
   });
 
-  it('prompt_templates has 4 level framings, one per level', () => {
-    expect(promptTemplatesV1.levelFraming).toHaveLength(LEVEL_TAGS.length);
-    const levels = new Set(promptTemplatesV1.levelFraming.map((f) => f.level));
-    for (const l of LEVEL_TAGS) {
-      expect(levels.has(l)).toBe(true);
-    }
+  it('prompt_templates v2 unified has empty practice + level framing (baked into systemText)', () => {
+    expect(promptTemplatesV2Unified.practiceFraming).toEqual([]);
+    expect(promptTemplatesV2Unified.levelFraming).toEqual([]);
   });
 
   it('crisis_resources v1 ships Tabaha + Befrienders Worldwide (historical baseline)', () => {

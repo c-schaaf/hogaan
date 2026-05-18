@@ -22,17 +22,15 @@ import { loadConfig } from '../src/shared/secrets/config.js';
  * and skips practice framing / level framing / voice rules / cultural framing /
  * directives — those are now baked into the prompt itself.
  *
- * Rollback: re-run with payload = promptTemplatesV1, version = 'v1'. The
- * resolver atomically demotes v2_unified and promotes v1; assembler reverts
- * to legacy multi-block assembly because template.id no longer matches.
+ * Rollback: republish a previous v2_unified_tune* row with makeActive:true.
+ * The original v1 multi-block path was deleted in SCRUM-43/47 along with
+ * the voice-rules / cultural-framing libraries it depended on — fix-forward
+ * is the only path now.
  *
  * Why a new version row (not edit-in-place):
- * - Preserves audit trail — turns that ran under v1 still resolve their
- *   exact prompt for replay
- * - Rollback is a one-line script change, no code deploy
+ * - Preserves audit trail — turns that ran under previous versions still
+ *   resolve their exact prompt for replay
  * - Lets us flip the active pointer in staging first before prod
- *
- * Mirrors scripts/publish-voice-rules-v2.ts.
  */
 async function main(): Promise<void> {
   const config = loadConfig();

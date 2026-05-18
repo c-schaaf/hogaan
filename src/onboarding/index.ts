@@ -29,4 +29,3 @@ export {
   type LocationParseResult,
 } from './parsers.js';
 export { extractCodeCandidate, tryRedeemCode, type RedeemResult } from './code-redemption.js';
-export { generateConfirmation } from './confirmation.js';
