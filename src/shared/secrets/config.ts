@@ -13,10 +13,6 @@ type OptionalKey =
   | 'ANTHROPIC_API_KEY'
   | 'GROQ_API_KEY'
   | 'VOYAGE_API_KEY'
-  | 'TWILIO_ACCOUNT_SID'
-  | 'TWILIO_AUTH_TOKEN'
-  | 'TWILIO_WHATSAPP_FROM'
-  | 'TWILIO_WEBHOOK_AUTH_TOKEN'
   | 'SENTRY_DSN'
   | 'AXIOM_TOKEN'
   | 'AXIOM_DATASET'
@@ -42,10 +38,6 @@ export interface AppConfig {
   anthropicApiKey: string | undefined;
   groqApiKey: string | undefined;
   voyageApiKey: string | undefined;
-  twilioAccountSid: string | undefined;
-  twilioAuthToken: string | undefined;
-  twilioWhatsAppFrom: string | undefined;
-  twilioWebhookAuthToken: string | undefined;
   sentryDsn: string | undefined;
   axiomToken: string | undefined;
   axiomDataset: string | undefined;
@@ -117,10 +109,6 @@ export function loadConfig(): AppConfig {
     anthropicApiKey: readOptional('ANTHROPIC_API_KEY'),
     groqApiKey: readOptional('GROQ_API_KEY'),
     voyageApiKey: readOptional('VOYAGE_API_KEY'),
-    twilioAccountSid: readOptional('TWILIO_ACCOUNT_SID'),
-    twilioAuthToken: readOptional('TWILIO_AUTH_TOKEN'),
-    twilioWhatsAppFrom: readOptional('TWILIO_WHATSAPP_FROM'),
-    twilioWebhookAuthToken: readOptional('TWILIO_WEBHOOK_AUTH_TOKEN'),
     sentryDsn: readOptional('SENTRY_DSN'),
     axiomToken: readOptional('AXIOM_TOKEN'),
     axiomDataset: readOptional('AXIOM_DATASET'),
