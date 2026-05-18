@@ -90,8 +90,8 @@ was removed to cut p99 turn latency from ~6 s to under 3 s.
 
 ## The Pipeline — 8 gates
 
-Every Jira ticket flows through these gates. **Stop after each gate; wait for
-the user's explicit go.** Never chain stages without approval.
+Every Jira ticket flows through these gates. **Stop at each gate package; wait
+for the user's explicit go.** Never chain stages without approval.
 
 | # | Stage | Agent produces | User's gate question |
 |---|---|---|---|
@@ -107,6 +107,31 @@ the user's explicit go.** Never chain stages without approval.
 
 If any gate fails, loop back — never bypass. Never use `--no-verify` or skip
 hooks.
+
+### Tiered pipeline — pick the right ceremony for the ticket
+
+Not every ticket needs eight gates. Triage tickets into three tiers:
+
+| Tier | When to use | Gates run | Approval points |
+|---|---|---|---|
+| **Trivial chore** | ≤ 1 file, deletion-only, config / script removal, no behavior change. Examples: remove an unused dep, delete a dead script line, drop a vestigial folder. | G3 → G4 → G5 (commit + push) → G6 (CI green + merge) → G7 (deploy verified) | 1 — user reviews the PR once and merges |
+| **Standard** | Bug fix or small feature with a clear AC. Examples: SCRUM-53 (session-id fix), SCRUM-54 (New Chat button). | All 8 gates | 4 packages (see below) |
+| **Risky** | Anything triggering G4.5: auth, schema migrations, libraries, PII / audit-log, or Jira labels `launch-blocker` / `needs-decision` / `legal`. | All 8 gates + G4.5 | 4 packages + explicit G4.5 audit approval |
+
+When in doubt, escalate one tier up, not down.
+
+### Batch gate approvals (default for Standard / Risky tiers)
+
+To cut interruptions, group the eight gates into four approval packages:
+
+1. **Plan package** — G1 + G2. User says go once after seeing scope + design.
+2. **Build package** — G3 + G4 (+ G4.5 if triggered). User says go once after seeing diff + green tests + audit table.
+3. **Ship package** — G5 + G6. User reviews + merges the PR.
+4. **Verify package** — G7 + G8. User confirms prod health + closes ticket.
+
+Same rigor, half the round-trips. Use this as the default. If something
+surprising surfaces mid-package (e.g. a regression, a missing AC), break out
+of the package and surface immediately — don't bury the issue.
 
 ## G4.5 — Risk audit (conditional)
 
