@@ -25,6 +25,14 @@ export interface UpdateSessionInput {
 /** Used by callers needing to start the resolver — userId is required. */
 export interface ResolveOptions {
   userId: UserId;
+  /**
+   * When provided, attach the new turn to this session (reopening it if it
+   * was closed). The session must belong to `userId`; if it doesn't, the
+   * resolver falls through silently to the legacy time-based logic rather
+   * than 404'ing, to avoid leaking session existence across users.
+   * When omitted, the legacy 30-min auto-split logic applies.
+   */
+  sessionId?: SessionId;
   /** Override "now" for tests / replays. Defaults to current time. */
   now?: Date;
 }
