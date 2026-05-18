@@ -1,9 +1,5 @@
 import 'dotenv/config';
-import {
-  assemblePrompt,
-  TOKEN_BUDGET_LIMIT,
-  type InputPayload,
-} from '../src/prompt-assembly/index.js';
+import { assemblePrompt, type InputPayload } from '../src/prompt-assembly/index.js';
 import { getDb } from '../src/shared/db/client.js';
 import { loadConfig } from '../src/shared/secrets/config.js';
 
@@ -14,7 +10,8 @@ import { loadConfig } from '../src/shared/secrets/config.js';
  *      valid (every required block present in canonical order)?
  *   2. Does it contain the right library versions (the 3-library version set
  *      pinned at assembly time)?
- *   3. Does it respect the 4000-token budget (no oversize, no E9)?
+ *   3. Token count is observational only (SCRUM-55 removed the 4000-token
+ *      budget — Haiku 4.5's 200k context makes the cap unnecessary).
  *   4. Does identical inputs → identical determinism hash (across two calls)?
  */
 
@@ -63,7 +60,7 @@ async function main(): Promise<void> {
   const r1 = await assemblePrompt(config, db, SYNTHETIC, { awaitLogWrite: true });
   console.log('endEvent:', r1.endEvent);
   console.log('determinismHash:', r1.determinismHash);
-  console.log('tokenCount:', r1.tokenCount, '/ budget', TOKEN_BUDGET_LIMIT);
+  console.log('tokenCount (observational):', r1.tokenCount);
   console.log('library versions:');
   console.log('  promptTemplates:', r1.libraryVersions.promptTemplates);
   console.log('  voiceRules:     ', r1.libraryVersions.voiceRules);
@@ -94,11 +91,6 @@ async function main(): Promise<void> {
   }
   console.log('all required sections present:', allPresent);
 
-  console.log('\n--- budget compliance ---');
-  console.log('  tokenCount:', r1.tokenCount, 'budget:', TOKEN_BUDGET_LIMIT);
-  console.log('  within budget:', r1.tokenCount <= TOKEN_BUDGET_LIMIT);
-  console.log('  oversize flag:', r1.oversize);
-
   console.log('\n--- determinism: identical inputs \u2192 identical hash ---');
   const r2 = await assemblePrompt(config, db, SYNTHETIC, { awaitLogWrite: true });
   console.log('run #1 hash:', r1.determinismHash);
@@ -111,11 +103,7 @@ async function main(): Promise<void> {
 
   await close();
 
-  if (
-    !allPresent ||
-    r1.tokenCount > TOKEN_BUDGET_LIMIT ||
-    r1.determinismHash !== r2.determinismHash
-  ) {
+  if (!allPresent || r1.determinismHash !== r2.determinismHash) {
     console.error('VERIFICATION FAILED');
     process.exit(1);
   }

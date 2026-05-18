@@ -11,7 +11,6 @@ export {
 } from './types.js';
 export { assemblePrompt, type AssembleOptions } from './assembler.js';
 export { computeDeterminismHash, type StructuralInputs } from './determinism-hash.js';
-export { estimateTokens, TOKEN_BUDGET_LIMIT, enforceTokenBudget } from './token-budget.js';
 export { writePromptLog } from './log.js';
 export { selectCulturalFraming, _practiceToFraming } from './framings.js';
 export { validateInputPayload } from './validate.js';
