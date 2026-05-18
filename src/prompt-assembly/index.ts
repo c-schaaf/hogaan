@@ -12,6 +12,5 @@ export {
 export { assemblePrompt, type AssembleOptions } from './assembler.js';
 export { computeDeterminismHash, type StructuralInputs } from './determinism-hash.js';
 export { writePromptLog } from './log.js';
-export { selectCulturalFraming, _practiceToFraming } from './framings.js';
 export { validateInputPayload } from './validate.js';
 export { selectSystemTemplate } from './template.js';

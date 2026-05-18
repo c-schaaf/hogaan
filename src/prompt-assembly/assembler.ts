@@ -7,13 +7,7 @@ import {
 import type { Database } from '../shared/db/client.js';
 import { reportIncident } from '../shared/observability/incidents.js';
 import type { AppConfig } from '../shared/secrets/config.js';
-import {
-  noDegradation,
-  type LevelTag,
-  type LibraryVersionSet,
-  type PracticeTag,
-  type ResponseMode,
-} from '../shared/types/index.js';
+import { noDegradation, type LibraryVersionSet, type ResponseMode } from '../shared/types/index.js';
 import {
   buildMemoryBlock,
   buildSessionContext,
@@ -21,12 +15,6 @@ import {
   buildUserProfileBlock,
 } from './blocks.js';
 import { computeDeterminismHash } from './determinism-hash.js';
-import {
-  buildLevelFraming,
-  buildPracticeFraming,
-  buildVoiceRules,
-  selectCulturalFraming,
-} from './framings.js';
 import { writePromptLog } from './log.js';
 import { selectSystemTemplate } from './template.js';
 import {
@@ -38,17 +26,21 @@ import {
 import { validateInputPayload } from './validate.js';
 
 /**
- * Process #9 §15 + orchestrator. Walks Steps 1–13 inline, kicks off the
- * async §14 log write, returns the OutputBundle with the resolved
- * terminal end event.
+ * Prompt assembly orchestrator.
  *
  * Returns OutputBundle for every reachable end event (success + soft
- * failures). Throws PromptAssemblyError for E5–E9 (caller maps to the
- * appropriate dispatch outcome — Process #2 §8 wraps these into a fallback
- * templated response). E10 is not thrown — it's reflected on the bundle's
- * logWriteFailed flag.
+ * failures). Throws PromptAssemblyError for E5–E8 (caller maps to the
+ * appropriate dispatch outcome). E10 is reflected on the bundle's
+ * logWriteFailed flag, never thrown.
  *
- * `awaitLogWrite` is a test-only knob; default false (Phase 7 hot-path
+ * Since SCRUM-47, the v0_unified template is the only assembly path —
+ * the v1 multi-block path (practice framing, level framing, voice rules,
+ * cultural framing, directives) was removed along with its dormant tests.
+ * Static framings now live inside `systemText` itself. The assembler
+ * concatenates the system template with the dynamic per-user blocks
+ * (memory, session, profile, message) and returns.
+ *
+ * `awaitLogWrite` is a test-only knob; default false (hot-path
  * fires-and-forgets).
  */
 export interface AssembleOptions {
@@ -65,7 +57,7 @@ export async function assemblePrompt(
   // Step 1: validate (throws PromptAssemblyError(E5) on failure)
   const validated = validateInputPayload(payload);
 
-  // Step 2: resolve libraries + tag validation
+  // Step 2: resolve libraries
   let libs: ResolvedLibraries;
   try {
     libs = await getActiveLibraryVersions(db);
@@ -82,85 +74,22 @@ export async function assemblePrompt(
   // Step 3: system template selection (throws E8)
   const template = selectSystemTemplate(libs.promptTemplates.payload, validated.responseMode);
 
-  // 2026-05-13 — v0_unified short-circuit. The unified prompt embeds the
-  // framework lens (§3), the therapeutic toolkit (§4), and the turn shape
-  // (§5) inside its systemText. Re-injecting practice framing / level
-  // framing / directives / voice rules / cultural framing on top of it
-  // would (a) double the prompt's token cost and (b) pull the model toward
-  // a checklist register that conflicts with the "values-driven companion"
-  // register the new prompt establishes. We deliberately skip those blocks
-  // when the unified template is active. Rollback to v1 is one
-  // `publishLibraryVersion(..., makeActive:true)` away and restores the
-  // legacy assembly path automatically because template.id flips back.
-  const isUnifiedV0 = template.id === 'coaching_v0_unified';
-
-  // Steps 4–5: practice + level framing (throw E7 on bad tag)
-  const tagsRequired =
-    !isUnifiedV0 &&
-    (validated.responseMode === 'FullCoachingResponse' ||
-      validated.responseMode === 'ProfileUpdateAcknowledgment' ||
-      validated.responseMode === 'ScenarioRolePlay');
-
-  const practiceFramingText =
-    tagsRequired && validated.practiceTag !== undefined
-      ? buildPracticeFraming(libs.promptTemplates.payload, validated.practiceTag)
-      : '';
-  const levelFramingText =
-    tagsRequired && validated.levelTag !== undefined
-      ? buildLevelFraming(libs.promptTemplates.payload, validated.levelTag)
-      : '';
-
-  // Batch P Piece 1 — structural directives. Tells the LLM to use the
-  // tagged practice as the organizing frame and anchor at the tagged
-  // level. Empty when either tag is missing (untagged response modes)
-  // or when the unified v0 prompt is active (handled inside the prompt).
-  const directivesBlockText = isUnifiedV0
-    ? ''
-    : buildDirectivesBlock(
-        tagsRequired ? (validated.practiceTag ?? null) : null,
-        tagsRequired ? (validated.levelTag ?? null) : null,
-      );
-
-  // Step 6: voice rules (skipped under unified v0 — voice baked into systemText)
-  const voiceRulesText = isUnifiedV0 ? '' : buildVoiceRules(libs.voiceRules.payload);
-
-  // Step 7: cultural framing (skipped under unified v0)
-  const cultural = isUnifiedV0
-    ? null
-    : selectCulturalFraming(
-        libs.culturalFraming.payload,
-        validated.responseMode,
-        validated.practiceTag,
-      );
-
-  // Steps 8–11: dynamic blocks
+  // Dynamic blocks
   const memoryBlockText = buildMemoryBlock(validated.retrievedMemories);
   const sessionContextText = buildSessionContext(validated.sessionTurns);
   const userProfileBlockText = buildUserProfileBlock(validated.userProfile);
   const userMessageText = buildUserMessageBlock(validated.userMessage);
 
-  const initial: PromptUnderConstruction = {
+  const finalPrompt: PromptUnderConstruction = {
     systemTemplateText: template.systemText,
-    practiceFramingText,
-    levelFramingText,
-    directivesBlockText,
-    voiceRulesText,
-    culturalFramingText: cultural?.text ?? null,
-    culturalFramingConcept: cultural?.concept ?? null,
     memoryBlockText,
     sessionContextText,
     userProfileBlockText,
     userMessageText,
   };
 
-  // SCRUM-55 — the Step 12 token-budget cascade was removed. Haiku 4.5's
-  // 200k context makes the 4000-token cap (which was tripping on normal
-  // multi-day sessions) obsolete. `finalPrompt` is therefore just `initial`;
-  // no degradation flags ever flip from the budget path.
-  const finalPrompt = initial;
-
-  // Step 13: determinism hash (over STRUCTURAL inputs only — independent of
-  // dynamic memory/session/user-message content)
+  // Determinism hash over STRUCTURAL inputs only — independent of dynamic
+  // memory/session/user-message content.
   const versionSet: LibraryVersionSet = toVersionSet(libs);
   const determinismHash = computeDeterminismHash({
     responseMode: validated.responseMode,
@@ -170,20 +99,15 @@ export async function assemblePrompt(
     secondaryPracticeTag: payload.secondaryPracticeTag ?? null,
     secondaryLevelTag: payload.secondaryLevelTag ?? null,
     taggerConfidence: payload.taggerConfidence ?? null,
-    culturalFramingConcept: finalPrompt.culturalFramingConcept,
     libraryVersions: versionSet,
   });
 
-  // Step 15: assemble final text in canonical block order
+  // Assemble final text in canonical block order.
   const assembledPrompt = canonicalAssemble(finalPrompt);
-
-  // Map to terminal end event (E1 / E3 / E4 / E10 — E2 + E9 were removed
-  // with SCRUM-55 along with the budget cascade).
   const terminal = pickTerminalMode(validated.responseMode);
 
-  // tokenCount stays on the bundle for observability (Process #2 trace +
-  // prompt-logs row + orchestrator debug log all consume it). Computed
-  // post-assembly purely as a metric — never gates execution.
+  // tokenCount stays on the bundle for observability. Computed post-assembly
+  // purely as a metric — never gates execution (SCRUM-55).
   const tokenCount = Math.ceil(assembledPrompt.length / 3.5);
 
   const bundleBase: OutputBundle = {
@@ -200,7 +124,7 @@ export async function assemblePrompt(
     assembledAt: new Date(),
   };
 
-  // Step 14: async log write (fail-open). E10 reflected on bundle, never thrown.
+  // Async log write (fail-open). E10 reflected on bundle, never thrown.
   const logPromise = writePromptLog(config, db, validated, bundleBase);
   if (options.awaitLogWrite === true) {
     const logResult = await logPromise;
@@ -208,11 +132,10 @@ export async function assemblePrompt(
       return { ...bundleBase, endEvent: 'E10_PromptLogWriteFailed', logWriteFailed: true };
     }
   } else {
-    // Background fire-and-forget. Surface failures via reportIncident inside writePromptLog.
     void logPromise.then((res) => {
       if (!res.success) {
         reportIncident('P2', 'prompt_logs background write failed', {
-          source: 'Process_9.Step_14_PromptLog',
+          source: 'PromptAssembly.LogWrite',
           extra: { determinismHash: bundleBase.determinismHash },
         });
       }
@@ -229,9 +152,6 @@ function pickTerminalMode(mode: ResponseMode): OutputBundle['endEvent'] {
   if (mode === 'MetaResponse') {
     return 'E4_PromptAssembledMetaMode';
   }
-  // FullCoachingResponse, ProfileUpdateAcknowledgment, ScenarioRolePlay all
-  // land on E1 now that the budget-driven Normal/Degraded distinction is gone
-  // (SCRUM-55).
   return 'E1_PromptAssembledNormal';
 }
 
@@ -240,57 +160,11 @@ function pickTerminalMode(mode: ResponseMode): OutputBundle['endEvent'] {
  * have stable axes.
  */
 function canonicalAssemble(p: PromptUnderConstruction): string {
-  const parts: string[] = [p.systemTemplateText];
-  if (p.practiceFramingText.length > 0) {
-    parts.push(p.practiceFramingText);
-  }
-  if (p.levelFramingText.length > 0) {
-    parts.push(p.levelFramingText);
-  }
-  if (p.directivesBlockText.length > 0) {
-    parts.push(p.directivesBlockText);
-  }
-  if (p.voiceRulesText.length > 0) {
-    parts.push(p.voiceRulesText);
-  }
-  if (p.culturalFramingText !== null && p.culturalFramingText.length > 0) {
-    parts.push(p.culturalFramingText);
-  }
-  parts.push(p.memoryBlockText);
-  parts.push(p.sessionContextText);
-  parts.push(p.userProfileBlockText);
-  parts.push(p.userMessageText);
-  return parts.join('\n\n');
-}
-
-/**
- * Batch P Piece 1 — engineering-authored structural framing per level.
- * NOT Hamse-owned voice content (those live in src/libraries/seed/). These
- * are scope descriptors that tell the LLM where to anchor a response.
- */
-const LEVEL_GUIDANCE: Record<LevelTag, string> = {
-  self: "anchor on the leader's interior — what they feel, see, decide, learn — not on the people around them.",
-  team: 'anchor on the dynamics, trust, and direct relationships within their team — not on their personal feelings or organizational structure.',
-  organization:
-    'anchor on structural, cultural, or cross-functional patterns at the org level — not on individual interpersonal moments.',
-  community:
-    'anchor on civic, sectoral, or community stakes — not on private organizational decisions.',
-};
-
-/**
- * Build the structural directives block. Returns empty string when either
- * tag is missing, so the canonical assembler can omit the block for
- * untagged response modes (ClarifyingQuestion, MetaResponse).
- */
-function buildDirectivesBlock(practiceTag: PracticeTag | null, levelTag: LevelTag | null): string {
-  if (practiceTag === null || levelTag === null) {
-    return '';
-  }
   return [
-    '## Required directives',
-    `Your response must use **${practiceTag}** as the organizing frame of the answer, not just as a vocabulary word. Anchor at **${levelTag}-level**: ${LEVEL_GUIDANCE[levelTag]}`,
-  ].join('\n');
+    p.systemTemplateText,
+    p.memoryBlockText,
+    p.sessionContextText,
+    p.userProfileBlockText,
+    p.userMessageText,
+  ].join('\n\n');
 }
-
-/** Test seam — exposes the directives block builder + level guidance for audit. */
-export const _internal = { LEVEL_GUIDANCE, buildDirectivesBlock };

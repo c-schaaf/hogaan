@@ -1,14 +1,10 @@
 import { and, desc, eq, gt, sql as drizzleSql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { fetchCoachingContext } from '../coaching/context-fetch.js';
-import { runCoachingTurn } from '../coaching/orchestrator.js';
-import { fastPathTriage } from '../coaching/triage.js';
-import type { CoachingInbound } from '../coaching/types.js';
 import { reportP2 } from '../incident-handling/index.js';
 import { assemblePrompt, PromptAssemblyError } from '../prompt-assembly/index.js';
 import { resolveSession } from '../session-lifecycle/index.js';
 import type { Database } from '../shared/db/client.js';
-import { hashPhone } from '../shared/db/encryption.js';
 import { sessions } from '../shared/db/schema/sessions.js';
 import { turns } from '../shared/db/schema/turns.js';
 import { users } from '../shared/db/schema/users.js';
@@ -17,7 +13,7 @@ import type { RedisBundle } from '../shared/redis/client.js';
 import type { RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import type { TraceEmitter } from '../shared/trace/index.js';
-import { asPhoneE164, asSessionId, asUserId } from '../shared/types/index.js';
+import { asSessionId, asUserId } from '../shared/types/index.js';
 import { generateSessionTitle } from './session-title.js';
 import { requireSupabaseSession } from './supabase-session.js';
 
@@ -30,98 +26,17 @@ export interface WebApiRoutesOpts {
 }
 
 /**
- * Phase C - end-user web API routes. All require a valid web session
- * cookie (set by /api/auth/verify after a magic-link click).
+ * End-user web API routes. All require a valid Supabase session.
  *
- *   POST /api/chat/turn       { message, sessionId?, private? } -> { responseText, sessionId, turnId, crisis }
- *   GET  /api/sessions                                          -> grouped session list
- *   GET  /api/sessions/:id                                      -> session + turn history
- *   DELETE /api/sessions/:id                                    -> hard delete (cascades to turns)
- *   GET  /api/profile                                           -> profile snapshot
+ *   POST /api/chat/turn/stream { message, sessionId?, private? } -> SSE
+ *   GET  /api/sessions                                           -> grouped session list
+ *   GET  /api/sessions/:id                                       -> session + turn history
+ *   DELETE /api/sessions/:id                                     -> hard delete (cascades to turns)
+ *   GET  /api/profile                                            -> profile snapshot
  *   PATCH /api/profile        { mappedPractices?, commStyle?, responseDepth?, fullName? }
- *   DELETE /api/profile                                         -> hard delete account + all data
- *
- * The coaching brain (runCoachingTurn) is reused as-is - the new
- * channel='web' flag in CoachingInbound suppresses Twilio dispatch and
- * isPrivate=true suppresses turns-table writes.
+ *   DELETE /api/profile                                          -> hard delete account + all data
  */
 export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpts): void {
-  // POST /api/chat/turn ------------------------------------------------
-  app.post<{
-    Body: { message?: unknown; sessionId?: unknown; private?: unknown };
-  }>('/api/chat/turn', async (req, reply) => {
-    const session = await requireSupabaseSession(req, reply, opts);
-    if (session === null) return;
-
-    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
-    if (message.length === 0) {
-      return reply.code(400).send({ error: 'message_required' });
-    }
-    const isPrivate = req.body?.private === true;
-    // Note: the non-streaming /api/chat/turn path runs through
-    // runCoachingTurn which calls resolveSession internally without
-    // threading sessionId. The streaming path /api/chat/turn/stream
-    // honors sessionId per SCRUM-53. The non-streaming path is vestigial
-    // (the web client uses streaming exclusively) and will be removed in a
-    // follow-up ticket.
-
-    const inbound: CoachingInbound = {
-      userId: asUserId(session.userId),
-      // Synthetic E.164 for web users; the orchestrator hashes this for
-      // suppression checks but no Twilio dispatch ever happens (sendBody
-      // short-circuits when channel === 'web').
-      phoneE164: asPhoneE164(`web:${session.userId}`),
-      phoneHash: hashPhone(`web:${session.userId}`),
-      body: message,
-      mediaUrls: [],
-      inboundMessageId: `web-${req.id}`,
-      receivedAt: new Date(),
-      traceId: String(req.id),
-      channel: 'web',
-      isPrivate,
-    };
-
-    const result = await runCoachingTurn(
-      {
-        config: opts.config,
-        db: opts.db,
-        redis: opts.redis,
-        rateLimiters: opts.rateLimiters,
-        traceEmitter: opts.traceEmitter,
-      },
-      inbound,
-    );
-
-    // If private mode, flag the session row so the list endpoint filters it.
-    if (isPrivate && result.sessionId !== 'pending') {
-      try {
-        await opts.db
-          .update(sessions)
-          .set({ isPrivate: true })
-          .where(eq(sessions.id, result.sessionId));
-      } catch (err) {
-        reportP2('failed to flag session is_private', {
-          source: 'PhaseC.WebApi',
-          extra: { error: err instanceof Error ? err.message : String(err) },
-        });
-      }
-    }
-
-    // Generate a session title via Haiku after the first non-private turn.
-    // Fire-and-forget so the user doesn't wait. The helper no-ops if a
-    // title is already set, so re-tries on subsequent turns are cheap.
-    if (!isPrivate && result.sessionId !== 'pending') {
-      void generateSessionTitle(opts.config, opts.db, result.sessionId, message);
-    }
-
-    return reply.send({
-      responseText: result.responseText,
-      sessionId: result.sessionId,
-      turnId: result.turnId,
-      endEvent: result.endEvent,
-    });
-  });
-
   // POST /api/chat/turn/stream ----------------------------------------
   // Streaming variant of /api/chat/turn. Returns Server-Sent Events:
   //   event: start   data: { sessionId }
@@ -129,11 +44,8 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   //   event: end     data: { turnId, sessionId, latencyMs }
   //   event: error   data: { message }         (on any failure mid-stream)
   //
-  // The path is intentionally a minimal inline orchestration that bypasses
-  // runCoachingTurn — we need direct control over the LLM call to surface
-  // chunks as they arrive. QC, tagger, voice-grading are all already off
-  // per 2026-05-13; the streaming path simply embodies that simplified
-  // pipeline.
+  // Streaming is the only chat path; the legacy non-streaming route and
+  // its orchestrator (triage / tagger / QC) were removed in SCRUM-43.
   app.post<{
     Body: { message?: unknown; sessionId?: unknown; private?: unknown };
   }>('/api/chat/turn/stream', async (req, reply) => {
@@ -176,19 +88,6 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     };
 
     try {
-      // ---- Fast-path triage (no LLM) ---------------------------------
-      const sync = fastPathTriage(message, []);
-      // empty/media_only on the streaming endpoint shouldn't happen (web
-      // sends text-only), but if it does just emit the templated copy.
-      if (sync !== null && sync.status === 'media_only') {
-        sendEvent('delta', {
-          text: "I work with text only for now. Type out what's on your mind and I'll respond.",
-        });
-        sendEvent('end', { turnId: null, sessionId: null, latencyMs: Date.now() - t0 });
-        reply.raw.end();
-        return reply;
-      }
-
       // ---- Session resolution ----------------------------------------
       // Spread the sessionId conditionally — `exactOptionalPropertyTypes`
       // forbids passing an explicit undefined for an optional field.

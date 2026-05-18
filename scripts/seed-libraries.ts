@@ -3,28 +3,30 @@ import { and, eq } from 'drizzle-orm';
 import { getDb } from '../src/shared/db/client.js';
 import {
   crisisResourcesV1,
-  culturalFramingV1,
   dailyPromptsV1,
-  promptTemplatesV1,
+  promptTemplatesV2Unified,
   publishLibraryVersion,
   scenariosV1,
-  voiceRulesV1,
 } from '../src/libraries/index.js';
 import { libraryVersions } from '../src/shared/db/schema/library-versions.js';
 import type { LibraryName } from '../src/libraries/index.js';
 import { loadConfig } from '../src/shared/secrets/config.js';
 
-// Sign-off record (2026-05-04):
-//   - voice_rules v1, cultural_framing v1, prompt_templates v1, scenarios v1:
-//     APPROVED by Hamse. See scripts/attest-library-signoffs.ts for the
-//     attestation that updates library_versions.published_by + notes.
-//   - crisis_resources v1 placeholder superseded by v2 — see
-//     scripts/publish-crisis-resources-v2.ts.
+// Baseline seed for libraries that still ship seed payloads from the repo:
+//   - prompt_templates v2_unified (the active Values-Driven Companion prompt)
+//   - crisis_resources v1 (Tabaha + Befrienders; placeholder superseded by v2
+//     via scripts/publish-crisis-resources-v2.ts)
+//   - scenarios v1, daily_prompts v1
 //
-// This script is the v1 baseline seed. Re-running it is idempotent. Critically,
-// when a library already has a newer active version (e.g. crisis_resources v2),
-// we skip the v1 row entirely so re-runs cannot demote a superseded version.
-// makeActive is computed dynamically per library based on current state.
+// Removed in SCRUM-43/47: voice_rules v1, cultural_framing v1, prompt_templates v1.
+// Those seeds were tied to the v1 multi-block assembly path which no longer
+// exists; voice-rules and cultural-framing libraries are no longer loaded
+// at runtime, and the v1 prompt template would crash on the simplified
+// assembler.
+//
+// Re-running this script is idempotent. When a library already has a newer
+// active version, we skip the lower-version row entirely so re-runs cannot
+// demote a superseded version.
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -32,22 +34,11 @@ async function main(): Promise<void> {
 
   const seeds = [
     {
-      libraryName: 'voice_rules' as const,
-      version: 'v1',
-      payload: voiceRulesV1,
-      notes: 'engineering baseline from PRD §7 — pending Hamse sign-off',
-    },
-    {
-      libraryName: 'cultural_framing' as const,
-      version: 'v1',
-      payload: culturalFramingV1,
-      notes: 'engineering baseline from PRD §7 — pending Hamse sign-off',
-    },
-    {
       libraryName: 'prompt_templates' as const,
-      version: 'v1',
-      payload: promptTemplatesV1,
-      notes: 'engineering baseline — 5 templates, 12 practice framings, 4 level framings',
+      version: 'v2_unified',
+      payload: promptTemplatesV2Unified,
+      notes:
+        'Values-Driven Companion unified prompt (2026-05-13). Single systemText subsumes all five response modes.',
     },
     {
       libraryName: 'crisis_resources' as const,

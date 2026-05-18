@@ -54,25 +54,14 @@ export interface InputPayload {
 }
 
 /**
- * Per-section text contributions to the assembled prompt. Each is a separate
- * named region so Step 12 can degrade specific blocks (memory, session,
- * cultural framing) without disturbing the rest.
+ * Per-section text contributions to the assembled prompt. Since SCRUM-47,
+ * the v1 multi-block path (practice/level framings, voice rules, cultural
+ * framing, directives) is gone — those static framings now live inside
+ * `systemTemplateText`. Only dynamic per-user blocks are assembled
+ * separately at runtime.
  */
 export interface PromptUnderConstruction {
   systemTemplateText: string;
-  practiceFramingText: string;
-  levelFramingText: string;
-  /** Batch P Piece 1 — structural directive instructing the LLM to ground in
-   *  the tagged practice as the organizing frame and anchor at the tagged
-   *  level. Empty string for response modes that are untagged
-   *  (ClarifyingQuestion, MetaResponse) — this engineering block does NOT
-   *  fire when there's no practice/level to ground in. */
-  directivesBlockText: string;
-  voiceRulesText: string;
-  /** Null when not applicable per Step 7 DMN, OR when degraded out by Step 12. */
-  culturalFramingText: string | null;
-  /** Sourced concept name (e.g., "Sharaf") for the chosen framing — preserved for trace. */
-  culturalFramingConcept: string | null;
   memoryBlockText: string;
   sessionContextText: string;
   userProfileBlockText: string;
