@@ -6,16 +6,24 @@ import { asSessionId } from '../shared/types/index.js';
 import type { ResolveOptions, SessionResolution } from './types.js';
 
 /**
- * Process #6 §session resolver — minimal MVP per Phase 4B plan:
- *   - 30-min idle → new session
- *   - >7d idle → still treated as "new"; the old session is archived
- *     (closed_at = last_turn_at) at the same time so we don't accumulate
- *     dangling open rows.
+ * Session resolver — see docs/bpmn/05-session-lifecycle.md for the full flow.
+ *
+ * Two modes:
+ *   1. Client-named session (SCRUM-53): caller passes opts.sessionId. If it
+ *      belongs to opts.userId, we attach to it — reopening (clearing
+ *      closedAt) if it had been closed. If it doesn't belong to the user
+ *      (or doesn't exist), we fall through silently to the legacy logic
+ *      rather than 404, to avoid leaking session existence across users.
+ *   2. No sessionId (legacy time-based):
+ *      - <=30-min idle → continue the user's most-recent open session
+ *      - >30-min idle  → close the old session, open a new one
+ *      - >7d idle      → same as above (a future archival cron handles
+ *        deletion of dormant rows)
  *
  * Concurrency note: two near-simultaneous inbound messages for the same user
- * could race here and produce two new sessions. Rare for our scale, and
- * downstream merging is cheap. If it becomes a problem, wrap in the same
- * advisory-lock pattern as Process #12 §4.
+ * with no sessionId could race here and produce two new sessions. Rare for
+ * our scale, and downstream merging is cheap. If it becomes a problem, wrap
+ * in the same advisory-lock pattern as the identity audit-log path.
  */
 
 export const SESSION_IDLE_MS = 30 * 60 * 1000; // 30 minutes
@@ -26,6 +34,37 @@ export async function resolveSession(
   opts: ResolveOptions,
 ): Promise<SessionResolution> {
   const now = opts.now ?? new Date();
+
+  // Mode 1: client named a specific session. Attach if it belongs to this
+  // user; reopen if closed. Otherwise fall through to legacy logic.
+  if (opts.sessionId !== undefined) {
+    const named = await db
+      .select({
+        id: sessions.id,
+        lastTurnAt: sessions.lastTurnAt,
+        turnCount: sessions.turnCount,
+        metadata: sessions.metadata,
+        closedAt: sessions.closedAt,
+      })
+      .from(sessions)
+      .where(and(eq(sessions.userId, opts.userId), eq(sessions.id, opts.sessionId)))
+      .limit(1);
+
+    const owned = named[0];
+    if (owned !== undefined) {
+      if (owned.closedAt !== null) {
+        await db.update(sessions).set({ closedAt: null }).where(eq(sessions.id, owned.id));
+      }
+      return {
+        sessionId: asSessionId(owned.id),
+        isNew: false,
+        turnCount: owned.turnCount,
+        lastTurnAt: asDate(owned.lastTurnAt),
+        metadata: owned.metadata as Record<string, unknown> | null,
+      };
+    }
+    // Foreign or fabricated sessionId — silently fall through.
+  }
 
   const existing = await db
     .select({

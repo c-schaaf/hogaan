@@ -58,10 +58,12 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       return reply.code(400).send({ error: 'message_required' });
     }
     const isPrivate = req.body?.private === true;
-    // sessionId from the client is informational only in v1 - the
-    // session-lifecycle resolver decides whether to open a new session
-    // or continue an active one based on lastTurnAt. Reopening a
-    // closed session by id is a follow-up.
+    // Note: the non-streaming /api/chat/turn path runs through
+    // runCoachingTurn which calls resolveSession internally without
+    // threading sessionId. The streaming path /api/chat/turn/stream
+    // honors sessionId per SCRUM-53. The non-streaming path is vestigial
+    // (the web client uses streaming exclusively) and will be removed in a
+    // follow-up ticket.
 
     const inbound: CoachingInbound = {
       userId: asUserId(session.userId),
@@ -143,6 +145,13 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       return reply.code(400).send({ error: 'message_required' });
     }
     const isPrivate = req.body?.private === true;
+    // SCRUM-53: honor the client's sessionId so "Continue past session"
+    // attaches the new turn to the named session instead of starting a
+    // duplicate one. The resolver validates ownership before reusing.
+    const clientSessionId =
+      typeof req.body?.sessionId === 'string' && req.body.sessionId.length > 0
+        ? asSessionId(req.body.sessionId)
+        : undefined;
 
     const t0 = Date.now();
     const userId = asUserId(session.userId);
@@ -181,7 +190,12 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       }
 
       // ---- Session resolution ----------------------------------------
-      const resolved = await resolveSession(opts.db, { userId });
+      // Spread the sessionId conditionally — `exactOptionalPropertyTypes`
+      // forbids passing an explicit undefined for an optional field.
+      const resolved = await resolveSession(opts.db, {
+        userId,
+        ...(clientSessionId !== undefined ? { sessionId: clientSessionId } : {}),
+      });
       const sessionId = resolved.sessionId;
 
       // ---- Context fetch (profile + recent turns + memory) -----------
