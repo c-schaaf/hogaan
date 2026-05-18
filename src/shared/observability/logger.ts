@@ -9,7 +9,6 @@ const REDACT_PATHS = [
   '*.ANTHROPIC_API_KEY',
   '*.GROQ_API_KEY',
   '*.VOYAGE_API_KEY',
-  '*.TWILIO_AUTH_TOKEN',
 ];
 
 export function loggerOptionsFor(config: AppConfig) {
