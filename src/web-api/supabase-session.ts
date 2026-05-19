@@ -1,28 +1,30 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { eq } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { reportP2 } from '../incident-handling/index.js';
+import { reportP0, reportP2 } from '../incident-handling/index.js';
 import type { Database } from '../shared/db/client.js';
+import { auditLog } from '../shared/db/schema/audit-log.js';
 import { users } from '../shared/db/schema/users.js';
 import { type AppConfig, requireConfig } from '../shared/secrets/config.js';
 
 /**
- * Phase B-bis - Supabase Auth session validation for /api/* routes.
+ * Phase B-bis — Supabase Auth session validation for /api/* routes.
  *
- * Replaces the custom magic-link middleware. Flow:
- *
- *   1. Client (web/src/lib/supabase.ts) signs in via supabase-js and gets
- *      an access token in localStorage.
+ * Flow:
+ *   1. Client signs in via supabase-js and gets an access token.
  *   2. Client sends `Authorization: Bearer <token>` on every /api/* call.
  *   3. This middleware calls supabase.auth.getUser(token) to validate.
  *   4. On first authed call we JIT-create the public.users row, keyed by
  *      `supabase_user_id`.
+ *   5. Every authed request also writes one append-only audit_log row
+ *      (CLAUDE.md hard rule #4 — fail-closed). If the audit insert
+ *      throws, the request is rejected with 5xx; the route handler is
+ *      never invoked.
  *
  * We deliberately use the REST validate path (getUser) instead of local
- * JWT verify so we don't have to grab SUPABASE_JWT_SECRET from the
- * dashboard. Latency cost is ~80-150ms per request - acceptable for v1.
- * Switch to local jose.jwtVerify later if it bites.
+ * JWT verify so we don't have to grab SUPABASE_JWT_SECRET. Latency cost
+ * is ~80-150ms per request — acceptable for v1.
  */
 
 export interface WebSession {
@@ -31,6 +33,8 @@ export interface WebSession {
   email: string;
   /** auth.users.id from Supabase. */
   supabaseUserId: string;
+  /** Display name from Supabase user_metadata.full_name (or .name). Empty string when not present. */
+  fullName: string;
 }
 
 let cachedClient: SupabaseClient | undefined;
@@ -47,6 +51,29 @@ function getSupabase(config: AppConfig): SupabaseClient {
 export interface ReadSessionOpts {
   config: AppConfig;
   db: Database;
+}
+
+/**
+ * Append a single audit_log row. Awaited by the middleware; if the insert
+ * throws, the caller returns 5xx and the route handler is never reached.
+ * Exported for the fail-closed-contract test.
+ */
+export async function writeSupabaseAuditEntry(
+  db: Database,
+  entry: {
+    userId: string;
+    requestId: string;
+    targetEndEvent: string;
+    ipAddress: string | null;
+  },
+): Promise<void> {
+  await db.insert(auditLog).values({
+    requestId: entry.requestId,
+    triggerSource: 'web_session',
+    userId: entry.userId,
+    targetEndEvent: entry.targetEndEvent,
+    ipAddress: entry.ipAddress,
+  });
 }
 
 export async function readSupabaseSession(
@@ -86,19 +113,6 @@ export async function readSupabaseSession(
 
   const supabaseUserId = data.user.id;
   const email = (data.user.email ?? '').toLowerCase();
-
-  // JIT lookup-or-create on public.users keyed by supabase_user_id.
-  const existing = await opts.db
-    .select({ id: users.id, email: users.email })
-    .from(users)
-    .where(eq(users.supabaseUserId, supabaseUserId))
-    .limit(1);
-
-  if (existing[0] !== undefined) {
-    return { userId: existing[0].id, email: existing[0].email ?? email, supabaseUserId };
-  }
-
-  // Provision a row. Pull display name from Supabase user_metadata when present.
   const meta = data.user.user_metadata ?? {};
   const fullName =
     typeof meta['full_name'] === 'string'
@@ -107,80 +121,115 @@ export async function readSupabaseSession(
         ? meta['name']
         : '';
 
-  const userId = randomUUID();
-  const phoneHash = createHash('sha256').update(`web:${userId}`).digest('hex');
+  // JIT lookup-or-create on public.users keyed by supabase_user_id.
+  const existing = await opts.db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.supabaseUserId, supabaseUserId))
+    .limit(1);
 
+  let userId: string;
+  if (existing[0] !== undefined) {
+    userId = existing[0].id;
+  } else {
+    const newId = randomUUID();
+    try {
+      await opts.db.insert(users).values({
+        id: newId,
+        email,
+        supabaseUserId,
+        status: 'provisional',
+      });
+      userId = newId;
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      req.log.error(
+        { error: errMsg, supabaseUserId, email },
+        'supabase-session: JIT insert into public.users failed',
+      );
+      reportP2('supabase-session: insert race', {
+        source: 'PhaseBbis.SupabaseSession',
+        extra: { error: errMsg },
+      });
+
+      // Case A: race with another concurrent JIT insert on the same supabaseUserId.
+      const refetched = await opts.db
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(eq(users.supabaseUserId, supabaseUserId))
+        .limit(1);
+      if (refetched[0] !== undefined) {
+        userId = refetched[0].id;
+      } else if (email !== '' && errMsg.includes('users_email_unique')) {
+        // Case B: orphan row owns the email — re-link.
+        const byEmail = await opts.db
+          .select({ id: users.id })
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
+        if (byEmail[0] !== undefined) {
+          const relinkId = byEmail[0].id;
+          try {
+            await opts.db.update(users).set({ supabaseUserId }).where(eq(users.id, relinkId));
+            req.log.warn(
+              { supabaseUserId, email, relinkId },
+              'supabase-session: relinked existing public.users row to new supabase identity',
+            );
+            userId = relinkId;
+          } catch (relinkErr) {
+            req.log.error(
+              {
+                error: relinkErr instanceof Error ? relinkErr.message : String(relinkErr),
+                supabaseUserId,
+                email,
+                relinkId,
+              },
+              'supabase-session: relink update failed',
+            );
+            return null;
+          }
+        } else {
+          req.log.error(
+            { supabaseUserId },
+            'supabase-session: refetch after insert-fail found nothing — returning null',
+          );
+          return null;
+        }
+      } else {
+        req.log.error(
+          { supabaseUserId },
+          'supabase-session: refetch after insert-fail found nothing — returning null',
+        );
+        return null;
+      }
+    }
+  }
+
+  // Append-only audit row — CLAUDE.md hard rule #4 fail-closed. If this
+  // throws, the middleware surfaces the error to the caller (5xx) and the
+  // route handler is never invoked. Caller-visible request id flows through
+  // for triage.
   try {
-    await opts.db.insert(users).values({
-      id: userId,
-      phoneHash,
-      email,
-      supabaseUserId,
-      status: 'provisional',
-      profileFlags: fullName !== '' ? { fullName } : {},
+    await writeSupabaseAuditEntry(opts.db, {
+      userId,
+      requestId: req.id,
+      targetEndEvent: 'E1_SupabaseSessionValidated',
+      ipAddress: req.ip ?? null,
     });
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    req.log.error(
-      { error: errMsg, supabaseUserId, email },
-      'supabase-session: JIT insert into public.users failed',
+    reportP0(
+      'supabase-session: audit_log insert failed — returning 5xx (hard rule #4)',
+      {
+        source: 'PhaseBbis.SupabaseSession.Audit',
+        extra: { error: errMsg, requestId: req.id, supabaseUserId },
+      },
+      err,
     );
-    reportP2('supabase-session: insert race', {
-      source: 'PhaseBbis.SupabaseSession',
-      extra: { error: errMsg },
-    });
-
-    // Case A: race with another concurrent JIT insert on the same supabaseUserId.
-    const refetched = await opts.db
-      .select({ id: users.id, email: users.email })
-      .from(users)
-      .where(eq(users.supabaseUserId, supabaseUserId))
-      .limit(1);
-    if (refetched[0] !== undefined) {
-      return { userId: refetched[0].id, email: refetched[0].email ?? email, supabaseUserId };
-    }
-
-    // Case B: orphan row owns the email. Happens when an auth identity is
-    // deleted and recreated for the same email — the public.users row from
-    // the prior identity still holds the email but points at a stale
-    // supabase_user_id. Re-link it. Authority for the email comes from
-    // Supabase having just confirmed the user owns it.
-    if (email !== '' && errMsg.includes('users_email_unique')) {
-      const byEmail = await opts.db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
-      if (byEmail[0] !== undefined) {
-        const relinkId = byEmail[0].id;
-        try {
-          await opts.db.update(users).set({ supabaseUserId }).where(eq(users.id, relinkId));
-          req.log.warn(
-            { supabaseUserId, email, relinkId },
-            'supabase-session: relinked existing public.users row to new supabase identity',
-          );
-          return { userId: relinkId, email, supabaseUserId };
-        } catch (relinkErr) {
-          req.log.error(
-            {
-              error: relinkErr instanceof Error ? relinkErr.message : String(relinkErr),
-              supabaseUserId,
-              email,
-              relinkId,
-            },
-            'supabase-session: relink update failed',
-          );
-        }
-      }
-    }
-
-    req.log.error(
-      { supabaseUserId },
-      'supabase-session: refetch after insert-fail found nothing — returning null',
-    );
-    return null;
+    throw err;
   }
-  return { userId, email, supabaseUserId };
+
+  return { userId, email, supabaseUserId, fullName };
 }
 
 export async function requireSupabaseSession(
@@ -188,7 +237,18 @@ export async function requireSupabaseSession(
   reply: FastifyReply,
   opts: ReadSessionOpts,
 ): Promise<WebSession | null> {
-  const session = await readSupabaseSession(req, opts);
+  let session: WebSession | null;
+  try {
+    session = await readSupabaseSession(req, opts);
+  } catch (err) {
+    // Hard rule #4 — audit_log insert failure is fail-closed.
+    req.log.error(
+      { error: err instanceof Error ? err.message : String(err) },
+      'supabase-session: hard failure',
+    );
+    void reply.code(500).send({ error: 'service_unavailable' });
+    return null;
+  }
   if (session === null) {
     void reply.code(401).send({ error: 'unauthorized' });
     return null;

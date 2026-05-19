@@ -41,8 +41,6 @@ describe('Profile', () => {
       email: 'hamse@test.com',
       mappedPractices: ['Integrity', 'Peace'],
       onboarded: true,
-      commStyle: null,
-      responseDepth: null,
     });
     mockProfilePatch.mockResolvedValue({ ok: true });
   });
@@ -83,8 +81,6 @@ describe('Profile', () => {
       email: 'h@test.com',
       mappedPractices: ['Integrity'],
       onboarded: true,
-      commStyle: null,
-      responseDepth: null,
     });
     render(<Profile {...defaultProps} practices={['Integrity']} />);
     await waitFor(() => {

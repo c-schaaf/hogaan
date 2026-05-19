@@ -18,7 +18,12 @@ vi.mock('../../src/shared/llm/chat.js', () => ({ chatStream: vi.fn() }));
 
 async function buildApp(dbOverride?: unknown) {
   const { requireSupabaseSession } = await import('../../src/web-api/supabase-session.js');
-  vi.mocked(requireSupabaseSession).mockResolvedValue({ userId: TEST_USER_ID } as never);
+  vi.mocked(requireSupabaseSession).mockResolvedValue({
+    userId: TEST_USER_ID,
+    email: 'test@hogaan.test',
+    supabaseUserId: 'supabase-uuid',
+    fullName: 'Test User',
+  } as never);
 
   const app = Fastify({ logger: false });
   registerWebApiRoutes(app, {
@@ -37,9 +42,7 @@ function buildProfileDb(userRow?: Record<string, unknown>, updateSpy?: ReturnTyp
     id: TEST_USER_ID,
     email: 'test@hogaan.test',
     mappedPractices: ['Integrity', 'Peace'],
-    commStyle: null,
-    responseDepth: null,
-    profileFlags: { fullName: 'Test User' },
+    fullNameEncrypted: null,
     onboardingCompletedAt: new Date(),
     status: 'onboarded',
     ...userRow,

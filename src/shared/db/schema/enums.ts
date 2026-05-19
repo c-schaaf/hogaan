@@ -1,7 +1,7 @@
 import { pgEnum } from 'drizzle-orm/pg-core';
 
 /**
- * User lifecycle states. Process #1 transitions:
+ * User lifecycle states.
  *   provisional → onboarding_started → onboarded
  *                                    → onboarding_dormant (after 7d idle) → onboarded
  *                                    → consent_declined (terminal)
@@ -19,13 +19,6 @@ export const userStatus = pgEnum('user_status', [
   'onboarding_error',
 ]);
 
-export const suppressionReason = pgEnum('suppression_reason', [
-  'opt_out',
-  'block',
-  'bounce',
-  'abuse',
-]);
-
 export const libraryName = pgEnum('library_name', [
   'prompt_templates',
   'voice_rules',
@@ -35,4 +28,9 @@ export const libraryName = pgEnum('library_name', [
   'daily_prompts',
 ]);
 
-export const triggerSource = pgEnum('trigger_source', ['whatsapp', 'web_session', 'web_signup']);
+/**
+ * Identity audit-log trigger source. The 'whatsapp' value remains in the
+ * Postgres enum for append-only audit history compliance (CLAUDE.md hard
+ * rule #3), but new writers may only use the values declared here.
+ */
+export const triggerSource = pgEnum('trigger_source', ['web_session', 'web_signup']);

@@ -10,12 +10,8 @@ export {
   OnboardingError,
   type ExperienceBand,
   type GoalOption,
-  type LastCompletedStep,
-  type OnboardingInboundEvent,
-  type OnboardingResult,
   type RoleOption,
 } from './types.js';
-export { isOptOutMessage, recordOptOut } from './opt-out.js';
 export {
   parseConsent,
   parseExperienceBand,

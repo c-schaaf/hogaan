@@ -96,19 +96,13 @@ describe('runWipe — confirm path', () => {
       io,
     );
     expect(code).toBe(0);
-    expect(deleteSpy).toHaveBeenCalledTimes(7);
+    expect(deleteSpy).toHaveBeenCalledTimes(6);
     const lines = io.lines.join('\n');
     // Order check — the BEFORE table list also fixes the order, but the
     // deleting-… log lines are the actual deletion sequence.
-    const seq = [
-      'prompt_logs',
-      'crisis_events',
-      'audit_log',
-      'memories',
-      'turns',
-      'sessions',
-      'users',
-    ].map((t) => lines.indexOf(`deleting ${t}…`));
+    const seq = ['prompt_logs', 'audit_log', 'memories', 'turns', 'sessions', 'users'].map((t) =>
+      lines.indexOf(`deleting ${t}…`),
+    );
     for (let i = 1; i < seq.length; i++) {
       expect(seq[i]).toBeGreaterThan(seq[i - 1]!);
     }

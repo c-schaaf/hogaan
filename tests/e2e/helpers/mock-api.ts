@@ -89,7 +89,6 @@ export async function mockProfile(
       body: JSON.stringify({
         ...profile,
         onboardingComplete: true,
-        profileFlags: { experienceYears: '5-10' },
       }),
     });
   });

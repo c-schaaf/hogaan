@@ -3,23 +3,24 @@ import { triggerSource } from './enums.js';
 import { users } from './users.js';
 
 /**
- * Process #12 §8 — append-only identity audit log. CLAUDE.md hard rule #4:
- * audit log writes are FAIL-CLOSED. If we cannot insert, we do not return an
- * authentication result to the caller.
+ * Append-only identity audit log. CLAUDE.md hard rule #4: audit-log writes
+ * are FAIL-CLOSED. If we cannot insert, the request returns 5xx and the
+ * route handler is never invoked.
  *
- * No raw phone numbers — only the SHA-256 hash. The post-migration SQL revokes
- * UPDATE/DELETE on this table from the application role; only INSERT is granted.
+ * Post-WhatsApp retirement (launch-cleanup batch), the writer is
+ * src/web-api/supabase-session.ts — one row per authenticated /api/*
+ * request. The phone_hash column was dropped in the same batch (no
+ * remaining writer carried a phone hash).
  *
- * No PII discipline beyond hash: trigger source, target end event, sanitized
- * input errors only.
+ * The post-migration SQL revokes UPDATE/DELETE on this table from the
+ * application role; only INSERT is granted.
  */
 export const auditLog = pgTable('audit_log', {
   id: uuid('id').primaryKey().defaultRandom(),
   requestId: text('request_id').notNull(),
   triggerSource: triggerSource('trigger_source').notNull(),
-  phoneHash: text('phone_hash'),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
-  /** Process #12 E1..E11. */
+  /** Terminal end event id. Today: E1_SupabaseSessionValidated. */
   targetEndEvent: text('target_end_event').notNull(),
   ipAddress: text('ip_address'),
   inputErrors: jsonb('input_errors'),

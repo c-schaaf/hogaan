@@ -2,7 +2,6 @@ import 'dotenv/config';
 import { sql } from 'drizzle-orm';
 import { getDb, type Database } from '../src/shared/db/client.js';
 import { auditLog } from '../src/shared/db/schema/audit-log.js';
-import { crisisEvents } from '../src/shared/db/schema/crisis-events.js';
 import { memories } from '../src/shared/db/schema/memories.js';
 import { promptLogs } from '../src/shared/db/schema/prompt-logs.js';
 import { sessions } from '../src/shared/db/schema/sessions.js';
@@ -24,11 +23,10 @@ import { loadConfig } from '../src/shared/secrets/config.js';
  *     is pointing at the wrong DB).
  *
  * Tables wiped (FK-respecting order):
- *   prompt_logs → crisis_events → audit_log → memories → turns →
- *   sessions → users
+ *   prompt_logs → audit_log → memories → turns → sessions → users
  *
  * Preserved (seeded or independent reference data):
- *   library_versions, suppression_list.
+ *   library_versions.
  *
  * Caveat — audit_log: prod revokes UPDATE / DELETE on this table from the
  * application role (see src/shared/db/schema/audit-log.ts). The wipe will
@@ -39,7 +37,6 @@ import { loadConfig } from '../src/shared/secrets/config.js';
 
 const TABLE_ORDER = [
   { name: 'prompt_logs', table: promptLogs },
-  { name: 'crisis_events', table: crisisEvents },
   { name: 'audit_log', table: auditLog },
   { name: 'memories', table: memories },
   { name: 'turns', table: turns },

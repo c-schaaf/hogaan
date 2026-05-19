@@ -19,8 +19,6 @@ vi.mock('../lib/api', () => ({
         email: 'hamse@example.com',
         mappedPractices: ['Integrity'],
         onboarded: true,
-        commStyle: null,
-        responseDepth: null,
       }),
       patch: mockPatch,
     },
