@@ -15,14 +15,14 @@ import type { UserId } from '../shared/types/index.js';
  *   - opt-out confirmation sent
  *   - terminal E5_OnboardingAbandoned
  *
- * WhatsApp Business policy mandates honoring STOP within "a short window"
- * (typically <24h, ideally <1m). All four writes are best-effort + logged.
+ * Opt-out must be honored within "a short window" (typically <24h, ideally
+ * <1m). All four writes are best-effort + logged.
  */
 
 // Phase 12 R18 — 'cancel' and 'end' removed from this list. Both produced
 // false positives in coaching context: "I want to cancel that meeting" /
-// "Let me end this conflict". WhatsApp Business policy honors STOP /
-// UNSUBSCRIBE / LEAVE / OPT OUT — those four are the canonical set.
+// "Let me end this conflict". The four canonical opt-out keywords are
+// STOP / UNSUBSCRIBE / LEAVE / OPT OUT.
 const OPT_OUT_KEYWORDS = ['stop', 'unsubscribe', 'leave', 'opt out', 'optout'];
 
 export function isOptOutMessage(text: string): boolean {

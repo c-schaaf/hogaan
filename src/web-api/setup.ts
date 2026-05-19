@@ -7,9 +7,8 @@ import { buildTraceEmitter } from '../shared/trace/index.js';
 import { registerWebApiRoutes } from './routes.js';
 
 /**
- * Phase C wiring. Mirrors web-auth/setup.ts and whatsapp-delivery/setup.ts.
- * Same gating as web-auth (DB + Redis + JWT + base URL) plus the rate-
- * limiter + trace emitter the coaching orchestrator needs.
+ * Phase C wiring. Same gating as web-auth (DB + Redis + JWT + base URL)
+ * plus the rate-limiter + trace emitter the coaching orchestrator needs.
  */
 // eslint-disable-next-line @typescript-eslint/require-await -- async signature kept symmetric with other setup helpers
 export async function wireWebApiRoutes(

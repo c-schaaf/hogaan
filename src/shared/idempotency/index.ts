@@ -1,9 +1,8 @@
 import type { RedisBundle } from '../redis/client.js';
 
 /**
- * Generic correlation-key idempotency. Process #11 wires this for outbound
- * WhatsApp dispatch (Steps 2 + 7), but the helper is intentionally agnostic
- * so other modules (sponsor portal, daily prompt scheduler) can reuse it.
+ * Generic correlation-key idempotency. The helper is intentionally agnostic
+ * so any module needing once-only dispatch semantics can reuse it.
  *
  * State machine — every key lives in Redis with a 24h TTL:
  *   - absent       : never seen; first-time dispatch.
@@ -33,7 +32,7 @@ export interface IdempotencyRecord {
   state: 'dispatching' | 'sent' | 'failed';
   /** Identifier of the worker/process that owns this key. */
   ownerId: string;
-  /** Provider-side receipt id (e.g. Twilio waMessageId) once state='sent'. */
+  /** Provider-side receipt id once state='sent'. */
   receiptId?: string;
   /** Free-form payload for callers that need to remember the dispatched body. */
   payload?: unknown;

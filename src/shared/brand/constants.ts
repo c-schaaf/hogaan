@@ -26,7 +26,7 @@ export const BRAND_AUTHOR_NAME = 'Hamse Warfa';
 
 /**
  * Convenience phrase: how Hogaan describes its own grounding when asked
- * who/what it is (MetaQuestion reply, sponsor portal "About"). Combines
+ * who/what it is (MetaQuestion reply, About surfaces). Combines
  * author + framework so callers don't have to compose it ad hoc.
  */
 export const BRAND_FRAMEWORK_ATTRIBUTION = `${BRAND_AUTHOR_NAME}'s ${BRAND_FRAMEWORK_NAME}`;

@@ -28,7 +28,7 @@ export const crisisEvents = pgTable('crisis_events', {
   outcomeCategory: text('outcome_category').notNull(),
   /** Crisis_resources library version pinned at the time of the event. */
   resourcesVersion: text('resources_version').notNull(),
-  /** Twilio waMessageId when dispatch succeeded; null otherwise. */
+  /** Provider message id when dispatch succeeded; null otherwise. */
   dispatchedWaMessageId: text('dispatched_wa_message_id'),
   /** Sanitized error string when outcome != dispatched. No PII. */
   errorReason: text('error_reason'),

@@ -8,9 +8,9 @@ import { users } from './users.js';
  * fidelity review (Phase 7.15 / 10.2 harness reads from here).
  *
  * Content note: this table holds plaintext user messages and Hamse-voice
- * responses. Both are PII-bearing and must NEVER be exposed to sponsors
- * (PRD §8 hard rule). Sponsor portal queries aggregate over `intent`,
- * `practice_tag`, `qa_outcome` — never `user_message` or `response_text`.
+ * responses. Both are PII-bearing — CLAUDE.md hard rule #3. Internal
+ * aggregations should query `intent`, `practice_tag`, `qa_outcome` and
+ * leave `user_message` / `response_text` alone.
  */
 export const turns = pgTable('turns', {
   id: uuid('id').primaryKey().defaultRandom(),
