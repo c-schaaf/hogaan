@@ -1,7 +1,7 @@
 # 02 — Coaching Turn
 
 **Status:** living contract — update in the same PR that changes this process.
-**Last reviewed:** 2026-05-19.
+**Last reviewed:** 2026-05-19 (updated per SCRUM-50 leadership-coach prompt rewrite).
 
 ## Purpose
 
@@ -58,9 +58,11 @@ orchestrator (triage / tagger / quality-check) were removed in SCRUM-43.
 - **No quality check / response grading.** Code removed in SCRUM-43.
 - **No tagger.** Code removed in SCRUM-43.
 - **No v1 multi-block prompt assembly path.** Code removed in SCRUM-47; the
-  unified `coaching_v0_unified` template is the only assembly path now.
-- **No crisis routing in code.** (The active system prompt does include a
-  crisis-protocol section. Ticket SCRUM-50 removes it.)
+  unified `coaching_v3_leadership` template is the only assembly path now.
+- **No crisis routing in code or in the prompt.** SCRUM-50 removed the
+  embedded Crisis Protocol; the onboarding AI disclaimer covers legal
+  exposure and §6 of the system prompt carries the one-line "not the
+  right help — refer and stop" policy.
 - **No token budget.** Removed in SCRUM-55; Haiku 4.5's 200k context dwarfs
   any realistic prompt.
 

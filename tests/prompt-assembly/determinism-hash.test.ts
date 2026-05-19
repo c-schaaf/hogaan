@@ -13,7 +13,7 @@ describe('computeDeterminismHash', () => {
   it('produces 64-hex SHA-256 digest', () => {
     const h = computeDeterminismHash({
       responseMode: 'FullCoachingResponse',
-      systemTemplateId: 'coaching_v0_unified',
+      systemTemplateId: 'coaching_v3_leadership',
       practiceTag: 'integrity',
       levelTag: 'self',
       libraryVersions: libs,
@@ -24,14 +24,14 @@ describe('computeDeterminismHash', () => {
   it('is identical for identical structural inputs (resolvedAt does NOT contribute)', () => {
     const a = computeDeterminismHash({
       responseMode: 'FullCoachingResponse',
-      systemTemplateId: 'coaching_v0_unified',
+      systemTemplateId: 'coaching_v3_leadership',
       practiceTag: 'integrity',
       levelTag: 'self',
       libraryVersions: libs,
     });
     const b = computeDeterminismHash({
       responseMode: 'FullCoachingResponse',
-      systemTemplateId: 'coaching_v0_unified',
+      systemTemplateId: 'coaching_v3_leadership',
       practiceTag: 'integrity',
       levelTag: 'self',
       libraryVersions: { ...libs, resolvedAt: new Date('2099-12-31T23:59:59Z') },
@@ -42,14 +42,14 @@ describe('computeDeterminismHash', () => {
   it('differs when responseMode changes', () => {
     const a = computeDeterminismHash({
       responseMode: 'FullCoachingResponse',
-      systemTemplateId: 'coaching_v0_unified',
+      systemTemplateId: 'coaching_v3_leadership',
       practiceTag: 'integrity',
       levelTag: 'self',
       libraryVersions: libs,
     });
     const b = computeDeterminismHash({
       responseMode: 'ClarifyingQuestion',
-      systemTemplateId: 'coaching_v0_unified',
+      systemTemplateId: 'coaching_v3_leadership',
       practiceTag: 'integrity',
       levelTag: 'self',
       libraryVersions: libs,
@@ -60,14 +60,14 @@ describe('computeDeterminismHash', () => {
   it('differs when promptTemplates library version changes (drift detection)', () => {
     const a = computeDeterminismHash({
       responseMode: 'FullCoachingResponse',
-      systemTemplateId: 'coaching_v0_unified',
+      systemTemplateId: 'coaching_v3_leadership',
       practiceTag: 'integrity',
       levelTag: 'self',
       libraryVersions: libs,
     });
     const b = computeDeterminismHash({
       responseMode: 'FullCoachingResponse',
-      systemTemplateId: 'coaching_v0_unified',
+      systemTemplateId: 'coaching_v3_leadership',
       practiceTag: 'integrity',
       levelTag: 'self',
       libraryVersions: { ...libs, promptTemplates: { version: 'v3', hash: 'zzzz' } },

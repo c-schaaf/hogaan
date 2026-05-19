@@ -8,14 +8,14 @@ import {
 import { PRACTICE_TAGS, RESPONSE_MODES } from '../../src/shared/types/index.js';
 
 describe('library seed content invariants', () => {
-  it('prompt_templates v2 unified has one entry per response mode, all pointing at coaching_v0_unified', () => {
+  it('prompt_templates v2 unified has one entry per response mode, all pointing at coaching_v3_leadership', () => {
     expect(promptTemplatesV2Unified.templates).toHaveLength(RESPONSE_MODES.length);
     const modes = new Set(promptTemplatesV2Unified.templates.map((t) => t.responseMode));
     for (const m of RESPONSE_MODES) {
       expect(modes.has(m)).toBe(true);
     }
     for (const t of promptTemplatesV2Unified.templates) {
-      expect(t.id).toBe('coaching_v0_unified');
+      expect(t.id).toBe('coaching_v3_leadership');
     }
   });
 
