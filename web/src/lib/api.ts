@@ -191,6 +191,14 @@ export const api = {
       const path = qs.length > 0 ? `/api/sessions?${qs}` : '/api/sessions';
       return call<{ sessions: SessionSummary[]; hasMore: boolean }>(path);
     },
+    search: (opts: { q: string; before?: string; limit?: number }) => {
+      const params = new URLSearchParams({ q: opts.q });
+      if (opts.before !== undefined) params.set('before', opts.before);
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+      return call<{ sessions: SessionSummary[]; hasMore: boolean }>(
+        `/api/sessions/search?${params.toString()}`,
+      );
+    },
     get: (id: string) => call<SessionDetail>(`/api/sessions/${id}`),
     del: (id: string) => call<{ ok: true }>(`/api/sessions/${id}`, { method: 'DELETE' }),
   },

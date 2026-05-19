@@ -102,6 +102,7 @@ const PAGE_SIZE = 20;
 export function Sessions({ onBack, onOpen, onNav }: Props) {
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<SessionSummary[] | null>(null);
+  const [searchResults, setSearchResults] = useState<SessionSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -122,6 +123,28 @@ export function Sessions({ onBack, onOpen, onNav }: Props) {
     })();
   }, []);
 
+  // SCRUM — server-side search. Debounce 300 ms; empty query clears
+  // results and falls back to the paginated list above.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length === 0) {
+      setSearchResults(null);
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const resp = await api.sessions.search({ q, limit: PAGE_SIZE });
+          setSearchResults(fromApi(resp.sessions));
+        } catch (err) {
+          console.error('sessions search failed', err);
+          setSearchResults([]);
+        }
+      })();
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [query]);
+
   const onLoadMore = async () => {
     if (loadingMore || !hasMore || rows === null || rows.length === 0) return;
     const last = rows[rows.length - 1];
@@ -139,20 +162,15 @@ export function Sessions({ onBack, onOpen, onNav }: Props) {
   };
 
   const groups = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const filter = (s: SessionSummary) =>
-      !q ||
-      s.title.toLowerCase().includes(q) ||
-      s.practices.some((p) => p.toLowerCase().includes(q));
+    const source = query.trim().length > 0 ? (searchResults ?? []) : (rows ?? []);
     const out: Partial<Record<SessionSummary['group'], SessionSummary[]>> = {};
-    for (const s of rows ?? []) {
-      if (!filter(s)) continue;
+    for (const s of source) {
       const list = out[s.group] ?? [];
       list.push(s);
       out[s.group] = list;
     }
     return out;
-  }, [query, rows]);
+  }, [query, rows, searchResults]);
 
   const empty = !loading && (rows?.length ?? 0) === 0;
   const hasAny = ORDER.some((g) => (groups[g]?.length ?? 0) > 0);

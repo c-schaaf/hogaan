@@ -15,7 +15,6 @@ export {
   type OnboardingResult,
   type RoleOption,
 } from './types.js';
-export { handleOnboardingMessage } from './orchestrator.js';
 export { isOptOutMessage, recordOptOut } from './opt-out.js';
 export {
   parseConsent,
@@ -28,4 +27,3 @@ export {
   type GoalParseResult,
   type LocationParseResult,
 } from './parsers.js';
-export { extractCodeCandidate, tryRedeemCode, type RedeemResult } from './code-redemption.js';

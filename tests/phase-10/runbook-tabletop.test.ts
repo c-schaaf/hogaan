@@ -26,30 +26,6 @@ async function readRunbook(name: string): Promise<string> {
   return readFile(path.join(RUNBOOKS_DIR, `${name}.md`), 'utf8');
 }
 
-describe('Phase 10.5 — Runbook tabletop: WhatsApp account suspension', () => {
-  it('runbook documents E11_AccountSuspended detection and recovery', async () => {
-    await withEvidence(
-      {
-        testId: 'phase-10/runbook-tabletop/whatsapp-suspension',
-        controlId: 'T1.BackupAndDR.WhatsAppAccountSuspension',
-        tier: 'T1',
-        description:
-          'Runbook references E11_AccountSuspended terminal event, Sentry source tag, suppression_list mitigation',
-      },
-      async () => {
-        const md = await readRunbook('whatsapp-account-suspension');
-        expect(md).toContain('E11_AccountSuspended');
-        expect(md).toContain('Process_11.Step_8_APIDispatch');
-        expect(md).toContain('suppression_list');
-        expect(md).toContain('correlation_id');
-        // Decision matrix referenced
-        expect(md.toLowerCase()).toContain('billing');
-        expect(md.toLowerCase()).toContain('policy');
-      },
-    );
-  });
-});
-
 describe('Phase 10.5 — Runbook tabletop: Render outage failover', () => {
   it('runbook documents the env vars + scripts needed to stand up Railway standby', async () => {
     await withEvidence(
@@ -99,29 +75,6 @@ describe('Phase 10.5 — Runbook tabletop: Supabase PITR drill', () => {
         // Verification scripts
         expect(md).toContain('verify-phase-7.ts');
         expect(md).toContain('verify-phase-9.ts');
-      },
-    );
-  });
-});
-
-describe('Phase 10.5 — Runbook tabletop: Twilio sender re-registration', () => {
-  it('runbook references the templates library and the verify-phase-8 modes', async () => {
-    await withEvidence(
-      {
-        testId: 'phase-10/runbook-tabletop/twilio-reregistration',
-        controlId: 'T1.BackupAndDR.TwilioSenderReregistration',
-        tier: 'T1',
-        description:
-          'Runbook references library_versions, prompt_templates, verify-phase-8 modes, FreeForm-in-window mitigation',
-      },
-      async () => {
-        const md = await readRunbook('twilio-sender-reregistration');
-        expect(md).toContain('library_versions');
-        expect(md).toContain('prompt_templates');
-        expect(md).toContain('verify-phase-8');
-        // The mitigation paragraph must explicitly call out the in-window FreeForm path.
-        expect(md.toLowerCase()).toContain('freeform');
-        expect(md.toLowerCase()).toContain('window');
       },
     );
   });

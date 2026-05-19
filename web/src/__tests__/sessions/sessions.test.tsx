@@ -3,11 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Sessions } from '../../phases/Sessions';
 
 const mockSessionsList = vi.hoisted(() => vi.fn());
+const mockSessionsSearch = vi.hoisted(() => vi.fn());
 
 vi.mock('../../lib/api', () => ({
   api: {
     sessions: {
       list: mockSessionsList,
+      search: mockSessionsSearch,
     },
   },
 }));
@@ -75,16 +77,21 @@ describe('Sessions', () => {
     });
   });
 
-  it('filters sessions by search query', async () => {
+  it('renders server search results in place of the paginated list', async () => {
     mockSessionsList.mockResolvedValue({
       sessions: [
         { id: 's1', title: 'Team Leadership', msgs: 5, when: '2 days ago', group: 'This week' },
         { id: 's2', title: 'Conflict Resolution', msgs: 3, when: '3 days ago', group: 'This week' },
       ],
     });
+    mockSessionsSearch.mockResolvedValue({
+      sessions: [
+        { id: 's1', title: 'Team Leadership', msgs: 5, when: '2 days ago', group: 'This week' },
+      ],
+      hasMore: false,
+    });
 
     render(<Sessions {...defaultProps} />);
-
     await waitFor(() => expect(screen.getByText('Team Leadership')).toBeTruthy());
 
     const input = screen.getByPlaceholderText('Search sessions…');
@@ -96,12 +103,13 @@ describe('Sessions', () => {
     });
   });
 
-  it('shows no-match message when search finds nothing', async () => {
+  it('shows no-match message when server returns no results', async () => {
     mockSessionsList.mockResolvedValue({
       sessions: [
         { id: 's1', title: 'Team Leadership', msgs: 5, when: '2 days ago', group: 'This week' },
       ],
     });
+    mockSessionsSearch.mockResolvedValue({ sessions: [], hasMore: false });
 
     render(<Sessions {...defaultProps} />);
     await waitFor(() => expect(screen.getByText('Team Leadership')).toBeTruthy());
@@ -111,24 +119,6 @@ describe('Sessions', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/No sessions match "zzznomatch"/)).toBeTruthy();
-    });
-  });
-
-  it('search is case-insensitive', async () => {
-    mockSessionsList.mockResolvedValue({
-      sessions: [
-        { id: 's1', title: 'Team Leadership', msgs: 5, when: '2 days ago', group: 'This week' },
-      ],
-    });
-
-    render(<Sessions {...defaultProps} />);
-    await waitFor(() => expect(screen.getByText('Team Leadership')).toBeTruthy());
-
-    const input = screen.getByPlaceholderText('Search sessions…');
-    fireEvent.change(input, { target: { value: 'TEAM' } });
-
-    await waitFor(() => {
-      expect(screen.getByText('Team Leadership')).toBeTruthy();
     });
   });
 

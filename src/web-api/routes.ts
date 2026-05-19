@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, lt, sql as drizzleSql } from 'drizzle-orm';
+import { and, desc, eq, gt, ilike, isNotNull, lt, sql as drizzleSql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { fetchCoachingContext } from '../coaching/context-fetch.js';
 import { reportP2 } from '../incident-handling/index.js';
@@ -295,6 +295,110 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
 
       // Fetch one more than the page size so we can detect hasMore without a
       // separate count query.
+      const rows = await opts.db
+        .select({
+          id: sessions.id,
+          title: sessions.title,
+          startedAt: sessions.startedAt,
+          lastTurnAt: sessions.lastTurnAt,
+          turnCount: sessions.turnCount,
+        })
+        .from(sessions)
+        .where(and(...baseConditions))
+        .orderBy(desc(sessions.lastTurnAt))
+        .limit(pageLimit + 1);
+
+      const hasMore = rows.length > pageLimit;
+      const pageRows = hasMore ? rows.slice(0, pageLimit) : rows;
+
+      const now = Date.now();
+      const oneWeek = 7 * 24 * 60 * 60 * 1000;
+      const oneMonth = 30 * 24 * 60 * 60 * 1000;
+
+      type Group = 'This week' | 'Earlier this month' | 'Older';
+      const groupOf = (d: Date): Group => {
+        const age = now - d.getTime();
+        if (age < oneWeek) return 'This week';
+        if (age < oneMonth) return 'Earlier this month';
+        return 'Older';
+      };
+      const relative = (d: Date): string => {
+        const age = now - d.getTime();
+        const days = Math.floor(age / (24 * 60 * 60 * 1000));
+        if (days < 1) return 'Today';
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+        return `${Math.floor(days / 30)} months ago`;
+      };
+
+      return reply.send({
+        sessions: pageRows.map((r) => ({
+          id: r.id,
+          title: r.title ?? 'Untitled session',
+          msgs: r.turnCount,
+          when: relative(r.lastTurnAt),
+          group: groupOf(r.lastTurnAt),
+        })),
+        hasMore,
+      });
+    },
+  );
+
+  // GET /api/sessions/search -------------------------------------------
+  // Case-insensitive ILIKE over session.title, scoped to the requesting
+  // user, with the same cursor pagination contract as GET /api/sessions.
+  // Bonus turn-text search (turns.user_message) is deferred — a JOIN
+  // there needs a GIN index to stay under the latency budget at scale.
+  app.get<{ Querystring: { q?: string; before?: string; limit?: string } }>(
+    '/api/sessions/search',
+    async (req, reply) => {
+      const session = await requireSupabaseSession(req, reply, opts);
+      if (session === null) return;
+
+      const q = req.query.q?.trim();
+      if (q === undefined || q.length === 0) {
+        return reply.code(400).send({ error: 'q is required' });
+      }
+
+      const parsedLimit = Number.parseInt(req.query.limit ?? '20', 10);
+      const pageLimit =
+        Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 20;
+      const beforeId = req.query.before?.trim();
+
+      let cursorLastTurnAt: Date | null = null;
+      if (beforeId !== undefined && beforeId.length > 0) {
+        const cur = await opts.db
+          .select({
+            id: sessions.id,
+            userId: sessions.userId,
+            lastTurnAt: sessions.lastTurnAt,
+          })
+          .from(sessions)
+          .where(eq(sessions.id, beforeId))
+          .limit(1);
+        const c = cur[0];
+        if (c !== undefined && c.userId === session.userId) {
+          cursorLastTurnAt = c.lastTurnAt;
+        }
+      }
+
+      // Escape SQL LIKE metacharacters in the user-supplied term so a query
+      // like "50%" matches the literal string, not "starts with 50".
+      const escaped = q.replace(/[\\%_]/g, (m) => `\\${m}`);
+      const pattern = `%${escaped}%`;
+
+      const baseConditions = [
+        eq(sessions.userId, session.userId),
+        eq(sessions.isPrivate, false),
+        gt(sessions.turnCount, 0),
+        isNotNull(sessions.title),
+        ilike(sessions.title, pattern),
+      ];
+      if (cursorLastTurnAt !== null) {
+        baseConditions.push(lt(sessions.lastTurnAt, cursorLastTurnAt));
+      }
+
       const rows = await opts.db
         .select({
           id: sessions.id,
