@@ -117,7 +117,7 @@ export async function validateSessionToken(
 }
 
 /**
- * Issuer used by sponsor-portal magic links (Phase 9). Lives in the identity
+ * Issuer used by legacy magic-link tokens. Lives in the identity
  * module so the issue/verify pair stays in one place.
  */
 export interface IssueOptions {

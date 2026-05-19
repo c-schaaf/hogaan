@@ -4,11 +4,10 @@ import { type AppConfig, requireConfig } from '../secrets/config.js';
 /**
  * Resend transport - the one place that talks to https://api.resend.com.
  *
- * Phase 9 (sponsor portal) was the first consumer and originally owned a
- * copy of this helper. Phase B (web app) shares it: same API key, same
- * RESEND_FROM_EMAIL, same failure semantics. Per the sponsor portal
- * comment: delivery failures are non-blocking - callers return success to
- * the requester regardless and incidents are logged via reportP1.
+ * Used by the web app for transactional email (signup verification,
+ * password reset). Delivery failures are non-blocking - callers return
+ * success to the requester regardless and incidents are logged via
+ * reportP1.
  */
 
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';

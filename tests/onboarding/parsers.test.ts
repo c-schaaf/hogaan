@@ -34,7 +34,7 @@ describe('parseGoals (Phase 12 R14 — direct practice picker)', () => {
     const r = parseGoals('integrity');
     expect(r).not.toBe('invalid');
     if (r !== 'invalid') {
-      expect(r.goals).toEqual(['integrity']);
+      expect(r.practices).toEqual(['integrity']);
     }
   });
   it('accepts multiple practices comma-separated', () => {
@@ -42,32 +42,32 @@ describe('parseGoals (Phase 12 R14 — direct practice picker)', () => {
     if (r === 'invalid') {
       throw new Error('expected parse');
     }
-    expect(r.goals).toContain('integrity');
-    expect(r.goals).toContain('peace');
+    expect(r.practices).toContain('integrity');
+    expect(r.practices).toContain('peace');
   });
   it('accepts keyword phrasing ("empathy and peace")', () => {
     const r1 = parseGoals('empathy and peace');
-    expect(r1 !== 'invalid' && r1.goals.includes('empathy')).toBe(true);
-    expect(r1 !== 'invalid' && r1.goals.includes('peace')).toBe(true);
+    expect(r1 !== 'invalid' && r1.practices.includes('empathy')).toBe(true);
+    expect(r1 !== 'invalid' && r1.practices.includes('peace')).toBe(true);
   });
   it('accepts ALL → all 12 practices', () => {
     const r = parseGoals('ALL');
     if (r === 'invalid') throw new Error('expected parse');
-    expect(r.goals).toHaveLength(12);
+    expect(r.practices).toHaveLength(12);
     expect(r.matchedAll).toBe(true);
   });
   it('accepts level shorthand "Self" → integrity/purpose/accountability', () => {
     const r = parseGoals('Self');
     if (r === 'invalid') throw new Error('expected parse');
-    expect(r.goals).toContain('integrity');
-    expect(r.goals).toContain('purpose');
-    expect(r.goals).toContain('accountability');
+    expect(r.practices).toContain('integrity');
+    expect(r.practices).toContain('purpose');
+    expect(r.practices).toContain('accountability');
   });
   it('fuzzy-matches typos within edit distance 2', () => {
     const r1 = parseGoals('humilty'); // missing 'i'
-    expect(r1 !== 'invalid' && r1.goals.includes('humility')).toBe(true);
+    expect(r1 !== 'invalid' && r1.practices.includes('humility')).toBe(true);
     const r2 = parseGoals('empthy'); // missing 'a'
-    expect(r2 !== 'invalid' && r2.goals.includes('empathy')).toBe(true);
+    expect(r2 !== 'invalid' && r2.practices.includes('empathy')).toBe(true);
   });
   it('rejects nonsense', () => {
     expect(parseGoals('asdfghjkl')).toBe('invalid');
@@ -157,24 +157,19 @@ describe('parseLocation', () => {
     expect(parseLocation('rather not')).toBe('skip');
     expect(parseLocation('private')).toBe('skip');
   });
-  it('detects Mogadishu as non-diaspora', () => {
+  it('returns the trimmed literal + default timezone for Mogadishu', () => {
     const r = parseLocation('Mogadishu, Somalia');
     if (r === 'skip') {
       throw new Error('expected location');
     }
-    expect(r.isDiaspora).toBe(false);
+    expect(r.literal).toBe('Mogadishu, Somalia');
     expect(r.timezone).toBe('Africa/Mogadishu');
   });
-  it('detects Hargeisa as non-diaspora', () => {
-    const r = parseLocation('Hargeisa');
-    expect(r !== 'skip' && r.isDiaspora === false).toBe(true);
-  });
-  it('detects Nairobi as non-diaspora (Horn of Africa)', () => {
-    const r = parseLocation('Nairobi, Kenya');
-    expect(r !== 'skip' && r.isDiaspora === false).toBe(true);
-  });
-  it('detects Minneapolis as diaspora', () => {
+  it('returns the trimmed literal for Minneapolis', () => {
     const r = parseLocation('Minneapolis, MN, USA');
-    expect(r !== 'skip' && r.isDiaspora === true).toBe(true);
+    if (r === 'skip') {
+      throw new Error('expected location');
+    }
+    expect(r.literal).toBe('Minneapolis, MN, USA');
   });
 });

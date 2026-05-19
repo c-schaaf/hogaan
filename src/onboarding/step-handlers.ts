@@ -38,8 +38,6 @@ export interface StepResult {
     experienceBand: ExperienceBand;
     location: string;
     timezone: string;
-    isDiaspora: boolean;
-    goals: GoalOption[];
     mappedPractices: string[];
     needsProfileReview: boolean;
   }>;
@@ -91,7 +89,6 @@ export function handleGoalReply(
         newStep: 7,
         defaultsApplied: true,
         dataUpdate: {
-          goals,
           mappedPractices: goalsToPractices(goals),
           needsProfileReview: true,
         },
@@ -100,12 +97,11 @@ export function handleGoalReply(
     return { outboundBody: GOAL_RETRY_PROMPT, newStep: 3, defaultsApplied: false };
   }
   return {
-    outboundBody: formatGoalAckPlusCoachingPrompt(parsed.goals),
+    outboundBody: formatGoalAckPlusCoachingPrompt(parsed.practices),
     newStep: 7,
     defaultsApplied: false,
     dataUpdate: {
-      goals: parsed.goals,
-      mappedPractices: goalsToPractices(parsed.goals),
+      mappedPractices: goalsToPractices(parsed.practices),
     },
   };
 }
@@ -152,7 +148,7 @@ export function handleLocationReply(text: string): StepResult {
       newStep: 6,
       defaultsApplied: false,
       // Default timezone per build plan open question §5: East Africa Time.
-      dataUpdate: { timezone: 'Africa/Mogadishu', isDiaspora: false },
+      dataUpdate: { timezone: 'Africa/Mogadishu' },
     };
   }
   return {
@@ -162,7 +158,6 @@ export function handleLocationReply(text: string): StepResult {
     dataUpdate: {
       location: parsed.literal,
       timezone: parsed.timezone,
-      isDiaspora: parsed.isDiaspora,
     },
   };
 }

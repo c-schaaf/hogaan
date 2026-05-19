@@ -1,7 +1,7 @@
 # 01 — Web Auth + Onboarding
 
 **Status:** living contract — update in the same PR that changes this process.
-**Last reviewed:** 2026-05-18
+**Last reviewed:** 2026-05-19
 
 ## Purpose
 

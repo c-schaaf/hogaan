@@ -73,7 +73,7 @@ export interface OnboardingInboundEvent {
   body: string;
   /** Receive timestamp; defaults to now. Tests override for resume scenarios. */
   receivedAt: Date;
-  /** Inbound message id from Twilio (for trace propagation). */
+  /** Inbound provider message id (for trace propagation). */
   inboundMessageId: string;
 }
 
@@ -84,7 +84,7 @@ export interface OnboardingResult {
   /** Outbound message dispatched (or queued via Process #11). */
   outboundCorrelationId?: string;
   outboundWaMessageId?: string;
-  /** When E1/E2/E7 fire, the cohort the user redeemed into (if any). */
+  /** Reserved. Was the cohort the user redeemed into pre-SCRUM-41. */
   cohortId?: CohortId;
   /** Practice mapping derived from the chosen goal. */
   mappedPractices?: PracticeTag[];

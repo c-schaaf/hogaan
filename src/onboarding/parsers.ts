@@ -136,8 +136,6 @@ export interface PracticeParseResult {
   matchedAll: boolean;
 }
 
-export type GoalParseResult = PracticeParseResult & { goals: PracticeTag[] };
-
 function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
@@ -218,13 +216,11 @@ export function parsePractices(text: string): PracticeParseResult | 'invalid' {
 }
 
 /**
- * Backwards-compat shim — previous callers used parseGoals(...).goals.
- * parsePractices returns .practices; this wrapper aliases.
+ * Public name for the practice picker. Returns the matched practice tags
+ * plus a flag indicating whether the user signaled "all twelve".
  */
-export function parseGoals(text: string): GoalParseResult | 'invalid' {
-  const r = parsePractices(text);
-  if (r === 'invalid') return 'invalid';
-  return { ...r, goals: r.practices };
+export function parseGoals(text: string): PracticeParseResult | 'invalid' {
+  return parsePractices(text);
 }
 
 /**
@@ -419,40 +415,14 @@ export function parseExperienceBand(text: string): ExperienceBand | 'invalid' {
 }
 
 /**
- * Location parser. Returns the literal string + a heuristic guess at
- * isDiaspora. "skip" / "private" / "rather not" → no location.
- *
- * Diaspora detection v1: reject countries inside Horn of Africa region as
- * non-diaspora (Somalia, Kenya, Ethiopia, Djibouti). Anything else with a
- * country-like token → diaspora. Tests pin a few common cases; Phase 2
- * widens via geocoding (PRD plan §6.5).
+ * Location parser. Returns the literal string. "skip" / "private" /
+ * "rather not" → no location. Timezone defaults to Africa/Mogadishu.
  */
 export interface LocationParseResult {
   literal: string;
-  isDiaspora: boolean;
   /** IANA tz best-guess. Defaults to Africa/Mogadishu (East Africa Time). */
   timezone: string;
 }
-
-const HOA_KEYWORDS = [
-  'somalia',
-  'mogadishu',
-  'hargeisa',
-  'somaliland',
-  'puntland',
-  'kismayo',
-  'baidoa',
-  'jigjiga',
-  'kenya',
-  'nairobi',
-  'mombasa',
-  'kisumu',
-  'eldoret',
-  'ethiopia',
-  'addis ababa',
-  'addis',
-  'djibouti',
-];
 
 const SKIP_TOKENS = ['skip', 'private', 'pass', 'rather not', 'no thanks', 'prefer not'];
 
@@ -464,10 +434,8 @@ export function parseLocation(text: string): LocationParseResult | 'skip' {
   if (SKIP_TOKENS.some((t) => norm === t || norm.includes(t))) {
     return 'skip';
   }
-  const isHoa = HOA_KEYWORDS.some((k) => norm.includes(k));
   return {
     literal: text.trim(),
-    isDiaspora: !isHoa,
     timezone: 'Africa/Mogadishu',
   };
 }

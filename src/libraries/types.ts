@@ -174,7 +174,7 @@ export interface DailyPrompt {
   id: string;
   /** Single practice this prompt anchors on. Drives rotation across the 12. */
   practice: PracticeTag;
-  /** WhatsApp body text (max ~300 chars; some can be quotes, some questions). */
+  /** Daily prompt body text (max ~300 chars; some can be quotes, some questions). */
   body: string;
   /** Tags for trace + future analytics ('reflection' | 'question' | 'quote' | ...). */
   kind: 'reflection' | 'question' | 'quote';

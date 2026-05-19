@@ -17,7 +17,7 @@ import { type AppConfig, requireConfig } from '../shared/secrets/config.js';
  *   2. Client sends `Authorization: Bearer <token>` on every /api/* call.
  *   3. This middleware calls supabase.auth.getUser(token) to validate.
  *   4. On first authed call we JIT-create the public.users row, keyed by
- *      `supabase_user_id`. WhatsApp users' rows are untouched.
+ *      `supabase_user_id`.
  *
  * We deliberately use the REST validate path (getUser) instead of local
  * JWT verify so we don't have to grab SUPABASE_JWT_SECRET from the

@@ -1,7 +1,7 @@
 # 02 — Coaching Turn
 
 **Status:** living contract — update in the same PR that changes this process.
-**Last reviewed:** 2026-05-18 (updated per SCRUM-43/47 cluster cleanup).
+**Last reviewed:** 2026-05-19.
 
 ## Purpose
 

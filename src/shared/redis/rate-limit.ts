@@ -5,8 +5,8 @@ import type { RedisBundle } from './client.js';
  * Process #11 Step 6 token-bucket rate limiter.
  *
  * Three independent limits:
- *   - perSecond: outbound throughput cap (e.g. WhatsApp Tier 1 ~80/sec).
- *   - perDay: rolling daily cap (e.g. Tier 1 1,000 unique recipients/day).
+ *   - perSecond: outbound throughput cap.
+ *   - perDay: rolling daily cap.
  *   - perUser: anti-spam cap (e.g. max N outbound to one user per hour).
  *
  * Critical-priority messages (crisis resources) bypass perUser but NOT perDay

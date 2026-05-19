@@ -22,24 +22,24 @@ export interface CoachingInbound {
   phoneHash: string;
   /** Plaintext user message body. */
   body: string;
-  /** Optional media URLs from Twilio inbound. Non-empty triggers Step 1 media branch. */
+  /** Optional inbound media URLs. Non-empty triggers Step 1 media branch. */
   mediaUrls: string[];
-  /** Twilio inbound MessageSid — for trace propagation + idempotency. */
+  /** Inbound provider message id — for trace propagation + idempotency. */
   inboundMessageId: string;
   receivedAt: Date;
-  /** Trace ID — typically the Fastify request ID propagated from the webhook. */
+  /** Trace ID — typically the Fastify request ID propagated from the caller. */
   traceId: string;
   /**
-   * Delivery channel. Defaults to 'whatsapp' if undefined (preserves the
-   * pre-Phase-B webhook caller signature). When 'web', sendBody short-
-   * circuits the Twilio dispatch — the responseText is returned to the
-   * caller via HTTP instead.
+   * Delivery channel. The legacy 'whatsapp' value is retained for the
+   * type union so historical fixtures still parse; the live path is 'web',
+   * which short-circuits external dispatch and returns the responseText
+   * via HTTP instead.
    */
   channel?: 'whatsapp' | 'web';
   /**
    * Web "Private session" toggle. When true, downstream persistence
-   * (post-turn writes, memory) is skipped for this turn. Ignored on
-   * whatsapp channel. See sessions.is_private column.
+   * (post-turn writes, memory) is skipped for this turn. See
+   * sessions.is_private column.
    */
   isPrivate?: boolean;
 }
@@ -75,7 +75,7 @@ export interface CoachingTurnResult {
   endEvent: CoachingEndEvent;
   /** When the response was dispatched, this is its body. Empty for crisis/silent-drop/etc. */
   responseText: string;
-  /** Twilio waMessageId when delivery succeeded. */
+  /** Provider message id when delivery succeeded. */
   waMessageId?: string;
   /** Practice + level the turn anchored on (if applicable). */
   practiceTag: PracticeTag | null;

@@ -35,8 +35,7 @@ export const users = pgTable('users', {
   /**
    * Supabase Auth uuid (auth.users.id). Populated JIT on first /api/*
    * call from a Supabase-authed session. Unique-when-not-null via the
-   * partial index in drizzle/0008_supabase_auth.sql. WhatsApp users
-   * keep this NULL.
+   * partial index in drizzle/0008_supabase_auth.sql.
    */
   supabaseUserId: uuid('supabase_user_id'),
   status: userStatus('status').notNull().default('provisional'),
