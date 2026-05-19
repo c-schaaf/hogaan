@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, sql as drizzleSql } from 'drizzle-orm';
+import { and, desc, eq, gt, lt, sql as drizzleSql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { fetchCoachingContext } from '../coaching/context-fetch.js';
 import { reportP2 } from '../incident-handling/index.js';
@@ -246,60 +246,104 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   });
 
   // GET /api/sessions --------------------------------------------------
-  app.get('/api/sessions', async (req, reply) => {
-    const session = await requireSupabaseSession(req, reply, opts);
-    if (session === null) return;
+  // Cursor-style pagination: pass ?before=<sessionId>&limit=20 to fetch the
+  // next page after the given session. Returns { sessions, hasMore }.
+  // Default page size is 20; max is 100.
+  app.get<{ Querystring: { before?: string; limit?: string } }>(
+    '/api/sessions',
+    async (req, reply) => {
+      const session = await requireSupabaseSession(req, reply, opts);
+      if (session === null) return;
 
-    const rows = await opts.db
-      .select({
-        id: sessions.id,
-        title: sessions.title,
-        startedAt: sessions.startedAt,
-        lastTurnAt: sessions.lastTurnAt,
-        turnCount: sessions.turnCount,
-      })
-      .from(sessions)
-      .where(
-        and(
-          eq(sessions.userId, session.userId),
-          eq(sessions.isPrivate, false),
-          gt(sessions.turnCount, 0),
-        ),
-      )
-      .orderBy(desc(sessions.lastTurnAt))
-      .limit(200);
+      const parsedLimit = Number.parseInt(req.query.limit ?? '20', 10);
+      const pageLimit =
+        Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 20;
+      const beforeId = req.query.before?.trim();
 
-    const now = Date.now();
-    const oneWeek = 7 * 24 * 60 * 60 * 1000;
-    const oneMonth = 30 * 24 * 60 * 60 * 1000;
+      // If a cursor was provided, resolve it to the cursor row's lastTurnAt so
+      // we can filter strictly older sessions. Cursor must belong to the
+      // requesting user (defence-in-depth; otherwise an attacker could probe
+      // for the existence of arbitrary session IDs).
+      let cursorLastTurnAt: Date | null = null;
+      if (beforeId !== undefined && beforeId.length > 0) {
+        const cur = await opts.db
+          .select({
+            id: sessions.id,
+            userId: sessions.userId,
+            lastTurnAt: sessions.lastTurnAt,
+          })
+          .from(sessions)
+          .where(eq(sessions.id, beforeId))
+          .limit(1);
+        const c = cur[0];
+        if (c !== undefined && c.userId === session.userId) {
+          cursorLastTurnAt = c.lastTurnAt;
+        }
+        // If the cursor is unknown or not owned, we silently fall through and
+        // return the first page rather than 404-ing. This keeps the client
+        // resilient to stale cursors (e.g. session was deleted in another tab).
+      }
 
-    type Group = 'This week' | 'Earlier this month' | 'Older';
-    const groupOf = (d: Date): Group => {
-      const age = now - d.getTime();
-      if (age < oneWeek) return 'This week';
-      if (age < oneMonth) return 'Earlier this month';
-      return 'Older';
-    };
-    const relative = (d: Date): string => {
-      const age = now - d.getTime();
-      const days = Math.floor(age / (24 * 60 * 60 * 1000));
-      if (days < 1) return 'Today';
-      if (days === 1) return 'Yesterday';
-      if (days < 7) return `${days} days ago`;
-      if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
-      return `${Math.floor(days / 30)} months ago`;
-    };
+      const baseConditions = [
+        eq(sessions.userId, session.userId),
+        eq(sessions.isPrivate, false),
+        gt(sessions.turnCount, 0),
+      ];
+      if (cursorLastTurnAt !== null) {
+        baseConditions.push(lt(sessions.lastTurnAt, cursorLastTurnAt));
+      }
 
-    return reply.send({
-      sessions: rows.map((r) => ({
-        id: r.id,
-        title: r.title ?? 'Untitled session',
-        msgs: r.turnCount,
-        when: relative(r.lastTurnAt),
-        group: groupOf(r.lastTurnAt),
-      })),
-    });
-  });
+      // Fetch one more than the page size so we can detect hasMore without a
+      // separate count query.
+      const rows = await opts.db
+        .select({
+          id: sessions.id,
+          title: sessions.title,
+          startedAt: sessions.startedAt,
+          lastTurnAt: sessions.lastTurnAt,
+          turnCount: sessions.turnCount,
+        })
+        .from(sessions)
+        .where(and(...baseConditions))
+        .orderBy(desc(sessions.lastTurnAt))
+        .limit(pageLimit + 1);
+
+      const hasMore = rows.length > pageLimit;
+      const pageRows = hasMore ? rows.slice(0, pageLimit) : rows;
+
+      const now = Date.now();
+      const oneWeek = 7 * 24 * 60 * 60 * 1000;
+      const oneMonth = 30 * 24 * 60 * 60 * 1000;
+
+      type Group = 'This week' | 'Earlier this month' | 'Older';
+      const groupOf = (d: Date): Group => {
+        const age = now - d.getTime();
+        if (age < oneWeek) return 'This week';
+        if (age < oneMonth) return 'Earlier this month';
+        return 'Older';
+      };
+      const relative = (d: Date): string => {
+        const age = now - d.getTime();
+        const days = Math.floor(age / (24 * 60 * 60 * 1000));
+        if (days < 1) return 'Today';
+        if (days === 1) return 'Yesterday';
+        if (days < 7) return `${days} days ago`;
+        if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+        return `${Math.floor(days / 30)} months ago`;
+      };
+
+      return reply.send({
+        sessions: pageRows.map((r) => ({
+          id: r.id,
+          title: r.title ?? 'Untitled session',
+          msgs: r.turnCount,
+          when: relative(r.lastTurnAt),
+          group: groupOf(r.lastTurnAt),
+        })),
+        hasMore,
+      });
+    },
+  );
 
   // GET /api/sessions/:id ----------------------------------------------
   app.get<{ Params: { id: string } }>('/api/sessions/:id', async (req, reply) => {

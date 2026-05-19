@@ -251,6 +251,32 @@
   background: var(--gold-tint);
 }
 
+.ses-loadmore {
+  display: flex;
+  justify-content: center;
+  margin: 18px 0 8px;
+}
+.ses-loadmore-btn {
+  appearance: none;
+  border: 1px solid var(--gold);
+  background: transparent;
+  color: var(--gold-deep);
+  font-family: var(--font-b);
+  font-weight: 600;
+  font-size: 13.5px;
+  padding: 10px 22px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease);
+}
+.ses-loadmore-btn:hover:not(:disabled) {
+  background: var(--gold-tint);
+}
+.ses-loadmore-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .ses-foot-space {
   height: 100px;
 }

@@ -183,7 +183,14 @@ export const api = {
     call<ChatTurnResponse>('/api/chat/turn', { method: 'POST', body }),
   turnStream,
   sessions: {
-    list: () => call<{ sessions: SessionSummary[] }>('/api/sessions'),
+    list: (opts: { before?: string; limit?: number } = {}) => {
+      const params = new URLSearchParams();
+      if (opts.before !== undefined) params.set('before', opts.before);
+      if (opts.limit !== undefined) params.set('limit', String(opts.limit));
+      const qs = params.toString();
+      const path = qs.length > 0 ? `/api/sessions?${qs}` : '/api/sessions';
+      return call<{ sessions: SessionSummary[]; hasMore: boolean }>(path);
+    },
     get: (id: string) => call<SessionDetail>(`/api/sessions/${id}`),
     del: (id: string) => call<{ ok: true }>(`/api/sessions/${id}`, { method: 'DELETE' }),
   },
