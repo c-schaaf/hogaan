@@ -5,6 +5,7 @@ import { reportP2 } from '../incident-handling/index.js';
 import { assemblePrompt, PromptAssemblyError } from '../prompt-assembly/index.js';
 import { resolveSession } from '../session-lifecycle/index.js';
 import type { Database } from '../shared/db/client.js';
+import { decryptPlaintext, encryptPlaintext } from '../shared/db/encryption.js';
 import { sessions } from '../shared/db/schema/sessions.js';
 import { turns } from '../shared/db/schema/turns.js';
 import { users } from '../shared/db/schema/users.js';
@@ -176,16 +177,8 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
             userId,
             userMessage: message,
             responseText: accumulated,
-            intent: 'Coaching',
-            practiceTag: 'integrity',
-            levelTag: 'self',
-            taggerConfidence: '0',
-            responseMode: 'FullCoachingResponse',
             modelUsed: final?.modelUsed ?? 'claude-haiku-4-5',
-            fallbackPath: 'none',
-            qaOutcome: 'E1_ApprovedFirstAttempt',
             latencyMs,
-            terminalEvent: 'E1_TurnCompleted',
           })
           .returning({ id: turns.id });
         turnId = inserted[0]?.id ?? null;
@@ -521,9 +514,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         id: users.id,
         email: users.email,
         mappedPractices: users.mappedPractices,
-        commStyle: users.commStyle,
-        responseDepth: users.responseDepth,
-        profileFlags: users.profileFlags,
+        fullNameEncrypted: users.fullNameEncrypted,
         onboardingCompletedAt: users.onboardingCompletedAt,
         status: users.status,
       })
@@ -533,13 +524,16 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     const u = row[0];
     if (u === undefined) return reply.code(404).send({ error: 'user_not_found' });
 
-    const fullName =
-      typeof u.profileFlags === 'object' && u.profileFlags !== null && 'fullName' in u.profileFlags
-        ? (() => {
-            const v = (u.profileFlags as { fullName?: unknown }).fullName;
-            return typeof v === 'string' ? v : '';
-          })()
-        : '';
+    // fullName precedence: stored (decrypted) > Supabase user_metadata > ''.
+    let fullName = '';
+    if (typeof u.fullNameEncrypted === 'string' && u.fullNameEncrypted.length > 0) {
+      try {
+        fullName = decryptPlaintext(opts.config, u.fullNameEncrypted);
+      } catch {
+        fullName = '';
+      }
+    }
+    if (fullName === '') fullName = session.fullName;
 
     return reply.send({
       id: u.id,
@@ -547,8 +541,6 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       fullName,
       onboarded: u.status === 'onboarded' || u.onboardingCompletedAt !== null,
       mappedPractices: Array.isArray(u.mappedPractices) ? (u.mappedPractices as string[]) : [],
-      commStyle: u.commStyle ?? null,
-      responseDepth: u.responseDepth ?? null,
     });
   });
 
@@ -572,8 +564,6 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     Body: Partial<{
       fullName: string;
       mappedPractices: string[];
-      commStyle: 'direct' | 'warm';
-      responseDepth: 'quick' | 'standard' | 'deep';
       finishOnboarding: boolean;
     }>;
   }>('/api/profile', async (req, reply) => {
@@ -586,19 +576,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     if (typeof req.body.fullName === 'string') {
       if (req.body.fullName.length > 200)
         return reply.code(400).send({ error: 'fullName_too_long' });
-      // Merge into profileFlags JSON (full_name_encrypted writes come later).
-      const row = await opts.db
-        .select({ profileFlags: users.profileFlags })
-        .from(users)
-        .where(eq(users.id, session.userId))
-        .limit(1);
-      const existing =
-        row[0] !== undefined &&
-        typeof row[0].profileFlags === 'object' &&
-        row[0].profileFlags !== null
-          ? (row[0].profileFlags as Record<string, unknown>)
-          : {};
-      update['profileFlags'] = { ...existing, fullName: req.body.fullName };
+      update['fullNameEncrypted'] = encryptPlaintext(opts.config, req.body.fullName);
     }
 
     if (Array.isArray(req.body.mappedPractices)) {
@@ -607,16 +585,6 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       if (invalid.length > 0)
         return reply.code(400).send({ error: 'invalid_practice', values: invalid });
       update['mappedPractices'] = incoming;
-    }
-    if (req.body.commStyle === 'direct' || req.body.commStyle === 'warm') {
-      update['commStyle'] = req.body.commStyle;
-    }
-    if (
-      req.body.responseDepth === 'quick' ||
-      req.body.responseDepth === 'standard' ||
-      req.body.responseDepth === 'deep'
-    ) {
-      update['responseDepth'] = req.body.responseDepth;
     }
     if (req.body.finishOnboarding === true) {
       update['status'] = 'onboarded';

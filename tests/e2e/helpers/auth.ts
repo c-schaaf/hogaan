@@ -24,8 +24,6 @@ const FAKE_ME = {
   email: TEST_EMAIL,
   onboarded: true,
   mappedPractices: ['Integrity', 'Empathy', 'Peace'],
-  commStyle: null,
-  responseDepth: null,
 };
 
 /**

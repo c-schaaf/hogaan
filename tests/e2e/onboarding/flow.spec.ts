@@ -43,8 +43,6 @@ test.describe('Onboarding flow', () => {
             email: 'test@test.com',
             onboarded: false,
             mappedPractices: [],
-            commStyle: null,
-            responseDepth: null,
           }),
         });
       }

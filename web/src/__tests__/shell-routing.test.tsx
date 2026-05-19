@@ -84,8 +84,6 @@ const ONBOARDED_PROFILE = {
   email: 'test@example.com',
   onboarded: true,
   mappedPractices: ['Integrity'],
-  commStyle: null,
-  responseDepth: null,
 };
 
 beforeEach(() => {

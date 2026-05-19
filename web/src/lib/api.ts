@@ -13,8 +13,6 @@ export interface MeResponse {
   email: string;
   onboarded: boolean;
   mappedPractices: string[];
-  commStyle: 'direct' | 'warm' | null;
-  responseDepth: 'quick' | 'standard' | 'deep' | null;
 }
 
 export interface ChatTurnRequest {
@@ -52,8 +50,6 @@ export interface SessionDetail {
 export interface ProfilePatchBody {
   fullName?: string;
   mappedPractices?: string[];
-  commStyle?: 'direct' | 'warm';
-  responseDepth?: 'quick' | 'standard' | 'deep';
   finishOnboarding?: boolean;
 }
 
