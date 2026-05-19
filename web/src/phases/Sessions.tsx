@@ -97,24 +97,46 @@ interface Props {
 
 const ORDER: SessionSummary['group'][] = ['This week', 'Earlier this month', 'Older'];
 
+const PAGE_SIZE = 20;
+
 export function Sessions({ onBack, onOpen, onNav }: Props) {
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<SessionSummary[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     void (async () => {
       try {
-        const resp = await api.sessions.list();
+        const resp = await api.sessions.list({ limit: PAGE_SIZE });
         setRows(fromApi(resp.sessions));
+        setHasMore(resp.hasMore);
       } catch (err) {
         console.error('sessions list failed', err);
         setRows([]);
+        setHasMore(false);
       } finally {
         setLoading(false);
       }
     })();
   }, []);
+
+  const onLoadMore = async () => {
+    if (loadingMore || !hasMore || rows === null || rows.length === 0) return;
+    const last = rows[rows.length - 1];
+    if (last === undefined) return;
+    setLoadingMore(true);
+    try {
+      const resp = await api.sessions.list({ before: last.id, limit: PAGE_SIZE });
+      setRows((prev) => [...(prev ?? []), ...fromApi(resp.sessions)]);
+      setHasMore(resp.hasMore);
+    } catch (err) {
+      console.error('sessions load-more failed', err);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -186,6 +208,18 @@ export function Sessions({ onBack, onOpen, onNav }: Props) {
                     </section>
                   );
                 })}
+                {hasMore && query.trim().length === 0 && (
+                  <div className="ses-loadmore">
+                    <button
+                      type="button"
+                      className="ses-loadmore-btn"
+                      onClick={() => void onLoadMore()}
+                      disabled={loadingMore}
+                    >
+                      {loadingMore ? 'Loading…' : 'Load more'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

@@ -110,10 +110,94 @@ describe('GET /api/sessions', () => {
     const res = await app.inject({ method: 'GET', url: '/api/sessions' });
 
     expect(res.statusCode).toBe(200);
-    const body = res.json<{ sessions: unknown[] }>();
+    const body = res.json<{ sessions: unknown[]; hasMore: boolean }>();
     expect(body.sessions).toHaveLength(1);
     expect((body.sessions[0] as Record<string, unknown>).title).toBe('Leadership Q');
     expect((body.sessions[0] as Record<string, unknown>).group).toBe('This week');
+    expect(body.hasMore).toBe(false);
+  });
+
+  it('paginates: returns first 20 + hasMore=true, then rest + hasMore=false', async () => {
+    const now = new Date();
+    // Build 30 session rows, lastTurnAt decreasing
+    const all = Array.from({ length: 30 }, (_, i) => ({
+      id: `sess-${i.toString().padStart(2, '0')}`,
+      title: `Session ${i}`,
+      startedAt: new Date(now.getTime() - i * 60 * 60 * 1000),
+      lastTurnAt: new Date(now.getTime() - i * 60 * 60 * 1000),
+      turnCount: 3,
+      userId: TEST_USER_ID,
+    }));
+
+    // Stub a db that interprets the chain. The first page call uses
+    // .from().where().orderBy().limit() and resolves to limit+1 rows
+    // (server fetches PAGE+1 to detect hasMore). The cursor-resolution call
+    // for ?before= uses .from().where().limit() (no orderBy) and resolves
+    // to the cursor row.
+    let lastLimitArg = 0;
+    let lastCursorId: string | null = null;
+
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: (whereExpr: unknown) => {
+            // Peek at the raw expression — we can't introspect drizzle easily
+            // here, so we rely on the test driving cursor via the query
+            // string we parse from req. Instead, we'll branch on whether
+            // orderBy() is chained.
+            void whereExpr;
+            return {
+              limit: (n: number) => {
+                // This branch = cursor lookup (no orderBy).
+                lastLimitArg = n;
+                const row = all.find((r) => r.id === lastCursorId);
+                return Promise.resolve(row !== undefined ? [row] : []);
+              },
+              orderBy: () => ({
+                limit: (n: number) => {
+                  // Page fetch (limit + 1 = 21).
+                  lastLimitArg = n;
+                  let pool = all;
+                  if (lastCursorId !== null) {
+                    const cur = all.find((r) => r.id === lastCursorId);
+                    if (cur !== undefined) {
+                      pool = all.filter((r) => r.lastTurnAt.getTime() < cur.lastTurnAt.getTime());
+                    }
+                  }
+                  return Promise.resolve(pool.slice(0, n));
+                },
+              }),
+            };
+          },
+        }),
+      }),
+      insert: () => ({ values: () => ({ returning: () => Promise.resolve([]) }) }),
+      update: () => ({ set: () => ({ where: () => Promise.resolve([]) }) }),
+      delete: () => ({ where: () => Promise.resolve([]) }),
+    } as never;
+
+    const app = await buildApp(db);
+
+    // First page: no cursor.
+    lastCursorId = null;
+    const r1 = await app.inject({ method: 'GET', url: '/api/sessions?limit=20' });
+    expect(r1.statusCode).toBe(200);
+    const b1 = r1.json<{ sessions: { id: string }[]; hasMore: boolean }>();
+    expect(b1.sessions).toHaveLength(20);
+    expect(b1.hasMore).toBe(true);
+    expect(lastLimitArg).toBe(21);
+
+    // Second page: cursor = last id from first page.
+    const cursorId = b1.sessions[b1.sessions.length - 1]!.id;
+    lastCursorId = cursorId;
+    const r2 = await app.inject({
+      method: 'GET',
+      url: `/api/sessions?limit=20&before=${cursorId}`,
+    });
+    expect(r2.statusCode).toBe(200);
+    const b2 = r2.json<{ sessions: { id: string }[]; hasMore: boolean }>();
+    expect(b2.sessions).toHaveLength(10);
+    expect(b2.hasMore).toBe(false);
   });
 
   it('returns 401 when not authenticated', async () => {

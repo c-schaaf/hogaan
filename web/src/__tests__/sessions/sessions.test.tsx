@@ -132,6 +132,63 @@ describe('Sessions', () => {
     });
   });
 
+  it('shows Load more button when hasMore=true and appends next page on click', async () => {
+    mockSessionsList
+      .mockResolvedValueOnce({
+        sessions: [
+          { id: 's1', title: 'First Session', msgs: 5, when: '1 day ago', group: 'This week' },
+        ],
+        hasMore: true,
+      })
+      .mockResolvedValueOnce({
+        sessions: [
+          {
+            id: 's2',
+            title: 'Second Session',
+            msgs: 3,
+            when: '8 days ago',
+            group: 'Earlier this month',
+          },
+        ],
+        hasMore: false,
+      });
+
+    render(<Sessions {...defaultProps} />);
+    await waitFor(() => expect(screen.getByText('First Session')).toBeTruthy());
+
+    const loadMore = screen.getByText('Load more');
+    expect(loadMore).toBeTruthy();
+
+    fireEvent.click(loadMore);
+
+    await waitFor(() => {
+      expect(screen.getByText('First Session')).toBeTruthy();
+      expect(screen.getByText('Second Session')).toBeTruthy();
+    });
+
+    // After last page, the button should be gone.
+    await waitFor(() => {
+      expect(screen.queryByText('Load more')).toBeNull();
+    });
+
+    // Verify cursor was used on second call.
+    expect(mockSessionsList).toHaveBeenCalledTimes(2);
+    expect(mockSessionsList).toHaveBeenNthCalledWith(2, { before: 's1', limit: 20 });
+  });
+
+  it('does not show Load more when hasMore=false', async () => {
+    mockSessionsList.mockResolvedValue({
+      sessions: [
+        { id: 's1', title: 'Only Session', msgs: 1, when: '1 day ago', group: 'This week' },
+      ],
+      hasMore: false,
+    });
+
+    render(<Sessions {...defaultProps} />);
+    await waitFor(() => expect(screen.getByText('Only Session')).toBeTruthy());
+    expect(screen.queryByText('Load more')).toBeNull();
+  });
+
   it('calls onOpen when a session row is clicked', async () => {
     mockSessionsList.mockResolvedValue({
       sessions: [

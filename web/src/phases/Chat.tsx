@@ -167,7 +167,9 @@ export function Chat({
   // so a freshly-generated session title appears without a page reload.
   const reloadPast = async () => {
     try {
-      const resp = await api.sessions.list();
+      // Sidebar/drawer: pull a generous page so the recent-sessions list
+      // stays populated. Pagination (Sessions phase) uses the default 20.
+      const resp = await api.sessions.list({ limit: 100 });
       const others = resp.sessions.filter((s) => s.id !== sessionId);
       setPastSessions(others);
       if (sessionId !== null) {
