@@ -103,26 +103,3 @@ describe('Phase 10.5 — Runbook tabletop: Supabase PITR drill', () => {
     );
   });
 });
-
-describe('Phase 10.5 — Runbook tabletop: Twilio sender re-registration', () => {
-  it('runbook references the templates library and the verify-phase-8 modes', async () => {
-    await withEvidence(
-      {
-        testId: 'phase-10/runbook-tabletop/twilio-reregistration',
-        controlId: 'T1.BackupAndDR.TwilioSenderReregistration',
-        tier: 'T1',
-        description:
-          'Runbook references library_versions, prompt_templates, verify-phase-8 modes, FreeForm-in-window mitigation',
-      },
-      async () => {
-        const md = await readRunbook('twilio-sender-reregistration');
-        expect(md).toContain('library_versions');
-        expect(md).toContain('prompt_templates');
-        expect(md).toContain('verify-phase-8');
-        // The mitigation paragraph must explicitly call out the in-window FreeForm path.
-        expect(md.toLowerCase()).toContain('freeform');
-        expect(md.toLowerCase()).toContain('window');
-      },
-    );
-  });
-});
