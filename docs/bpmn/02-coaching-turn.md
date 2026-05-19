@@ -86,7 +86,5 @@ orchestrator (triage / tagger / quality-check) were removed in SCRUM-43.
 
 ## Known issues
 
-- **SCRUM-48** — Selected practices, comm style, response depth not piped into
-  the LLM prompt. Personalization gap.
 - **SCRUM-50** — Active prompt includes a crisis-protocol section. To be
   rewritten as leadership-only.
