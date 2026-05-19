@@ -21,7 +21,7 @@
     "test:watch": "vitest",
     "test:web": "vitest run --config web/vitest.config.ts",
     "test:web:watch": "vitest --config web/vitest.config.ts",
-    "test:routes": "vitest run --dir tests/web-api",
+    "test:routes": "vitest run tests/web-api",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:all": "pnpm test && pnpm test:web && pnpm test:routes && pnpm test:e2e",
