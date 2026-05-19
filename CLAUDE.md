@@ -33,8 +33,8 @@ support.** The AI disclaimer covers safety framing.
 - Daily coaching prompts
 - Paid tiers ($9–$19/month premium with personalized tracks)
 - Cohort / certification offering
-- User-facing rehearsal of difficult conversations (`src/scenario-learning/`
-  exists as a state machine but isn't wired to the UI yet)
+- User-facing rehearsal of difficult conversations (the prototype state
+  machine was retired 2026-05-19; revisit when the feature ships)
 
 ## Read before changing behavior
 
@@ -63,7 +63,6 @@ src/
 ├── onboarding/        # First-name, years, practice selection, consent
 ├── coaching/          # Legacy non-streaming orchestrator (vestigial; streaming path bypasses it)
 ├── prompt-assembly/   # Build the LLM prompt from libraries + session context
-├── scenario-learning/ # Multi-step guided exercises (not user-facing yet)
 ├── session-lifecycle/ # Active/idle/archive + continue-past-session
 ├── identity/          # Supabase JWT validation + audit log (fail-CLOSED)
 ├── memory/            # pgvector read/write

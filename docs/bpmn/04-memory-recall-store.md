@@ -1,7 +1,7 @@
 # 04 — Memory Recall + Store
 
 **Status:** living contract — update in the same PR that changes this process.
-**Last reviewed:** 2026-05-18
+**Last reviewed:** 2026-05-19 (path fixups for memory/{read,write}.ts).
 
 ## Purpose
 
@@ -67,8 +67,8 @@ user asks something new.
 
 ## Key files
 
-- `src/memory/recall.ts` — embed + similarity search
-- `src/memory/store.ts` — embed + insert
+- `src/memory/read.ts` — embed + similarity search
+- `src/memory/write.ts` — embed + insert
 - `src/prompt-assembly/blocks.ts` — `buildMemoryBlock`
 - `src/shared/llm/voyage.ts` — Voyage embeddings wrapper
 - `src/shared/db/schema/memory.ts`
