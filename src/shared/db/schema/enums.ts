@@ -19,33 +19,6 @@ export const userStatus = pgEnum('user_status', [
   'onboarding_error',
 ]);
 
-export const accessCodeStatus = pgEnum('access_code_status', [
-  'unredeemed',
-  'redeemed',
-  'expired',
-  'revoked',
-]);
-
-export const whatsappDirection = pgEnum('whatsapp_direction', ['inbound', 'outbound']);
-
-export const whatsappMessageType = pgEnum('whatsapp_message_type', ['free_form', 'template']);
-
-export const whatsappPriority = pgEnum('whatsapp_priority', ['Normal', 'High', 'Critical']);
-
-/**
- * Process #11 dispatch status:
- *   queued → dispatching → sent → delivered → read
- *                            → failed (terminal)
- */
-export const whatsappStatus = pgEnum('whatsapp_status', [
-  'queued',
-  'dispatching',
-  'sent',
-  'delivered',
-  'read',
-  'failed',
-]);
-
 export const suppressionReason = pgEnum('suppression_reason', [
   'opt_out',
   'block',
@@ -63,10 +36,3 @@ export const libraryName = pgEnum('library_name', [
 ]);
 
 export const triggerSource = pgEnum('trigger_source', ['whatsapp', 'web_session', 'web_signup']);
-
-/**
- * Sponsor portal RBAC. Two roles for Phase 9A:
- *   - sponsor_admin: scoped read access to their own sponsor's cohorts
- *   - hogaan_ops: read all sponsors / cohorts (internal staff)
- */
-export const sponsorUserRole = pgEnum('sponsor_user_role', ['sponsor_admin', 'hogaan_ops']);

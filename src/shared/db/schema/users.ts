@@ -1,5 +1,4 @@
 import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { cohorts } from './cohorts.js';
 import { userStatus } from './enums.js';
 
 /**
@@ -66,7 +65,6 @@ export const users = pgTable('users', {
   mappedPractices: jsonb('mapped_practices'),
   /** Free-form profile flags (e.g., needs_profile_review caveats, ops review notes). */
   profileFlags: jsonb('profile_flags'),
-  cohortId: uuid('cohort_id').references(() => cohorts.id, { onDelete: 'set null' }),
   onboardingCompletedAt: timestamp('onboarding_completed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
