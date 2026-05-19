@@ -81,11 +81,23 @@ export function buildUserProfileBlock(profile: InputPayload['userProfile']): str
   if (Array.isArray(profile.goals) && profile.goals.length > 0) {
     lines.push(`Goals: ${profile.goals.join(', ')}`);
   }
-  // 2026-05-13 — practices in focus / commStyle / responseDepth omitted on
-  // purpose. The v0_unified system prompt embeds the framework lens (§3) and
-  // tone calibration (§2/§5) so the model handles those organically; injecting
-  // them again here both inflates token cost and pulls the model toward a
-  // checklist register rather than the values-driven companion register.
+  // SCRUM-48 — onboarding-selected practices are piped through here so the
+  // LLM can reference the user's stated focus when shaping responses.
+  // Practices are stored lowercase (PracticeTag union); we Title-case them in
+  // the prompt so the model reads them as named concepts ("Integrity") rather
+  // than as raw tags ("integrity"). Line omitted entirely when the array is
+  // empty or undefined.
+  if (Array.isArray(profile.mappedPractices) && profile.mappedPractices.length > 0) {
+    const titled = profile.mappedPractices.map(titleCase);
+    lines.push(`Focus practices: ${titled.join(', ')}`);
+  }
+  // 2026-05-13 — first name / commStyle / responseDepth still omitted on
+  // purpose. First name is held back per CLAUDE.md hard rule #4; commStyle
+  // and responseDepth are handled organically by the v0_unified system
+  // prompt's tone calibration (§2/§5) so injecting them again inflates token
+  // cost and pulls the model toward a checklist register. SCRUM-48 added
+  // mappedPractices above because the framework lens (§3) needs to know
+  // which practices the user actually selected at onboarding.
   if (lines.length === 1) {
     lines.push('(profile is sparse — proceed without strong personalization)');
   }
@@ -103,6 +115,13 @@ export function buildUserMessageBlock(userMessage: string): string {
 
 function oneLine(s: string): string {
   return s.replace(/\s+/g, ' ').trim();
+}
+
+function titleCase(s: string): string {
+  if (s.length === 0) {
+    return s;
+  }
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /**
