@@ -274,6 +274,19 @@ export function Chat({
     }
   };
 
+  // SCRUM-54 — explicit "New Chat" reset. Clears the conversation state so
+  // the next send carries no sessionId; the server (post-SCRUM-54) treats
+  // a missing sessionId as "create a fresh session", which matches the
+  // ChatGPT mental model users now expect.
+  const startNewChat = () => {
+    setSessionId(null);
+    setItems([{ kind: 'divider', label: dividerLabel() }]);
+    setCurrentTitle('Tonight’s session');
+    setDraft('');
+    setThinking(false);
+    setDrawerOpen(false);
+  };
+
   // Auto-send the seed (when Home composed a topic) after first paint.
   useEffect(() => {
     if (seedRef.current !== null && seedRef.current !== undefined && seedRef.current.length > 0) {
@@ -305,6 +318,14 @@ export function Chat({
             <div className="ch-title">{currentTitle}</div>
             <div className="ch-sub">Practices in focus · {practices.join(', ')}</div>
           </div>
+          <button
+            type="button"
+            className="ch-new-chat"
+            onClick={startNewChat}
+            aria-label="Start a new chat"
+          >
+            New Chat
+          </button>
           <PrivacyToggle on={privateMode} onChange={setPrivateMode} />
         </div>
 

@@ -747,6 +747,24 @@
 .ch-back:hover {
   background: rgba(0, 0, 77, 0.05);
 }
+.ch-new-chat {
+  appearance: none;
+  border: 1px solid var(--hairline);
+  background: transparent;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  color: var(--ink-1);
+  font-family: var(--font-b);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ch-new-chat:hover {
+  background: rgba(0, 0, 77, 0.05);
+}
 .ch-title-wrap {
   flex: 1;
   display: flex;
