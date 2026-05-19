@@ -26,41 +26,19 @@ interface FakeRow {
 function buildDb(opts: {
   /** Row to return for the `where(userId AND id)` named-session lookup. */
   namedLookup?: FakeRow;
-  /** Row to return for the legacy `where(userId AND closedAt IS NULL)` lookup. */
-  legacyLookup?: FakeRow;
   /** Captures the row that `update(sessions).set(...)` was called with. */
   updateSpy?: ReturnType<typeof vi.fn>;
-  /** Inserted-session row that the legacy fall-through path returns. */
+  /** Inserted-session row that the no-sessionId path returns. */
   insertedRow?: FakeRow;
 }) {
-  // Each .select() call returns a fresh chain; we use call-count to switch
-  // between the named-lookup and the legacy-lookup branches.
-  let selectCalls = 0;
   return {
-    select: () => {
-      selectCalls += 1;
-      const callIdx = selectCalls;
-      return {
-        from: () => ({
-          where: () => ({
-            limit: () =>
-              Promise.resolve(
-                callIdx === 1 && opts.namedLookup !== undefined
-                  ? [opts.namedLookup]
-                  : callIdx === 1
-                    ? []
-                    : opts.legacyLookup !== undefined
-                      ? [opts.legacyLookup]
-                      : [],
-              ),
-            orderBy: () => ({
-              limit: () =>
-                Promise.resolve(opts.legacyLookup !== undefined ? [opts.legacyLookup] : []),
-            }),
-          }),
+    select: () => ({
+      from: () => ({
+        where: () => ({
+          limit: () => Promise.resolve(opts.namedLookup !== undefined ? [opts.namedLookup] : []),
         }),
-      };
-    },
+      }),
+    }),
     update: () => ({
       set: (vals: Record<string, unknown>) => ({
         where: () => {
@@ -147,20 +125,19 @@ describe('resolveSession — SCRUM-53 client sessionId', () => {
     expect(updateSpy).toHaveBeenCalledWith({ closedAt: null });
   });
 
-  it('falls through to legacy logic when the sessionId is not owned by the user', async () => {
-    // First select (named lookup) returns []; second select (legacy lookup)
-    // returns an open recent session within the 30-min window — caller
-    // continues that session, no new row created.
-    const recentLegacy: FakeRow = {
-      id: 'sess-legacy-open',
-      lastTurnAt: new Date(),
-      turnCount: 2,
-      metadata: null,
-      closedAt: null,
-    };
+  it('creates a new session silently when the sessionId is not owned by the user', async () => {
+    // Named lookup returns [] (foreign sessionId). Resolver must not 404 or
+    // leak existence — it falls through to the no-sessionId path, which now
+    // always creates a new session (SCRUM-54).
     const db = buildDb({
-      legacyLookup: recentLegacy,
       updateSpy,
+      insertedRow: {
+        id: 'sess-fresh-from-foreign',
+        lastTurnAt: new Date(),
+        turnCount: 0,
+        metadata: null,
+        closedAt: null,
+      },
     });
 
     const result = await resolveSession(db, {
@@ -168,12 +145,12 @@ describe('resolveSession — SCRUM-53 client sessionId', () => {
       sessionId: asSessionId(FOREIGN),
     });
 
-    expect(result.sessionId).toBe('sess-legacy-open');
-    expect(result.isNew).toBe(false);
-    // Did not 404 and did not leak the foreign session — silent fall-through.
+    expect(result.isNew).toBe(true);
+    expect(result.sessionId).toBe('sess-fresh-from-foreign');
+    // No leak: caller cannot distinguish "foreign id" from "no id".
   });
 
-  it('falls through to legacy logic and creates a new session when sessionId is fabricated and no legacy session exists', async () => {
+  it('creates a new session when sessionId is fabricated', async () => {
     const db = buildDb({ updateSpy });
 
     const result = await resolveSession(db, {
@@ -185,19 +162,13 @@ describe('resolveSession — SCRUM-53 client sessionId', () => {
     expect(result.sessionId).toBe('sess-new-generated');
   });
 
-  it('preserves legacy 30-min auto-split behavior when no sessionId is provided', async () => {
-    const legacyOpen: FakeRow = {
-      id: 'sess-legacy-stale',
-      lastTurnAt: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago — past idle
-      turnCount: 3,
-      metadata: null,
-      closedAt: null,
-    };
+  it('always creates a new session when no sessionId is provided (SCRUM-54)', async () => {
+    // Even if the user has a recent open session, the resolver must not
+    // continue it when no sessionId is named. Homepage / "New Chat" path.
     const db = buildDb({
-      legacyLookup: legacyOpen,
       updateSpy,
       insertedRow: {
-        id: 'sess-new-after-split',
+        id: 'sess-fresh-no-sessionid',
         lastTurnAt: new Date(),
         turnCount: 0,
         metadata: null,
@@ -207,11 +178,9 @@ describe('resolveSession — SCRUM-53 client sessionId', () => {
 
     const result = await resolveSession(db, { userId: USER });
 
-    // Stale session was closed (update fired with closedAt = lastTurnAt),
-    // then a fresh row created.
-    expect(updateSpy).toHaveBeenCalledTimes(1);
-    expect(updateSpy.mock.calls[0]?.[0]).toHaveProperty('closedAt');
     expect(result.isNew).toBe(true);
-    expect(result.sessionId).toBe('sess-new-after-split');
+    expect(result.sessionId).toBe('sess-fresh-no-sessionid');
+    // No legacy SELECT, no close-stale UPDATE — only the INSERT runs.
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 });
