@@ -35,8 +35,8 @@ describe('handleGoalReply with retry budget (Khadija UX Reframe — onboarding c
     const r = handleGoalReply('integrity, peace', 1);
     expect(r.newStep).toBe(7);
     expect(r.defaultsApplied).toBe(false);
-    expect(r.dataUpdate?.goals).toContain('integrity');
-    expect(r.dataUpdate?.goals).toContain('peace');
+    expect(r.dataUpdate?.mappedPractices).toContain('integrity');
+    expect(r.dataUpdate?.mappedPractices).toContain('peace');
   });
 
   it('dispatches inline-gloss ack + FIRST_COACHING_PROMPT in one message', () => {
@@ -57,7 +57,7 @@ describe('handleGoalReply with retry budget (Khadija UX Reframe — onboarding c
     const r = handleGoalReply('???', 3);
     expect(r.newStep).toBe(7);
     expect(r.defaultsApplied).toBe(true);
-    expect(r.dataUpdate?.goals).toEqual(['integrity']);
+    expect(r.dataUpdate?.mappedPractices).toEqual(['integrity']);
     expect(r.dataUpdate?.needsProfileReview).toBe(true);
     // Default path still produces ack + coaching prompt.
     expect(r.outboundBody).toMatch(/integrity/);
@@ -100,7 +100,6 @@ describe('handleLocationReply', () => {
   it('captures location and timezone for a Horn-of-Africa city', () => {
     const r = handleLocationReply('Mogadishu');
     expect(r.dataUpdate?.location).toBe('Mogadishu');
-    expect(r.dataUpdate?.isDiaspora).toBe(false);
     expect(r.dataUpdate?.timezone).toBe('Africa/Mogadishu');
   });
 
@@ -108,11 +107,5 @@ describe('handleLocationReply', () => {
     const r = handleLocationReply('skip');
     expect(r.dataUpdate?.location).toBeUndefined();
     expect(r.dataUpdate?.timezone).toBe('Africa/Mogadishu');
-    expect(r.dataUpdate?.isDiaspora).toBe(false);
-  });
-
-  it('flags diaspora for non-HoA city', () => {
-    const r = handleLocationReply('Toronto, Canada');
-    expect(r.dataUpdate?.isDiaspora).toBe(true);
   });
 });

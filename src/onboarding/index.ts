@@ -24,6 +24,6 @@ export {
   parseLocation,
   goalsToPractices,
   type ConsentResult,
-  type GoalParseResult,
   type LocationParseResult,
+  type PracticeParseResult,
 } from './parsers.js';
