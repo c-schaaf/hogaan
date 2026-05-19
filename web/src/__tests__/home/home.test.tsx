@@ -103,4 +103,22 @@ describe('Home — compose', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onCompose).toHaveBeenCalledWith('test message');
   });
+
+  it('pressing space in compose input does NOT call onCompose', () => {
+    const onCompose = vi.fn();
+    render(<Home {...defaultProps} onCompose={onCompose} />);
+    const input = screen.getByPlaceholderText(/Tell me what happened/);
+    fireEvent.change(input, { target: { value: 'hello' } });
+    fireEvent.keyDown(input, { key: ' ' });
+    expect(onCompose).not.toHaveBeenCalled();
+  });
+
+  it('pressing Shift+Enter in compose input does NOT call onCompose', () => {
+    const onCompose = vi.fn();
+    render(<Home {...defaultProps} onCompose={onCompose} />);
+    const input = screen.getByPlaceholderText(/Tell me what happened/);
+    fireEvent.change(input, { target: { value: 'hello' } });
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true });
+    expect(onCompose).not.toHaveBeenCalled();
+  });
 });
