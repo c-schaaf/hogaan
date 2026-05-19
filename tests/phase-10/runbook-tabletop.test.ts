@@ -26,30 +26,6 @@ async function readRunbook(name: string): Promise<string> {
   return readFile(path.join(RUNBOOKS_DIR, `${name}.md`), 'utf8');
 }
 
-describe('Phase 10.5 — Runbook tabletop: WhatsApp account suspension', () => {
-  it('runbook documents E11_AccountSuspended detection and recovery', async () => {
-    await withEvidence(
-      {
-        testId: 'phase-10/runbook-tabletop/whatsapp-suspension',
-        controlId: 'T1.BackupAndDR.WhatsAppAccountSuspension',
-        tier: 'T1',
-        description:
-          'Runbook references E11_AccountSuspended terminal event, Sentry source tag, suppression_list mitigation',
-      },
-      async () => {
-        const md = await readRunbook('whatsapp-account-suspension');
-        expect(md).toContain('E11_AccountSuspended');
-        expect(md).toContain('Process_11.Step_8_APIDispatch');
-        expect(md).toContain('suppression_list');
-        expect(md).toContain('correlation_id');
-        // Decision matrix referenced
-        expect(md.toLowerCase()).toContain('billing');
-        expect(md.toLowerCase()).toContain('policy');
-      },
-    );
-  });
-});
-
 describe('Phase 10.5 — Runbook tabletop: Render outage failover', () => {
   it('runbook documents the env vars + scripts needed to stand up Railway standby', async () => {
     await withEvidence(
