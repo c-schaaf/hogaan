@@ -50,3 +50,16 @@ describe('SCRUM-48 — buildUserProfileBlock renders mappedPractices', () => {
     expect(block).not.toContain('Focus practices:');
   });
 });
+
+describe('SCRUM-49 — buildUserProfileBlock drops Diaspora and Goals lines', () => {
+  it('does NOT render a Diaspora or Goals line even when other fields are present', () => {
+    const block = buildUserProfileBlock({
+      experienceBand: '5-10',
+      location: 'Mogadishu',
+      timezone: 'Africa/Mogadishu',
+      mappedPractices: ['integrity'],
+    });
+    expect(block).not.toMatch(/Diaspora/i);
+    expect(block).not.toMatch(/Goals/i);
+  });
+});

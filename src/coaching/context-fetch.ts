@@ -107,9 +107,7 @@ async function fetchProfile(db: Database, userId: UserId): Promise<CoachingConte
       role: users.role,
       experienceBand: users.experienceBand,
       location: users.location,
-      isDiaspora: users.isDiaspora,
       timezone: users.timezone,
-      goals: users.goals,
       mappedPractices: users.mappedPractices,
     })
     .from(users)
@@ -123,9 +121,7 @@ async function fetchProfile(db: Database, userId: UserId): Promise<CoachingConte
     ...(typeof row.role === 'string' ? { role: row.role } : {}),
     ...(typeof row.experienceBand === 'string' ? { experienceBand: row.experienceBand } : {}),
     ...(typeof row.location === 'string' ? { location: row.location } : {}),
-    ...(typeof row.isDiaspora === 'boolean' ? { isDiaspora: row.isDiaspora } : {}),
     ...(typeof row.timezone === 'string' ? { timezone: row.timezone } : {}),
-    ...(Array.isArray(row.goals) ? { goals: row.goals as string[] } : {}),
     ...(Array.isArray(row.mappedPractices)
       ? { mappedPractices: row.mappedPractices as PracticeTag[] }
       : {}),

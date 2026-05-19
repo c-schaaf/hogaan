@@ -208,12 +208,6 @@ export async function applyDataUpdate(
   if (dataUpdate?.timezone !== undefined) {
     update['timezone'] = dataUpdate.timezone;
   }
-  if (dataUpdate?.isDiaspora !== undefined) {
-    update['isDiaspora'] = dataUpdate.isDiaspora;
-  }
-  if (dataUpdate?.goals !== undefined) {
-    update['goals'] = dataUpdate.goals;
-  }
   if (dataUpdate?.mappedPractices !== undefined) {
     update['mappedPractices'] = dataUpdate.mappedPractices;
   }

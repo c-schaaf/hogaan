@@ -42,9 +42,7 @@ export interface InputPayload {
      */
     experienceBand?: string;
     location?: string;
-    isDiaspora?: boolean;
     timezone?: string;
-    goals?: string[];
     mappedPractices?: PracticeTag[];
   };
   /** Memories already retrieved by Process #2 §5a. Oldest-first. */

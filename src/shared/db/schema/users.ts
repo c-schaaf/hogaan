@@ -42,8 +42,6 @@ export const users = pgTable('users', {
   status: userStatus('status').notNull().default('provisional'),
   lastCompletedStep: integer('last_completed_step').notNull().default(0),
   needsProfileReview: boolean('needs_profile_review').notNull().default(false),
-  /** Self-reported leadership goals (PRD onboarding step 4). */
-  goals: jsonb('goals'),
   /** Student | Professional | Leader. Kept nullable for backwards compatibility;
    *  superseded by experience_band per customer-feedback PR4. */
   role: text('role'),
@@ -60,7 +58,6 @@ export const users = pgTable('users', {
   /** Free-text city/region. */
   location: text('location'),
   timezone: text('timezone').default('Africa/Mogadishu'),
-  isDiaspora: boolean('is_diaspora').notNull().default(false),
   /** Twelve-practice subset the user has signaled focus on. */
   mappedPractices: jsonb('mapped_practices'),
   /** Free-form profile flags (e.g., needs_profile_review caveats, ops review notes). */

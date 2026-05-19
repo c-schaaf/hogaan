@@ -63,9 +63,7 @@ export interface CoachingContext {
     /** Customer-feedback PR4 — leadership experience band: '<5' | '5-10' | '10+'. */
     experienceBand?: string;
     location?: string;
-    isDiaspora?: boolean;
     timezone?: string;
-    goals?: string[];
     mappedPractices?: PracticeTag[];
   };
   sessionTurns: { userMessage: string; responseText: string | null }[];

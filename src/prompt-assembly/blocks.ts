@@ -75,12 +75,6 @@ export function buildUserProfileBlock(profile: InputPayload['userProfile']): str
   if (profile.timezone !== undefined) {
     lines.push(`Timezone: ${profile.timezone}`);
   }
-  if (profile.isDiaspora !== undefined) {
-    lines.push(`Diaspora: ${profile.isDiaspora ? 'yes' : 'no'}`);
-  }
-  if (Array.isArray(profile.goals) && profile.goals.length > 0) {
-    lines.push(`Goals: ${profile.goals.join(', ')}`);
-  }
   // SCRUM-48 — onboarding-selected practices are piped through here so the
   // LLM can reference the user's stated focus when shaping responses.
   // Practices are stored lowercase (PracticeTag union); we Title-case them in
