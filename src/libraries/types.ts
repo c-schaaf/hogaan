@@ -22,7 +22,7 @@ export interface PromptTemplate {
     | 'clarify_v1'
     | 'meta_v1'
     | 'scenario_rolePlay_v1'
-    | 'coaching_v0_unified';
+    | 'coaching_v3_leadership';
   responseMode: ResponseMode;
   /** Approximate token count of the system text — used for budget planning. */
   tokenBudget: number;

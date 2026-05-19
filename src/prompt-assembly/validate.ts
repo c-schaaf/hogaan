@@ -5,7 +5,7 @@ import { PromptAssemblyError, type InputPayload } from './types.js';
  * PromptAssemblyError(E5) on any structural problem. Cheap, synchronous.
  *
  * 2026-05-13: the prior mode-dependent practiceTag + levelTag presence
- * check was removed. Under coaching_v0_unified the assembler short-
+ * check was removed. Under the unified prompt the assembler short-
  * circuits the practice + level framing blocks entirely, so the tags
  * are not load-bearing for any active code path. Callers that supply
  * them are still respected (e.g., legacy callers that go through the

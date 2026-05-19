@@ -87,7 +87,7 @@ export function buildUserProfileBlock(profile: InputPayload['userProfile']): str
   }
   // 2026-05-13 — first name / commStyle / responseDepth still omitted on
   // purpose. First name is held back per CLAUDE.md hard rule #4; commStyle
-  // and responseDepth are handled organically by the v0_unified system
+  // and responseDepth are handled organically by the unified system
   // prompt's tone calibration (§2/§5) so injecting them again inflates token
   // cost and pulls the model toward a checklist register. SCRUM-48 added
   // mappedPractices above because the framework lens (§3) needs to know

@@ -14,7 +14,7 @@ import type { Database } from '../../src/shared/db/client.js';
  * "Something went wrong on my side just now" fallback in the orchestrator.
  *
  * If a future refactor reintroduces a hard cap on prompt size, this test
- * must fail. It mocks `getActiveLibraryVersions` (returns coaching_v0_unified
+ * must fail. It mocks `getActiveLibraryVersions` (returns coaching_v3_leadership
  * so the assembler skips practice/level/voice/cultural blocks) and
  * `writePromptLog` (no-ops the DB write).
  */
@@ -31,7 +31,7 @@ vi.mock('../../src/libraries/index.js', async () => {
           payload: {
             templates: [
               {
-                id: 'coaching_v0_unified',
+                id: 'coaching_v3_leadership',
                 responseMode: 'FullCoachingResponse',
                 tokenBudget: 0,
                 systemText: 'You are Hogaan. (test unified template)',

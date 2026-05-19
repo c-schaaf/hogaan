@@ -33,7 +33,7 @@ import { validateInputPayload } from './validate.js';
  * appropriate dispatch outcome). E10 is reflected on the bundle's
  * logWriteFailed flag, never thrown.
  *
- * Since SCRUM-47, the v0_unified template is the only assembly path —
+ * Since SCRUM-47, the unified template is the only assembly path —
  * the v1 multi-block path (practice framing, level framing, voice rules,
  * cultural framing, directives) was removed along with its dormant tests.
  * Static framings now live inside `systemText` itself. The assembler
