@@ -90,31 +90,42 @@ export function Home({ user, practices, showPracticeCaption = false, onCompose, 
             <h1 className="hm-greet">{greeting}</h1>
             <p className="hm-sub">What's on your mind?</p>
 
-            <button
-              type="button"
-              className="hm-compose"
-              onClick={() => onCompose(composeText || null)}
-              aria-label="Open chat"
-            >
-              <span className="hm-mic">
+            {/* SCRUM — was a <button> wrapping the <input>, which made
+                spacebar (native button activation) submit the form on the
+                first space, breaking multi-word entry. The wrapper is now a
+                <div>; the arrow is the real submit control. */}
+            <div className="hm-compose">
+              <span className="hm-mic" aria-hidden="true">
                 <HomeIconMic />
               </span>
               <input
                 className="hm-compose-input"
                 placeholder="Tell me what happened today…"
+                aria-label="What's on your mind"
                 value={composeText}
-                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => setComposeText(e.target.value)}
                 onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === 'Enter' && !e.shiftKey && !e.altKey && !e.metaKey) {
+                  if (
+                    e.key === 'Enter' &&
+                    !e.shiftKey &&
+                    !e.altKey &&
+                    !e.metaKey &&
+                    !e.nativeEvent.isComposing
+                  ) {
                     e.preventDefault();
                     onCompose(composeText || null);
                   }
                 }}
               />
-              <span className="hm-compose-arrow">→</span>
-            </button>
+              <button
+                type="button"
+                className="hm-compose-arrow"
+                onClick={() => onCompose(composeText || null)}
+                aria-label="Open chat"
+              >
+                →
+              </button>
+            </div>
 
             <div className="hm-section-h">You might want to explore</div>
             <div className="hm-chips">

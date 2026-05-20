@@ -28,28 +28,47 @@ function fromApi(rows: ApiSessionSummary[]): SessionSummary[] {
   }));
 }
 
-function SessionRow({ s, onOpen }: { s: SessionSummary; onOpen: () => void }) {
+function SessionRow({
+  s,
+  onOpen,
+  onDelete,
+}: {
+  s: SessionSummary;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
   return (
-    <button type="button" className="ses-row" onClick={onOpen}>
-      <div className="ses-row-main">
-        <div className="ses-row-title">{s.title}</div>
-        <div className="ses-row-chips">
-          {s.practices.map((p) => (
-            <span key={p} className="ses-chip">
-              {p}
-            </span>
-          ))}
+    <div className="ses-row-wrap">
+      <button type="button" className="ses-row" onClick={onOpen}>
+        <div className="ses-row-main">
+          <div className="ses-row-title">{s.title}</div>
+          <div className="ses-row-chips">
+            {s.practices.map((p) => (
+              <span key={p} className="ses-chip">
+                {p}
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
-      <div className="ses-row-side">
-        <div className="ses-row-meta">
-          {s.when} · {s.msgs} messages
+        <div className="ses-row-side">
+          <div className="ses-row-meta">
+            {s.when} · {s.msgs} messages
+          </div>
+          <span className="ses-row-arrow">
+            <SesIconArrow />
+          </span>
         </div>
-        <span className="ses-row-arrow">
-          <SesIconArrow />
-        </span>
-      </div>
-    </button>
+      </button>
+      <button
+        type="button"
+        className="ses-row-del"
+        onClick={onDelete}
+        aria-label={`Delete session: ${s.title}`}
+        title="Delete"
+      >
+        ×
+      </button>
+    </div>
   );
 }
 
@@ -106,6 +125,25 @@ export function Sessions({ onBack, onOpen, onNav }: Props) {
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (s: SessionSummary) => {
+    const ok = window.confirm(
+      `Delete "${s.title}"? This conversation and its messages will be removed permanently.`,
+    );
+    if (!ok) return;
+    setDeletingId(s.id);
+    try {
+      await api.sessions.del(s.id);
+      setRows((prev) => (prev ?? []).filter((r) => r.id !== s.id));
+      setSearchResults((prev) => (prev === null ? null : prev.filter((r) => r.id !== s.id)));
+    } catch (err) {
+      console.error('delete session failed', err);
+      window.alert("Couldn't delete that session — please try again.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   useEffect(() => {
     void (async () => {
@@ -208,7 +246,22 @@ export function Sessions({ onBack, onOpen, onNav }: Props) {
               <SessionsEmpty onHome={onBack} />
             ) : loading ? null : !hasAny ? (
               <div className="ses-noresults">
-                {query.trim().length > 0 ? `No sessions match "${query}".` : 'No sessions yet.'}
+                {query.trim().length > 0 ? (
+                  <>
+                    No session titles match "{query}".
+                    <div
+                      style={{
+                        marginTop: 6,
+                        fontSize: 12,
+                        color: 'var(--ink-3)',
+                      }}
+                    >
+                      Search currently matches titles only — body search is coming soon.
+                    </div>
+                  </>
+                ) : (
+                  'No sessions yet.'
+                )}
               </div>
             ) : (
               <div className="ses-groups">
@@ -220,7 +273,14 @@ export function Sessions({ onBack, onOpen, onNav }: Props) {
                       <h2 className="ses-group-h">{g}</h2>
                       <div className="ses-list">
                         {rows.map((s) => (
-                          <SessionRow key={s.id} s={s} onOpen={() => onOpen(s.id)} />
+                          <SessionRow
+                            key={s.id}
+                            s={s}
+                            onOpen={() => onOpen(s.id)}
+                            onDelete={() => {
+                              if (deletingId === null) void handleDelete(s);
+                            }}
+                          />
                         ))}
                       </div>
                     </section>

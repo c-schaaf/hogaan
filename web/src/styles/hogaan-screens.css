@@ -573,9 +573,18 @@
   color: var(--ink-3);
 }
 .hm-compose-arrow {
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0 4px;
   font-family: var(--font-h);
   font-size: 18px;
   color: var(--ink-3);
+  cursor: pointer;
+  line-height: 1;
+}
+.hm-compose-arrow:hover {
+  color: var(--ink-1);
 }
 
 .hm-section-h {
@@ -868,6 +877,26 @@
   color: var(--bg);
   border-top-right-radius: 6px;
 }
+.chat-bubble.user.is-unsent {
+  opacity: 0.55;
+}
+.chat-retry {
+  appearance: none;
+  background: transparent;
+  border: none;
+  margin-top: 4px;
+  font-family: var(--font-b);
+  font-size: 12px;
+  color: var(--ink-3);
+  cursor: pointer;
+  align-self: flex-end;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+.chat-retry:hover {
+  color: var(--ink-1);
+  background: var(--paper-sunken);
+}
 .chat-bubble.bot {
   background: var(--paper);
   color: var(--ink-1);
@@ -992,13 +1021,17 @@
   appearance: none;
   border: none;
   background: var(--paper-sunken);
-  border-radius: 999px;
-  height: 40px;
-  padding: 0 16px;
+  border-radius: 20px;
+  min-height: 40px;
+  max-height: 160px;
+  padding: 10px 16px;
   font-family: var(--font-b);
   font-size: 14.5px;
+  line-height: 1.4;
   color: var(--ink-1);
   outline: none;
+  resize: none;
+  overflow-y: auto;
 }
 .ch-input:focus {
   box-shadow: 0 0 0 2px rgba(0, 134, 255, 0.3);

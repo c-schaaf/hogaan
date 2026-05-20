@@ -115,6 +115,8 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
   const [editingPractices, setEditingPractices] = useState(false);
   const [draftPractices, setDraftPractices] = useState<string[]>(practices);
   const [savingPractices, setSavingPractices] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [practicesError, setPracticesError] = useState<string | null>(null);
 
   // Hydrate from /api/profile on mount so the page reflects what the
   // server actually has (in case the in-memory `me` from Shell is stale).
@@ -140,12 +142,14 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
 
   const savePractices = async () => {
     setSavingPractices(true);
+    setPracticesError(null);
     try {
       await api.profile.patch({ mappedPractices: draftPractices });
       setLivePractices(draftPractices);
       setEditingPractices(false);
     } catch (err) {
       console.error('save practices failed', err);
+      setPracticesError("We couldn't save your practices. Please try again.");
     } finally {
       setSavingPractices(false);
     }
@@ -153,17 +157,20 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
 
   const cancelEditingPractices = () => {
     setDraftPractices(livePractices);
+    setPracticesError(null);
     setEditingPractices(false);
   };
 
   const saveName = async () => {
     setSavingName(true);
+    setNameError(null);
     try {
       await api.profile.patch({ fullName: draftName });
       setFullName(draftName);
       setEditingName(false);
     } catch (err) {
       console.error('save name failed', err);
+      setNameError("We couldn't save your name. Please try again.");
     } finally {
       setSavingName(false);
     }
@@ -202,6 +209,7 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
                             if (e.key === 'Enter') void saveName();
                             if (e.key === 'Escape') {
                               setDraftName(fullName);
+                              setNameError(null);
                               setEditingName(false);
                             }
                           }}
@@ -220,12 +228,25 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
                           style={{ background: 'transparent', color: 'var(--ink-2)' }}
                           onClick={() => {
                             setDraftName(fullName);
+                            setNameError(null);
                             setEditingName(false);
                           }}
                         >
                           Cancel
                         </button>
                       </div>
+                      {nameError !== null && (
+                        <div
+                          role="alert"
+                          style={{
+                            marginTop: 6,
+                            fontSize: 12,
+                            color: '#c0392b',
+                          }}
+                        >
+                          {nameError}
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <FieldRow
@@ -244,11 +265,10 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
                       }
                     />
                   )}
-                  <FieldRow
-                    label="Email"
-                    value={email}
-                    action={<InlineButton icon={<PrIconEdit />}>Change</InlineButton>}
-                  />
+                  {/* SCRUM — Email change flow is not yet wired (no Supabase
+                      updateUser call) so the previous "Change" button was a
+                      dead control. Removed until the flow ships. */}
+                  <FieldRow label="Email" value={email} />
                   <div className="pr-account-out">
                     <button type="button" className="pr-signout" onClick={onSignOut}>
                       Sign out
@@ -303,6 +323,18 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
                     editing={editingPractices}
                     onToggle={togglePracticeDraft}
                   />
+                  {practicesError !== null && (
+                    <div
+                      role="alert"
+                      style={{
+                        marginTop: 8,
+                        fontSize: 12,
+                        color: '#c0392b',
+                      }}
+                    >
+                      {practicesError}
+                    </div>
+                  )}
                 </ProfileCard>
 
                 <ProfileCard title="Support">

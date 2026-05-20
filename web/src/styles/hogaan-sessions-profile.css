@@ -108,6 +108,38 @@
   gap: 10px;
 }
 
+.ses-row-wrap {
+  position: relative;
+}
+.ses-row-del {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--ink-3);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
+}
+.ses-row-wrap:hover .ses-row-del,
+.ses-row-del:focus-visible {
+  opacity: 1;
+}
+.ses-row-del:hover {
+  background: var(--paper-sunken);
+  color: var(--ink-1);
+}
+
 .ses-row {
   appearance: none;
   background: var(--paper);

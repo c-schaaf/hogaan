@@ -44,16 +44,23 @@ interface ChatItem {
   text?: string;
   paras?: ReactNode[];
   chips?: string[];
+  // SCRUM — when a turn fails before any reply was streamed, the optimistic
+  // user bubble is marked unsent and offered for retry. retryText is the
+  // original prompt so the user can resend with one click.
+  unsent?: boolean;
+  retryText?: string;
 }
 
 function SessionsRail({
   hidden,
   past,
   currentTitle,
+  onOpen,
 }: {
   hidden: boolean;
   past: SessionSummary[];
   currentTitle: string;
+  onOpen: (id: string) => void;
 }) {
   if (hidden) return null;
   return (
@@ -70,7 +77,7 @@ function SessionsRail({
       </div>
       {past.length > 0 && <div className="ch-rail-divider">Earlier</div>}
       {past.map((s) => (
-        <button key={s.id} type="button" className="ch-rail-row">
+        <button key={s.id} type="button" className="ch-rail-row" onClick={() => onOpen(s.id)}>
           <span className="ch-rail-row-body">
             <span className="ch-rail-row-title">{s.title}</span>
             <span className="ch-rail-row-when">{s.when}</span>
@@ -133,6 +140,12 @@ interface Props {
   seed?: string | null;
   onBack: () => void;
   openSessionId?: string | null;
+  /**
+   * Switch to a different session while the chat view is mounted.
+   * Shell.tsx owns openSessionId; the in-chat sidebar/drawer calls this so
+   * a row click navigates without leaving the chat phase.
+   */
+  onOpenSession?: (id: string) => void;
 }
 
 function dividerLabel(): string {
@@ -149,6 +162,7 @@ export function Chat({
   seed,
   onBack,
   openSessionId,
+  onOpenSession,
 }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [items, setItems] = useState<ChatItem[]>(() => [
@@ -162,6 +176,18 @@ export function Chat({
   const [privateMode, setPrivateMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const seedRef = useRef(seed);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  // SCRUM — persist the active session id across page refreshes so reloading
+  // mid-conversation rehydrates the transcript rather than landing in an
+  // empty new chat. Shell reads ACTIVE_SESSION_KEY in routeAuthed.
+  useEffect(() => {
+    if (sessionId === null) {
+      sessionStorage.removeItem('hogaan.activeSessionId');
+    } else {
+      sessionStorage.setItem('hogaan.activeSessionId', sessionId);
+    }
+  }, [sessionId]);
 
   // Pull real past sessions for the sidebar/drawer; refresh after each turn
   // so a freshly-generated session title appears without a page reload.
@@ -224,6 +250,7 @@ export function Chat({
     // under us). Append iff the last item is not the bot bubble we're
     // streaming into; otherwise replace.
     let streamingText = '';
+    let receivedDeltas = false;
     const upsertStreamingBot = (text: string) => {
       const r = renderResponse(text);
       setItems((prev) => {
@@ -247,6 +274,7 @@ export function Chat({
           setSessionId(ev.sessionId);
           setThinking(false); // first byte received — drop the spinner
         } else if (ev.type === 'delta') {
+          receivedDeltas = true;
           streamingText += ev.text;
           upsertStreamingBot(streamingText);
         } else if (ev.type === 'error') {
@@ -258,19 +286,43 @@ export function Chat({
     } catch (err) {
       setThinking(false);
       console.error('stream turn failed', err);
-      setItems((prev) => [
-        ...prev,
-        {
-          kind: 'bot',
-          paras: [
-            <>
-              Something went wrong on my side just now. Take a breath and try again - I'm still
-              here.
-            </>,
-          ],
-          chips: [],
-        },
-      ]);
+      const errorBubble: ChatItem = {
+        kind: 'bot',
+        paras: [
+          <>
+            Something went wrong on my side just now. Take a breath and try again - I'm still here.
+          </>,
+        ],
+        chips: [],
+      };
+      if (receivedDeltas) {
+        // Mid-stream failure: replace the partial reply bubble in place
+        // rather than appending a second bubble.
+        setItems((prev) => {
+          const lastIdx = prev.length - 1;
+          if (lastIdx >= 0 && prev[lastIdx].kind === 'bot') {
+            const next = prev.slice();
+            next[lastIdx] = errorBubble;
+            return next;
+          }
+          return [...prev, errorBubble];
+        });
+      } else {
+        // Pre-first-byte failure: no bot bubble exists yet. Mark the
+        // optimistic user bubble as unsent so the user can retry without
+        // re-typing, and append the error copy.
+        setItems((prev) => {
+          const next = prev.slice();
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i].kind === 'user' && next[i].text === t) {
+              next[i] = { ...next[i], unsent: true, retryText: t };
+              break;
+            }
+          }
+          next.push(errorBubble);
+          return next;
+        });
+      }
     }
   };
 
@@ -299,7 +351,14 @@ export function Chat({
 
   return (
     <div className={`ch-page ${privateMode ? 'is-private' : ''}`}>
-      <SessionsRail hidden={privateMode} past={pastSessions} currentTitle={currentTitle} />
+      <SessionsRail
+        hidden={privateMode}
+        past={pastSessions}
+        currentTitle={currentTitle}
+        onOpen={(id) => {
+          if (onOpenSession !== undefined) onOpenSession(id);
+        }}
+      />
 
       <main className="ch-shell">
         <div className="ch-topbar">
@@ -350,7 +409,19 @@ export function Chat({
               if (it.kind === 'user')
                 return (
                   <div key={i} className="chat-row user">
-                    <div className="chat-bubble user">{it.text}</div>
+                    <div className={`chat-bubble user ${it.unsent === true ? 'is-unsent' : ''}`}>
+                      {it.text}
+                    </div>
+                    {it.unsent === true && it.retryText !== undefined && (
+                      <button
+                        type="button"
+                        className="chat-retry"
+                        onClick={() => void sendText(it.retryText!)}
+                        aria-label="Retry sending message"
+                      >
+                        Not sent · Retry
+                      </button>
+                    )}
                   </div>
                 );
               if (it.kind === 'bot') {
@@ -408,13 +479,33 @@ export function Chat({
           <button type="button" className="ch-mic" aria-label="Voice">
             <ChatIconMic />
           </button>
-          <input
+          <textarea
+            ref={composerRef}
             className="ch-input"
             placeholder="Type your message…"
+            rows={1}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              // Auto-grow up to a 6-line cap; let .ch-input max-height
+              // CSS clip beyond that with overflow:auto.
+              const el = e.target;
+              el.style.height = 'auto';
+              el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+            }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.altKey && !e.metaKey) void sendText(draft);
+              // Enter submits; Shift+Enter (and IME composition Enter)
+              // inserts a newline. Guard against alt/meta variants too.
+              if (
+                e.key === 'Enter' &&
+                !e.shiftKey &&
+                !e.altKey &&
+                !e.metaKey &&
+                !e.nativeEvent.isComposing
+              ) {
+                e.preventDefault();
+                void sendText(draft);
+              }
             }}
           />
           <button
@@ -467,7 +558,10 @@ export function Chat({
                 key={s.id}
                 type="button"
                 className="ch-drawer-row"
-                onClick={() => setDrawerOpen(false)}
+                onClick={() => {
+                  setDrawerOpen(false);
+                  if (onOpenSession !== undefined) onOpenSession(s.id);
+                }}
               >
                 <span className="ch-rail-row-body">
                   <span className="ch-rail-row-title">{s.title}</span>

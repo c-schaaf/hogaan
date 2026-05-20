@@ -104,13 +104,20 @@ describe('Home — compose', () => {
     expect(onCompose).toHaveBeenCalledWith('test message');
   });
 
-  it('pressing space in compose input does NOT call onCompose', () => {
-    const onCompose = vi.fn();
-    render(<Home {...defaultProps} onCompose={onCompose} />);
+  // Note: spacebar safety is now structural (the wrapping <button> was
+  // removed so native button activation on Space no longer fires). A
+  // synthetic JSDOM keyDown can't reproduce the bug the wrapper caused.
+  // Browser-level coverage lives in tests/e2e/home/compose-space.spec.ts.
+
+  it('compose input is NOT nested inside a <button> (prevents space activation)', () => {
+    render(<Home {...defaultProps} />);
     const input = screen.getByPlaceholderText(/Tell me what happened/);
-    fireEvent.change(input, { target: { value: 'hello' } });
-    fireEvent.keyDown(input, { key: ' ' });
-    expect(onCompose).not.toHaveBeenCalled();
+    // Walk up the tree — no ancestor should be a <button>.
+    let el: HTMLElement | null = input.parentElement;
+    while (el !== null) {
+      expect(el.tagName).not.toBe('BUTTON');
+      el = el.parentElement;
+    }
   });
 
   it('pressing Shift+Enter in compose input does NOT call onCompose', () => {
