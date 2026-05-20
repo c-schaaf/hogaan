@@ -26,6 +26,7 @@ const testConfig: AppConfig = {
   resendFromEmail: undefined,
   supabaseUrl: undefined,
   supabaseAnonKey: undefined,
+  supabaseJwtSecret: undefined,
 };
 
 describe('app', () => {

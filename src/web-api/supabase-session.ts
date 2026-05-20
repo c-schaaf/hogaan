@@ -7,6 +7,7 @@ import type { Database } from '../shared/db/client.js';
 import { auditLog } from '../shared/db/schema/audit-log.js';
 import { users } from '../shared/db/schema/users.js';
 import { type AppConfig, requireConfig } from '../shared/secrets/config.js';
+import { verifySupabaseJwtLocal } from './local-jwt.js';
 
 /**
  * Phase B-bis — Supabase Auth session validation for /api/* routes.
@@ -112,6 +113,57 @@ export async function readSupabaseSession(
     return null;
   }
 
+  // SCRUM (PR 6, launch-readiness D-5) — try local JWT verify first. For
+  // an already-onboarded user this skips the ~80–150ms Supabase round-
+  // trip entirely. If local verify fails (no secret configured, or any
+  // verification error) OR if the user is unknown to `public.users` (so
+  // we need user_metadata to JIT-create), we fall back to `getUser`.
+  const localClaims = await verifySupabaseJwtLocal(opts.config, token);
+
+  let supabaseUserId: string;
+  let email: string;
+  let fullName: string;
+
+  // Fast path: local verify succeeded AND we already have a public.users
+  // row for this Supabase identity. No Supabase round-trip needed.
+  if (localClaims !== null) {
+    const existingFast = await opts.db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.supabaseUserId, localClaims.sub))
+      .limit(1);
+    if (existingFast[0] !== undefined) {
+      const userId = existingFast[0].id;
+      try {
+        await writeSupabaseAuditEntry(opts.db, {
+          userId,
+          requestId: req.id,
+          targetEndEvent,
+          ipAddress: req.ip ?? null,
+        });
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        reportP0(
+          'supabase-session: audit_log insert failed — returning 5xx (hard rule #4)',
+          {
+            source: 'PhaseBbis.SupabaseSession.Audit',
+            extra: { error: errMsg, requestId: req.id, supabaseUserId: localClaims.sub },
+          },
+          err,
+        );
+        throw err;
+      }
+      return {
+        userId,
+        email: existingFast[0].email ?? localClaims.email,
+        supabaseUserId: localClaims.sub,
+        fullName: localClaims.fullName ?? '',
+      };
+    }
+  }
+
+  // Slow path: either local verify failed, or we need user_metadata to
+  // JIT-create. Hit Supabase `getUser` for full identity info.
   const supabase = getSupabase(opts.config);
   const { data, error } = await supabase.auth.getUser(token);
   if (error !== null || data.user === null) {
@@ -129,10 +181,10 @@ export async function readSupabaseSession(
     return null;
   }
 
-  const supabaseUserId = data.user.id;
-  const email = (data.user.email ?? '').toLowerCase();
+  supabaseUserId = data.user.id;
+  email = (data.user.email ?? '').toLowerCase();
   const meta = data.user.user_metadata ?? {};
-  const fullName =
+  fullName =
     typeof meta['full_name'] === 'string'
       ? meta['full_name']
       : typeof meta['name'] === 'string'
@@ -170,7 +222,19 @@ export async function readSupabaseSession(
         extra: { error: errMsg },
       });
 
-      // Case A: race with another concurrent JIT insert on the same supabaseUserId.
+      // SCRUM (PR 6, launch-readiness D-6) — only legitimate retry path is
+      // a concurrent JIT race on the same `supabase_user_id`. Refetch on
+      // that condition and use the winner.
+      //
+      // The previous code also had a Case B that relinked an existing row
+      // to a new supabase identity when an orphan email collided
+      // (`users_email_unique`). That was a tenant-takeover vector: if user
+      // A was deleted from Supabase Auth and user B later signed up with
+      // the same email, B inherited A's `public.users` row (and all of
+      // A's sessions / turns / profile). The relink branch is removed.
+      // An orphan-email collision now hard-fails the JIT — operator must
+      // clean up the orphan row (see `scripts/orphan-users-report.ts`)
+      // before the new sign-in can proceed.
       const refetched = await opts.db
         .select({ id: users.id, email: users.email })
         .from(users)
@@ -179,40 +243,21 @@ export async function readSupabaseSession(
       if (refetched[0] !== undefined) {
         userId = refetched[0].id;
       } else if (email !== '' && errMsg.includes('users_email_unique')) {
-        // Case B: orphan row owns the email — re-link.
-        const byEmail = await opts.db
-          .select({ id: users.id })
-          .from(users)
-          .where(eq(users.email, email))
-          .limit(1);
-        if (byEmail[0] !== undefined) {
-          const relinkId = byEmail[0].id;
-          try {
-            await opts.db.update(users).set({ supabaseUserId }).where(eq(users.id, relinkId));
-            req.log.warn(
-              { supabaseUserId, email, relinkId },
-              'supabase-session: relinked existing public.users row to new supabase identity',
-            );
-            userId = relinkId;
-          } catch (relinkErr) {
-            req.log.error(
-              {
-                error: relinkErr instanceof Error ? relinkErr.message : String(relinkErr),
-                supabaseUserId,
-                email,
-                relinkId,
-              },
-              'supabase-session: relink update failed',
-            );
-            return null;
-          }
-        } else {
-          req.log.error(
-            { supabaseUserId },
-            'supabase-session: refetch after insert-fail found nothing — returning null',
-          );
-          return null;
-        }
+        // Orphan-email collision — refuse to relink. Surface a P0 so ops
+        // can investigate and decide whether to remove the orphan.
+        reportP0(
+          'supabase-session: orphan-email collision on JIT (refusing to relink)',
+          {
+            source: 'PhaseBbis.SupabaseSession.OrphanEmail',
+            extra: { supabaseUserId, email, requestId: req.id },
+          },
+          err,
+        );
+        req.log.error(
+          { supabaseUserId, email },
+          'supabase-session: orphan-email collision — refusing to relink, returning null',
+        );
+        return null;
       } else {
         req.log.error(
           { supabaseUserId },

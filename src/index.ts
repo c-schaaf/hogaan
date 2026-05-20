@@ -38,10 +38,9 @@ async function main(): Promise<void> {
   // backend just validates the `Authorization: Bearer <supabase-token>`
   // header on /api/* via web-api/supabase-session.ts middleware.
   const webApiWired = await wireWebApiRoutes(app, config);
-  app.log.info(
-    { webApiRoutes: webApiWired.registered, reason: webApiWired.reason ?? 'ok' },
-    'web api routes',
-  );
+  // SCRUM (PR 6, launch-readiness D-3) — wireWebApiRoutes now crashes on
+  // missing required env, so it always returns { registered: true }.
+  app.log.info({ webApiRoutes: webApiWired.registered }, 'web api routes');
   // Static SPA serve — must come LAST so it doesn't claim API/webhook paths.
   const staticWired = await wireWebStatic(app, config);
   app.log.info(

@@ -30,9 +30,14 @@ export function getDb(config: AppConfig): DbBundle {
 
   const url = requireConfig(config, 'databaseUrl');
 
+  // SCRUM (PR 6, launch-readiness D-1) — pool max raised from 10 to 20.
+  // At 100 concurrent users (locked-in target) firing ~5 queries per turn,
+  // 10 slots per instance × 2 instances = 20 total against ~100-500
+  // queries/sec at peak was a structural bottleneck. 20 slots × 2 = 40
+  // is comfortable and well under Supabase Pro's 200-connection ceiling.
   const sql = postgres(url, {
     prepare: false,
-    max: config.nodeEnv === 'test' ? 4 : 10,
+    max: config.nodeEnv === 'test' ? 4 : 20,
     idle_timeout: 30,
     connect_timeout: 10,
     onnotice: () => undefined,
