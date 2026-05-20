@@ -76,7 +76,12 @@ export async function assemblePrompt(
 
   // Dynamic blocks
   const memoryBlockText = buildMemoryBlock(validated.retrievedMemories);
-  const sessionContextText = buildSessionContext(validated.sessionTurns);
+  // SCRUM — when the caller will pass prior turns via the LLM's messages[]
+  // parameter, omit the session-context block from the system prompt so the
+  // model doesn't see the same history twice. (The streaming chat path
+  // does this; the legacy non-streaming path keeps the block as before.)
+  const sessionContextText =
+    validated.historyInMessages === true ? '' : buildSessionContext(validated.sessionTurns);
   const userProfileBlockText = buildUserProfileBlock(validated.userProfile);
   const userMessageText = buildUserMessageBlock(validated.userMessage);
 
@@ -157,7 +162,9 @@ function pickTerminalMode(mode: ResponseMode): OutputBundle['endEvent'] {
 
 /**
  * Canonical block order — same every assembly so determinism + diff'ing both
- * have stable axes.
+ * have stable axes. Empty blocks are filtered so the prompt doesn't gain
+ * stray double-newline gaps when an opt-in section is suppressed
+ * (e.g. `historyInMessages` skips the session-context block).
  */
 function canonicalAssemble(p: PromptUnderConstruction): string {
   return [
@@ -166,5 +173,7 @@ function canonicalAssemble(p: PromptUnderConstruction): string {
     p.sessionContextText,
     p.userProfileBlockText,
     p.userMessageText,
-  ].join('\n\n');
+  ]
+    .filter((b) => b.length > 0)
+    .join('\n\n');
 }

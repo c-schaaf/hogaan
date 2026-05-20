@@ -143,32 +143,13 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         );
       }
 
-      // ---- Prompt assembly (v0_unified handles all response modes) ---
-      // No practiceTag / levelTag — the validator's mode-dependent check was
-      // removed 2026-05-13 (see prompt-assembly/validate.ts header note) and
-      // the v0_unified assembler skips practice/level framing entirely.
-      const promptBundle = await assemblePrompt(opts.config, opts.db, {
-        userId,
-        sessionId: asSessionId(sessionId),
-        responseMode: 'FullCoachingResponse',
-        userMessage: message,
-        userProfile: ctx.profile,
-        sessionTurns: ctx.sessionTurns,
-        retrievedMemories: ctx.memories,
-      });
-
-      sendEvent('start', { sessionId });
-
-      // ---- Stream the response ---------------------------------------
-      // Pass prior turns as proper conversation messages, not as flattened
-      // text in the system prompt. The assembler still embeds them in the
-      // assembledPrompt (acceptable duplication for now — ~150 token cost),
-      // but the model's conversation-tracking attention only fires on the
-      // messages array. Chunk-2 audit (2026-05-13) showed the model
-      // hallucinated "I'm coming in mid-conversation" and lost mentor
-      // identity / past-tense / cultural specifics when prior turns lived
-      // only in the system text. Skip turns with null/empty responseText to
-      // preserve the alternating user/assistant invariant the API requires.
+      // ---- Build the prior-turns messages array first ---------------
+      // Chunk-2 audit (2026-05-13) showed the model lost mentor identity
+      // and past-tense continuity when prior turns lived only in the
+      // system text. So we always pass them via the LLM's `messages[]`
+      // parameter for proper conversation-tracking attention. Skip turns
+      // with null/empty responseText to preserve the alternating
+      // user/assistant invariant the API requires.
       const priorMessages = ctx.sessionTurns.flatMap((t) => {
         if (t.responseText === null || t.responseText === '') {
           return [];
@@ -178,6 +159,29 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
           { role: 'assistant' as const, content: t.responseText },
         ];
       });
+
+      // ---- Prompt assembly (v0_unified handles all response modes) ---
+      // No practiceTag / levelTag — the validator's mode-dependent check was
+      // removed 2026-05-13 (see prompt-assembly/validate.ts header note) and
+      // the v0_unified assembler skips practice/level framing entirely.
+      //
+      // SCRUM — when priorMessages carries history, set historyInMessages so
+      // the assembler omits the "Recent session context" block from the
+      // system prompt. Previously both paths carried the transcript, costing
+      // ~150 tokens per turn and (per the audit) confusing the model on
+      // continued sessions.
+      const promptBundle = await assemblePrompt(opts.config, opts.db, {
+        userId,
+        sessionId: asSessionId(sessionId),
+        responseMode: 'FullCoachingResponse',
+        userMessage: message,
+        userProfile: ctx.profile,
+        sessionTurns: ctx.sessionTurns,
+        retrievedMemories: ctx.memories,
+        historyInMessages: priorMessages.length > 0,
+      });
+
+      sendEvent('start', { sessionId });
 
       const stream = chatStream(opts.config, {
         systemPrompt: promptBundle.assembledPrompt,
