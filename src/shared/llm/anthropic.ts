@@ -68,6 +68,24 @@ export async function anthropicChat(
 }
 
 function mapAnthropicError(err: unknown): Error {
+  // SCRUM — connection/abort/pre-flight failures had no numeric HTTP status,
+  // so the prior code path flattened them to `LlmTransientError(provider, 0)`
+  // which read in production logs as the misleading
+  // `anthropic transient error (0)`. They are now mapped to
+  // LlmServiceUnavailableError BEFORE the status flatten so callers can
+  // dispatch a real "service unavailable" branch.
+  if (
+    err instanceof Anthropic.APIConnectionError ||
+    err instanceof Anthropic.APIConnectionTimeoutError ||
+    err instanceof Anthropic.APIUserAbortError
+  ) {
+    return new LlmServiceUnavailableError('anthropic', err);
+  }
+  // Defence-in-depth: cover the abort class even when the SDK didn't wrap
+  // it (some Node fetch paths surface a raw AbortError).
+  if (err instanceof Error && (err.name === 'AbortError' || err.name === 'APIConnectionError')) {
+    return new LlmServiceUnavailableError('anthropic', err);
+  }
   if (err instanceof Anthropic.APIError) {
     const status: number = typeof err.status === 'number' ? err.status : 0;
     if (status === 401 || status === 403) {
@@ -100,16 +118,81 @@ function mapAnthropicError(err: unknown): Error {
  * generates them. The final accumulated text + usage are returned in the
  * resolved promise after the stream closes.
  *
- * No timeout / breaker / fallback applied at this layer — streaming has
- * different latency semantics (TTFB vs total) and a mid-stream timeout
- * would leave the user looking at a half-written reply. Callers handle
- * mid-stream errors by emitting an error event and closing.
+ * Stream-open is wrapped in a TTFB timeout + bounded retry: an
+ * APIConnectionError or APIConnectionTimeoutError on the open is retried
+ * once with backoff. Once the first byte has arrived the stream proceeds
+ * un-supervised — a mid-stream timeout would leave the user looking at a
+ * half-written reply, and re-opening the stream after deltas have been
+ * delivered would duplicate the bot bubble.
  */
 export interface AnthropicStreamFinal {
   text: string;
   inputTokens: number;
   outputTokens: number;
   stopReason: 'end_turn' | 'max_tokens' | 'stop_sequence' | 'tool_use' | 'pause_turn' | 'refusal';
+}
+
+/**
+ * Stream-open guard rails. The 8s TTFB cap mirrors what production observed
+ * as healthy stream-start latency from Render-Virginia → Anthropic on
+ * 3700-token coaching prompts (well under p95). Retry attempts are bounded
+ * so we never multiply user-perceived latency more than 2x.
+ */
+const STREAM_OPEN_TIMEOUT_MS = 8_000;
+const STREAM_OPEN_MAX_ATTEMPTS = 2;
+
+function isStreamOpenRetryable(err: unknown): boolean {
+  return (
+    err instanceof Anthropic.APIConnectionError ||
+    err instanceof Anthropic.APIConnectionTimeoutError ||
+    (err instanceof Error && err.name === 'AbortError')
+  );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, ms);
+    if (typeof t.unref === 'function') t.unref();
+  });
+}
+
+type AnthropicStream = Awaited<ReturnType<Anthropic['messages']['create']>> &
+  AsyncIterable<Anthropic.RawMessageStreamEvent>;
+
+async function openStreamWithRetry(
+  client: Anthropic,
+  req: Omit<AnthropicChatRequest, 'timeoutMs'>,
+): Promise<AnthropicStream> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= STREAM_OPEN_MAX_ATTEMPTS; attempt++) {
+    try {
+      // Lower-level streaming API — returns an async iterable of raw events.
+      // Preferred over messages.stream() because event types are stable across
+      // SDK versions and we don't depend on the helper's finalMessage() shape.
+      // The SDK types the return as a union of Message | Stream; since we
+      // pass stream:true the runtime value is always the Stream branch.
+      const result = await withTimeout('anthropic', STREAM_OPEN_TIMEOUT_MS, () =>
+        client.messages.create({
+          model: req.model,
+          max_tokens: req.maxTokens,
+          ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+          system: req.systemPrompt,
+          messages: req.messages,
+          stream: true,
+        }),
+      );
+      return result as AnthropicStream;
+    } catch (err) {
+      lastErr = err;
+      // Only retry on connection / abort class errors. Auth, rate-limit,
+      // 4xx content issues, and 5xx server errors should surface immediately
+      // — retrying them just wastes the user's time.
+      if (!isStreamOpenRetryable(err) || attempt === STREAM_OPEN_MAX_ATTEMPTS) break;
+      const exp = Math.min(1000, 250 * 2 ** (attempt - 1));
+      await sleep(Math.floor(Math.random() * exp));
+    }
+  }
+  throw lastErr;
 }
 
 export async function* anthropicChatStream(
@@ -120,17 +203,7 @@ export async function* anthropicChatStream(
 
   let stream;
   try {
-    // Lower-level streaming API — returns an async iterable of raw events.
-    // Preferred over messages.stream() because event types are stable across
-    // SDK versions and we don't depend on the helper's finalMessage() shape.
-    stream = await client.messages.create({
-      model: req.model,
-      max_tokens: req.maxTokens,
-      ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-      system: req.systemPrompt,
-      messages: req.messages,
-      stream: true,
-    });
+    stream = await openStreamWithRetry(client, req);
   } catch (err) {
     throw mapAnthropicError(err);
   }
@@ -176,4 +249,13 @@ export async function* anthropicChatStream(
 
 export function resetAnthropicClientForTests(): void {
   cached = undefined;
+}
+
+/**
+ * Test-only seam — inject a stub client so the streaming + retry paths can
+ * be exercised without a network call. The override is removed by
+ * `resetAnthropicClientForTests`.
+ */
+export function __setAnthropicClientForTests(stub: Anthropic): void {
+  cached = stub;
 }

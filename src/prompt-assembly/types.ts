@@ -49,6 +49,16 @@ export interface InputPayload {
   retrievedMemories: { content: string; createdAt: Date }[];
   /** Recent turns from Process #2 §5c. Oldest-first. */
   sessionTurns: { userMessage: string; responseText: string | null }[];
+  /**
+   * SCRUM — when true, the caller will pass prior turns to the LLM via the
+   * `messages[]` parameter directly. The assembler must NOT also embed the
+   * "## Recent session context" block in the system prompt, or the model
+   * sees the same history twice (which has been observed to confuse it on
+   * mid-conversation continues). Defaults to false so legacy non-streaming
+   * callers — which only have the system prompt to carry continuity — keep
+   * their behavior.
+   */
+  historyInMessages?: boolean;
 }
 
 /**
