@@ -299,6 +299,96 @@ describe('GET /api/sessions/:id', () => {
 
     expect(res.statusCode).toBe(404);
   });
+
+  // SCRUM — the audit found GET /api/sessions/:id silently truncated long
+  // transcripts at the 200-turn cap. The response now returns hasMore so
+  // the client can surface a "showing latest 200 turns" notice.
+  it('returns hasMore=true when the turn cap is exceeded', async () => {
+    const createdAt = new Date('2026-05-01T10:00:00Z');
+    // 201 rows so the route's `limit(201)` returns more than the 200 page.
+    const turns = Array.from({ length: 201 }, (_, i) => ({
+      id: `t-${i}`,
+      userMessage: `u${i}`,
+      responseText: `a${i}`,
+      createdAt,
+    }));
+    let callIdx = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: () =>
+              Promise.resolve(
+                callIdx++ === 0
+                  ? [
+                      {
+                        id: SESSION_ID,
+                        title: 'Big session',
+                        userId: TEST_USER_ID,
+                        isPrivate: false,
+                      },
+                    ]
+                  : [],
+              ),
+            orderBy: () => ({ limit: () => Promise.resolve(turns) }),
+          }),
+        }),
+      }),
+      insert: () => ({ values: () => ({ returning: () => Promise.resolve([]) }) }),
+      update: () => ({ set: () => ({ where: () => Promise.resolve([]) }) }),
+      delete: () => ({ where: () => Promise.resolve([]) }),
+    } as never;
+
+    const app = await buildApp(db);
+    const res = await app.inject({ method: 'GET', url: `/api/sessions/${SESSION_ID}` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ turns: unknown[]; hasMore: boolean }>();
+    expect(body.hasMore).toBe(true);
+    expect(body.turns).toHaveLength(200);
+  });
+
+  it('returns hasMore=false when turn count is at or below the cap', async () => {
+    const createdAt = new Date('2026-05-01T10:00:00Z');
+    const turns = Array.from({ length: 50 }, (_, i) => ({
+      id: `t-${i}`,
+      userMessage: `u${i}`,
+      responseText: `a${i}`,
+      createdAt,
+    }));
+    let callIdx = 0;
+    const db = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            limit: () =>
+              Promise.resolve(
+                callIdx++ === 0
+                  ? [
+                      {
+                        id: SESSION_ID,
+                        title: 'Small session',
+                        userId: TEST_USER_ID,
+                        isPrivate: false,
+                      },
+                    ]
+                  : [],
+              ),
+            orderBy: () => ({ limit: () => Promise.resolve(turns) }),
+          }),
+        }),
+      }),
+      insert: () => ({ values: () => ({ returning: () => Promise.resolve([]) }) }),
+      update: () => ({ set: () => ({ where: () => Promise.resolve([]) }) }),
+      delete: () => ({ where: () => Promise.resolve([]) }),
+    } as never;
+
+    const app = await buildApp(db);
+    const res = await app.inject({ method: 'GET', url: `/api/sessions/${SESSION_ID}` });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<{ turns: unknown[]; hasMore: boolean }>();
+    expect(body.hasMore).toBe(false);
+    expect(body.turns).toHaveLength(50);
+  });
 });
 
 describe('DELETE /api/sessions/:id', () => {

@@ -131,4 +131,35 @@ describe('PATCH /api/profile', () => {
 
     expect(res.statusCode).toBe(200);
   });
+
+  // SCRUM — the audit found the onboarding question for "years of leadership"
+  // was being silently dropped server-side. The PATCH body now accepts an
+  // explicit experienceBand token; the route validates it against the
+  // canonical set and persists it.
+  it('persists a valid experienceBand', async () => {
+    const updateSpy = vi.fn().mockResolvedValue([]);
+    const db = buildProfileDb({}, updateSpy);
+    const app = await buildApp(db);
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/profile',
+      payload: { experienceBand: '5-10' },
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(updateSpy).toHaveBeenCalled();
+    const setValue = updateSpy.mock.calls[0]![0] as Record<string, unknown>;
+    expect(setValue.experienceBand).toBe('5-10');
+  });
+
+  it('rejects an unknown experienceBand with 400', async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/api/profile',
+      payload: { experienceBand: '11-15' },
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json<Record<string, unknown>>().error).toBe('invalid_experience_band');
+  });
 });

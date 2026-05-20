@@ -76,9 +76,27 @@ export async function writeSupabaseAuditEntry(
   });
 }
 
+/**
+ * Per-route audit event name. Each /api/* handler passes its own value so
+ * audit_log captures route-level granularity instead of the legacy constant
+ * E1_SupabaseSessionValidated. Unknown / unsupplied values fall back to the
+ * legacy constant for backwards compatibility with older callers.
+ */
+export type AuditEvent =
+  | 'E1_SupabaseSessionValidated'
+  | 'E1_ChatTurnStream'
+  | 'E1_SessionsList'
+  | 'E1_SessionsSearch'
+  | 'E1_SessionGet'
+  | 'E1_SessionDelete'
+  | 'E1_ProfileGet'
+  | 'E1_ProfilePatch'
+  | 'E1_ProfileDelete';
+
 export async function readSupabaseSession(
   req: FastifyRequest,
   opts: ReadSessionOpts,
+  targetEndEvent: AuditEvent = 'E1_SupabaseSessionValidated',
 ): Promise<WebSession | null> {
   const auth = req.headers.authorization;
   const hasAuthHeader = typeof auth === 'string' && auth.length > 0;
@@ -213,7 +231,7 @@ export async function readSupabaseSession(
     await writeSupabaseAuditEntry(opts.db, {
       userId,
       requestId: req.id,
-      targetEndEvent: 'E1_SupabaseSessionValidated',
+      targetEndEvent,
       ipAddress: req.ip ?? null,
     });
   } catch (err) {
@@ -236,10 +254,11 @@ export async function requireSupabaseSession(
   req: FastifyRequest,
   reply: FastifyReply,
   opts: ReadSessionOpts,
+  targetEndEvent: AuditEvent = 'E1_SupabaseSessionValidated',
 ): Promise<WebSession | null> {
   let session: WebSession | null;
   try {
-    session = await readSupabaseSession(req, opts);
+    session = await readSupabaseSession(req, opts, targetEndEvent);
   } catch (err) {
     // Hard rule #4 — audit_log insert failure is fail-closed.
     req.log.error(

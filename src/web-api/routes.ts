@@ -11,7 +11,7 @@ import { turns } from '../shared/db/schema/turns.js';
 import { users } from '../shared/db/schema/users.js';
 import { chatStream } from '../shared/llm/chat.js';
 import type { RedisBundle } from '../shared/redis/client.js';
-import type { RateLimiters } from '../shared/redis/rate-limit.js';
+import { checkRateLimit, type RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import type { TraceEmitter } from '../shared/trace/index.js';
 import { asSessionId, asUserId } from '../shared/types/index.js';
@@ -50,7 +50,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   app.post<{
     Body: { message?: unknown; sessionId?: unknown; private?: unknown };
   }>('/api/chat/turn/stream', async (req, reply) => {
-    const session = await requireSupabaseSession(req, reply, opts);
+    const session = await requireSupabaseSession(req, reply, opts, 'E1_ChatTurnStream');
     if (session === null) return;
 
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
@@ -68,6 +68,30 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
 
     const t0 = Date.now();
     const userId = asUserId(session.userId);
+
+    // SCRUM — per-user + global rate limit on the stream endpoint.
+    // The hand-off to reply.hijack() happens *after* this check so we can
+    // still return a proper 429 status code with a JSON body if rejected.
+    const rateDecision = await checkRateLimit(
+      opts.rateLimiters,
+      'web-chat',
+      `web-chat:${userId}`,
+      'Normal',
+    );
+    if (rateDecision.decision === 'REJECT') {
+      return reply.code(429).send({ error: 'rate_limited', reason: rateDecision.reason });
+    }
+    if (rateDecision.decision === 'QUEUE') {
+      // Streaming + queueing is awkward; surface the back-pressure to the
+      // client as 429 with retry-after rather than holding the connection
+      // open. The UI can decide to retry after the suggested delay.
+      void reply.header('Retry-After', Math.ceil(rateDecision.retryAfterMs / 1000));
+      return reply.code(429).send({
+        error: 'rate_limited',
+        reason: rateDecision.reason,
+        retryAfterMs: rateDecision.retryAfterMs,
+      });
+    }
 
     // Tell Fastify to stop managing this response — we're going raw for SSE.
     // Without hijack, Fastify can layer Content-Length/serialization on top
@@ -109,6 +133,15 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
           recentTurnsLimit: 3,
         },
       );
+      // SCRUM — surface partial context-fetch failures on the request log so
+      // continuity issues can be correlated with degraded turns. The
+      // underlying P2 incident is still emitted by context-fetch itself.
+      if (ctx.partialFailure) {
+        req.log.warn(
+          { userId, sessionId, requestId: req.id },
+          'coaching context fetch was partial — turn may be degraded',
+        );
+      }
 
       // ---- Prompt assembly (v0_unified handles all response modes) ---
       // No practiceTag / levelTag — the validator's mode-dependent check was
@@ -169,45 +202,78 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       // ---- Persist turn row ------------------------------------------
       const latencyMs = Date.now() - t0;
       let turnId: string | null = null;
-      try {
-        const inserted = await opts.db
-          .insert(turns)
-          .values({
-            sessionId,
-            userId,
-            userMessage: message,
-            responseText: accumulated,
-            modelUsed: final?.modelUsed ?? 'claude-haiku-4-5',
-            latencyMs,
-          })
-          .returning({ id: turns.id });
-        turnId = inserted[0]?.id ?? null;
-
-        // Bump session.lastTurnAt / turnCount.
+      let persistFailed = false;
+      if (isPrivate) {
+        // SCRUM — Hard Rule #3 / privacy contract: private turns are
+        // never written to the `turns` table. The session row was created
+        // by the resolver; mark it isPrivate so the existing list/search
+        // filters keep it off the user's history. turnCount stays at 0.
         await opts.db
           .update(sessions)
-          .set({
-            lastTurnAt: new Date(),
-            turnCount: drizzleSql`${sessions.turnCount} + 1`,
-            ...(isPrivate ? { isPrivate: true } : {}),
-          })
+          .set({ isPrivate: true, lastTurnAt: new Date() })
           .where(eq(sessions.id, sessionId));
-      } catch (err) {
-        reportP2(
-          'streaming turn persist failed (non-blocking)',
-          {
-            source: 'PhaseC.WebApi.Stream',
-            extra: { error: err instanceof Error ? err.message : String(err) },
-          },
-          err,
-        );
+      } else {
+        // SCRUM — wrap the turn insert + session bump in a single
+        // transaction. Pre-fix, an insert success followed by a bump
+        // failure left `turn_count=0` so the session never appeared in
+        // the user's list even though the reply rendered. A transaction
+        // makes that state unreachable: either both writes succeed and
+        // the row surfaces, or both roll back and we emit a `warning`
+        // SSE event so the client can surface "not saved".
+        try {
+          turnId = await opts.db.transaction(async (tx) => {
+            const inserted = await tx
+              .insert(turns)
+              .values({
+                sessionId,
+                userId,
+                userMessage: message,
+                responseText: accumulated,
+                modelUsed: final?.modelUsed ?? 'claude-haiku-4-5',
+                latencyMs,
+              })
+              .returning({ id: turns.id });
+            await tx
+              .update(sessions)
+              .set({
+                lastTurnAt: new Date(),
+                turnCount: drizzleSql`${sessions.turnCount} + 1`,
+              })
+              .where(eq(sessions.id, sessionId));
+            return inserted[0]?.id ?? null;
+          });
+        } catch (err) {
+          persistFailed = true;
+          reportP2(
+            'streaming turn persist failed (non-blocking)',
+            {
+              source: 'PhaseC.WebApi.Stream',
+              extra: { error: err instanceof Error ? err.message : String(err) },
+            },
+            err,
+          );
+          // Tell the client the reply they just saw was not saved so the
+          // UI can mark the turn accordingly. Sent BEFORE `end` so the
+          // client's stream loop sees it before unwinding.
+          sendEvent('warning', {
+            code: 'persist_failed',
+            correlationId: req.id,
+            message: 'Your reply rendered but was not saved. Try sending again.',
+          });
+        }
       }
 
       sendEvent('end', { turnId, sessionId, latencyMs });
       reply.raw.end();
 
-      // Fire-and-forget session title generation (after the user sees their reply).
-      if (!isPrivate) {
+      // SCRUM — fire title generation only on the genuine first turn.
+      // resolved.isNew covers a freshly-created session; resolved.turnCount
+      // is the count BEFORE this turn was inserted, so === 0 means "this
+      // was the first persisted turn". Private sessions never get a title
+      // (matches the no-persistence contract). Persist failures also skip
+      // titling — we don't want a title on a session whose first turn
+      // didn't make it to the DB.
+      if (!isPrivate && !persistFailed && (resolved.isNew || resolved.turnCount === 0)) {
         void generateSessionTitle(opts.config, opts.db, sessionId, message);
       }
       return reply;
@@ -245,7 +311,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   app.get<{ Querystring: { before?: string; limit?: string } }>(
     '/api/sessions',
     async (req, reply) => {
-      const session = await requireSupabaseSession(req, reply, opts);
+      const session = await requireSupabaseSession(req, reply, opts, 'E1_SessionsList');
       if (session === null) return;
 
       const parsedLimit = Number.parseInt(req.query.limit ?? '20', 10);
@@ -271,10 +337,15 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         const c = cur[0];
         if (c !== undefined && c.userId === session.userId) {
           cursorLastTurnAt = c.lastTurnAt;
+        } else {
+          // SCRUM — silently fall through, but log the stale-cursor case so
+          // frequent occurrences (UI bug? session deleted in another tab?)
+          // can be detected via dashboard counts.
+          req.log.debug(
+            { cursor: beforeId, requestId: req.id },
+            'stale_cursor: unknown or foreign session id on /api/sessions',
+          );
         }
-        // If the cursor is unknown or not owned, we silently fall through and
-        // return the first page rather than 404-ing. This keeps the client
-        // resilient to stale cursors (e.g. session was deleted in another tab).
       }
 
       const baseConditions = [
@@ -346,7 +417,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   app.get<{ Querystring: { q?: string; before?: string; limit?: string } }>(
     '/api/sessions/search',
     async (req, reply) => {
-      const session = await requireSupabaseSession(req, reply, opts);
+      const session = await requireSupabaseSession(req, reply, opts, 'E1_SessionsSearch');
       if (session === null) return;
 
       const q = req.query.q?.trim();
@@ -443,8 +514,15 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   );
 
   // GET /api/sessions/:id ----------------------------------------------
+  // SCRUM — turn cap. Long sessions still return their most recent N turns
+  // (oldest-first within the page); the response now signals `hasMore` so
+  // the client can surface a "showing latest N turns" notice rather than
+  // silently truncating. Pagination via a cursor parameter is the next
+  // step (see follow-up ticket).
+  const SESSION_TURN_LIMIT = 200;
+
   app.get<{ Params: { id: string } }>('/api/sessions/:id', async (req, reply) => {
-    const session = await requireSupabaseSession(req, reply, opts);
+    const session = await requireSupabaseSession(req, reply, opts, 'E1_SessionGet');
     if (session === null) return;
 
     const row = await opts.db
@@ -462,6 +540,8 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       return reply.code(404).send({ error: 'not_found' });
     }
 
+    // Fetch one more than the cap so we can detect overflow without a
+    // separate COUNT.
     const turnRows = await opts.db
       .select({
         id: turns.id,
@@ -472,22 +552,26 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       .from(turns)
       .where(eq(turns.sessionId, s.id))
       .orderBy(turns.createdAt)
-      .limit(200);
+      .limit(SESSION_TURN_LIMIT + 1);
+
+    const hasMore = turnRows.length > SESSION_TURN_LIMIT;
+    const pageTurns = hasMore ? turnRows.slice(0, SESSION_TURN_LIMIT) : turnRows;
 
     return reply.send({
       session: { id: s.id, title: s.title, isPrivate: s.isPrivate },
-      turns: turnRows.map((t) => ({
+      turns: pageTurns.map((t) => ({
         id: t.id,
         userMessage: t.userMessage,
         responseText: t.responseText,
         createdAt: t.createdAt.toISOString(),
       })),
+      hasMore,
     });
   });
 
   // DELETE /api/sessions/:id -------------------------------------------
   app.delete<{ Params: { id: string } }>('/api/sessions/:id', async (req, reply) => {
-    const session = await requireSupabaseSession(req, reply, opts);
+    const session = await requireSupabaseSession(req, reply, opts, 'E1_SessionDelete');
     if (session === null) return;
 
     const row = await opts.db
@@ -506,7 +590,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
 
   // GET /api/profile ---------------------------------------------------
   app.get('/api/profile', async (req, reply) => {
-    const session = await requireSupabaseSession(req, reply, opts);
+    const session = await requireSupabaseSession(req, reply, opts, 'E1_ProfileGet');
     if (session === null) return;
 
     const row = await opts.db
@@ -560,14 +644,20 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     'Democracy',
   ]);
 
+  // SCRUM — canonical experience-band tokens. Must match the union in
+  // web/src/lib/api.ts ProfilePatchBody and the formatter in
+  // src/prompt-assembly/blocks.ts.
+  const KNOWN_EXPERIENCE_BANDS = new Set(['<5', '5-10', '10+']);
+
   app.patch<{
     Body: Partial<{
       fullName: string;
       mappedPractices: string[];
       finishOnboarding: boolean;
+      experienceBand: string;
     }>;
   }>('/api/profile', async (req, reply) => {
-    const session = await requireSupabaseSession(req, reply, opts);
+    const session = await requireSupabaseSession(req, reply, opts, 'E1_ProfilePatch');
     if (session === null) return;
 
     // Validate. Reject unknown values for the bounded enums.
@@ -586,6 +676,19 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         return reply.code(400).send({ error: 'invalid_practice', values: invalid });
       update['mappedPractices'] = incoming;
     }
+
+    if (typeof req.body.experienceBand === 'string') {
+      // SCRUM — onboarding used to drop this silently because the route had
+      // no field for it. Coach prompt assembler keys on this value, so a
+      // missing band degrades personalization across every turn.
+      if (!KNOWN_EXPERIENCE_BANDS.has(req.body.experienceBand)) {
+        return reply
+          .code(400)
+          .send({ error: 'invalid_experience_band', value: req.body.experienceBand });
+      }
+      update['experienceBand'] = req.body.experienceBand;
+    }
+
     if (req.body.finishOnboarding === true) {
       update['status'] = 'onboarded';
       update['onboardingCompletedAt'] = new Date();
@@ -597,7 +700,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
 
   // DELETE /api/profile (delete-account) -------------------------------
   app.delete('/api/profile', async (req, reply) => {
-    const session = await requireSupabaseSession(req, reply, opts);
+    const session = await requireSupabaseSession(req, reply, opts, 'E1_ProfileDelete');
     if (session === null) return;
 
     // FK ON DELETE CASCADE on sessions.user_id and turns.session_id will
@@ -606,7 +709,4 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     await opts.db.delete(users).where(eq(users.id, session.userId));
     return reply.send({ ok: true });
   });
-
-  // Reserved for future use.
-  void drizzleSql;
 }

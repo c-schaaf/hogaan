@@ -51,6 +51,8 @@ export interface ProfilePatchBody {
   fullName?: string;
   mappedPractices?: string[];
   finishOnboarding?: boolean;
+  /** Canonical experience band — used by the coach prompt assembler. */
+  experienceBand?: '<5' | '5-10' | '10+';
 }
 
 export class ApiError extends Error {
@@ -107,7 +109,17 @@ export type TurnStreamEvent =
   | { type: 'delta'; text: string }
   | { type: 'crisis'; reason: string; resources: Record<string, string> }
   | { type: 'end'; turnId: string | null; sessionId: string | null; latencyMs: number }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  // SCRUM — emitted by the server when the reply rendered but the turn
+  // failed to persist (e.g., DB transaction rollback). The client should
+  // surface "not saved" UI on the just-rendered bubble rather than treat
+  // the stream as failed.
+  | {
+      type: 'warning';
+      code: string;
+      correlationId?: string;
+      message?: string;
+    };
 
 /**
  * POST /api/chat/turn/stream as an async generator. Yields TurnStreamEvent
