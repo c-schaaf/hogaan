@@ -29,15 +29,24 @@ export interface ResolvedLibraries {
 }
 
 /**
- * Process #9 §2 resolver. In-process cache with a 60s TTL — cache hit is the
- * hot path (target p99 ~5ms; miss target p99 ~35ms).
+ * Process #9 §2 resolver. In-process cache — cache hit is the hot path
+ * (target p99 ~5ms; miss target p99 ~35ms).
  *
  * Why pin all five libraries together: a single turn must use one consistent
  * snapshot. If voice_rules v3 is active but cultural_framing v2 is fetched
  * mid-resolution, Process #9 §13 determinismHash diverges — replays will not
  * reproduce.
+ *
+ * SCRUM (PR 7, launch-readiness D-7) — TTL dropped from 60s to 5s. With the
+ * 2-instance Render fleet (B-3), per-process caches diverged: instance A
+ * picked up a new library version at t+0:30 of the minute, instance B at
+ * t+0:42 — a ~12 second window where users on different instances saw
+ * different prompts. 5s TTL caps the divergence window at ~5s with a small
+ * extra DB read frequency cost (12× more reads at idle, still negligible
+ * vs. the per-turn workload). The DB is the source of truth; no Redis
+ * pub-sub needed for convergence.
  */
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 5_000;
 
 interface CacheEntry {
   resolved: ResolvedLibraries;
