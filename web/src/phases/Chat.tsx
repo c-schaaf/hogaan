@@ -39,6 +39,14 @@ function renderResponse(text: string): BotParagraph {
 }
 
 interface ChatItem {
+  /**
+   * SCRUM — stable per-item id. Pre-fix, list rows were keyed by array
+   * index, which collides on role changes (e.g., the streaming bubble's
+   * replace-vs-append flip in `upsertStreamingBot`) and causes React to
+   * reuse the wrong DOM node + state across renders. Generated locally
+   * via a monotonic counter so server round-trips aren't required.
+   */
+  id: string;
   kind: 'divider' | 'user' | 'bot';
   label?: string;
   text?: string;
@@ -49,6 +57,12 @@ interface ChatItem {
   // original prompt so the user can resend with one click.
   unsent?: boolean;
   retryText?: string;
+}
+
+let nextItemId = 0;
+function newItemId(): string {
+  nextItemId += 1;
+  return `ci-${nextItemId.toString(36)}`;
 }
 
 function SessionsRail({
@@ -166,7 +180,7 @@ export function Chat({
 }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [items, setItems] = useState<ChatItem[]>(() => [
-    { kind: 'divider', label: dividerLabel() },
+    { id: newItemId(), kind: 'divider', label: dividerLabel() },
   ]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentTitle, setCurrentTitle] = useState('Tonight’s session');
@@ -222,12 +236,20 @@ export function Chat({
         const detail = await api.sessions.get(openSessionId);
         setSessionId(detail.session.id);
         if (detail.session.title) setCurrentTitle(detail.session.title);
-        const hydrated: ChatItem[] = [{ kind: 'divider', label: dividerLabel() }];
+        const hydrated: ChatItem[] = [{ id: newItemId(), kind: 'divider', label: dividerLabel() }];
         for (const t of detail.turns) {
-          hydrated.push({ kind: 'user', text: t.userMessage });
+          // Use the persisted turn id as a stable key for the user bubble;
+          // the assistant bubble keys off a derived suffix so each pair has
+          // distinct ids without collisions across turns.
+          hydrated.push({ id: `turn-${t.id}-u`, kind: 'user', text: t.userMessage });
           if (t.responseText) {
             const r = renderResponse(t.responseText);
-            hydrated.push({ kind: 'bot', paras: r.paras, chips: r.chips });
+            hydrated.push({
+              id: `turn-${t.id}-b`,
+              kind: 'bot',
+              paras: r.paras,
+              chips: r.chips,
+            });
           }
         }
         setItems(hydrated);
@@ -240,7 +262,8 @@ export function Chat({
   const sendText = async (text: string) => {
     const t = text.trim();
     if (t.length === 0) return;
-    setItems((prev) => [...prev, { kind: 'user', text: t }]);
+    const userItemId = newItemId();
+    setItems((prev) => [...prev, { id: userItemId, kind: 'user', text: t }]);
     setDraft('');
     setThinking(true);
 
@@ -251,16 +274,27 @@ export function Chat({
     // streaming into; otherwise replace.
     let streamingText = '';
     let receivedDeltas = false;
+    // Stable id for the streaming bot bubble — so the replace-in-place
+    // path uses the same React key as the original append, and so a
+    // mid-stream error that replaces this bubble with the error copy
+    // doesn't change the row's identity.
+    const botItemId = newItemId();
     const upsertStreamingBot = (text: string) => {
       const r = renderResponse(text);
       setItems((prev) => {
         const lastIdx = prev.length - 1;
         if (lastIdx >= 0 && prev[lastIdx].kind === 'bot') {
           const next = prev.slice();
-          next[lastIdx] = { kind: 'bot', paras: r.paras, chips: r.chips };
+          next[lastIdx] = {
+            ...prev[lastIdx],
+            id: prev[lastIdx].id,
+            kind: 'bot',
+            paras: r.paras,
+            chips: r.chips,
+          };
           return next;
         }
-        return [...prev, { kind: 'bot', paras: r.paras, chips: r.chips }];
+        return [...prev, { id: botItemId, kind: 'bot', paras: r.paras, chips: r.chips }];
       });
     };
 
@@ -286,26 +320,28 @@ export function Chat({
     } catch (err) {
       setThinking(false);
       console.error('stream turn failed', err);
-      const errorBubble: ChatItem = {
-        kind: 'bot',
-        paras: [
-          <>
-            Something went wrong on my side just now. Take a breath and try again - I'm still here.
-          </>,
-        ],
-        chips: [],
-      };
+      const errorBubbleParas = [
+        <>
+          Something went wrong on my side just now. Take a breath and try again - I'm still here.
+        </>,
+      ];
       if (receivedDeltas) {
         // Mid-stream failure: replace the partial reply bubble in place
-        // rather than appending a second bubble.
+        // rather than appending a second bubble. Preserve its id so React
+        // reuses the same DOM node.
         setItems((prev) => {
           const lastIdx = prev.length - 1;
           if (lastIdx >= 0 && prev[lastIdx].kind === 'bot') {
             const next = prev.slice();
-            next[lastIdx] = errorBubble;
+            next[lastIdx] = {
+              ...prev[lastIdx],
+              kind: 'bot',
+              paras: errorBubbleParas,
+              chips: [],
+            };
             return next;
           }
-          return [...prev, errorBubble];
+          return [...prev, { id: newItemId(), kind: 'bot', paras: errorBubbleParas, chips: [] }];
         });
       } else {
         // Pre-first-byte failure: no bot bubble exists yet. Mark the
@@ -319,7 +355,7 @@ export function Chat({
               break;
             }
           }
-          next.push(errorBubble);
+          next.push({ id: newItemId(), kind: 'bot', paras: errorBubbleParas, chips: [] });
           return next;
         });
       }
@@ -332,7 +368,7 @@ export function Chat({
   // ChatGPT mental model users now expect.
   const startNewChat = () => {
     setSessionId(null);
-    setItems([{ kind: 'divider', label: dividerLabel() }]);
+    setItems([{ id: newItemId(), kind: 'divider', label: dividerLabel() }]);
     setCurrentTitle('Tonight’s session');
     setDraft('');
     setThinking(false);
@@ -399,16 +435,16 @@ export function Chat({
 
         <div className="ch-scroll" ref={scrollRef}>
           <div className="ch-stream">
-            {items.map((it, i) => {
+            {items.map((it) => {
               if (it.kind === 'divider')
                 return (
-                  <div key={i} className="chat-divider">
+                  <div key={it.id} className="chat-divider">
                     <span>{it.label}</span>
                   </div>
                 );
               if (it.kind === 'user')
                 return (
-                  <div key={i} className="chat-row user">
+                  <div key={it.id} className="chat-row user">
                     <div className={`chat-bubble user ${it.unsent === true ? 'is-unsent' : ''}`}>
                       {it.text}
                     </div>
@@ -426,7 +462,7 @@ export function Chat({
                 );
               if (it.kind === 'bot') {
                 return (
-                  <Fragment key={i}>
+                  <Fragment key={it.id}>
                     <div className="chat-row bot">
                       <div className="chat-avatar">
                         <span>H</span>
