@@ -10,7 +10,11 @@ export {
   type PromptUnderConstruction,
 } from './types.js';
 export { assemblePrompt, type AssembleOptions } from './assembler.js';
-export { computeDeterminismHash, type StructuralInputs } from './determinism-hash.js';
+export {
+  computeDeterminismHash,
+  DETERMINISM_HASH_VERSION,
+  type StructuralInputs,
+} from './determinism-hash.js';
 export { writePromptLog } from './log.js';
 export { validateInputPayload } from './validate.js';
 export { selectSystemTemplate } from './template.js';

@@ -16,14 +16,17 @@ import { users } from './users.js';
  * identical to this one" — the basis for the Phase 7.15 voice-fidelity
  * audit harness.
  */
+// SCRUM (PR 5) — `practice_tag` and `level_tag` columns dropped in
+// migration 0016. The tagger has been stubbed since the unified prompt
+// landed (`src/prompt-assembly/validate.ts:7-15`) so they have been null
+// on every live row. The `analytics.prompt_logs_safe` view was re-created
+// in 0017 without these columns.
 export const promptLogs = pgTable('prompt_logs', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
   sessionId: uuid('session_id').references(() => sessions.id, { onDelete: 'set null' }),
   turnId: uuid('turn_id').references(() => turns.id, { onDelete: 'set null' }),
   responseMode: text('response_mode').notNull(),
-  practiceTag: text('practice_tag'),
-  levelTag: text('level_tag'),
   /** AES-256-GCM ciphertext of the full assembled prompt body. */
   promptTextEncrypted: text('prompt_text_encrypted').notNull(),
   tokenCount: integer('token_count').notNull(),

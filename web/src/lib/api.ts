@@ -204,8 +204,11 @@ export const api = {
         `/api/sessions/search?${params.toString()}`,
       );
     },
-    get: (id: string) => call<SessionDetail>(`/api/sessions/${id}`),
-    del: (id: string) => call<{ ok: true }>(`/api/sessions/${id}`, { method: 'DELETE' }),
+    // SCRUM (PR 5) — encode the session id so a stray `/` or whitespace
+    // can't change the URL shape (handler-side UUID guard backs this up).
+    get: (id: string) => call<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
+    del: (id: string) =>
+      call<{ ok: true }>(`/api/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
   profile: {
     get: () => call<MeResponse>('/api/profile'),

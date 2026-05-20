@@ -6,8 +6,6 @@ import type { LibraryVersionSet, ResponseMode } from '../shared/types/index.js';
  *
  *   - responseMode
  *   - systemTemplateId
- *   - practiceTag, levelTag
- *   - secondaryPracticeTag, secondaryLevelTag, taggerConfidence
  *   - active library versions (promptTemplates)
  *
  * Excluded (dynamic): userMessage, sessionTurns, retrievedMemories, profile.
@@ -18,29 +16,20 @@ import type { LibraryVersionSet, ResponseMode } from '../shared/types/index.js';
  * structurally identical to this one" and rerun them under a new library
  * version for regression detection.
  *
- * Hash version: any change to the tagger output schema (e.g. adding a new
- * tag dimension) MUST bump the hash version. Two turns from before vs.
- * after such a change should NOT produce the same hash even if their
- * surface fields look identical — they're tagged with different machinery.
- *
- * SCRUM-47 — `culturalFramingConcept` and the v1 library versions
- * (voiceRules, culturalFraming) were removed from the structural input set
- * along with the v1 multi-block assembly path. Hash version stays at v2;
- * the consumer audit harness tolerates the resulting structural drift.
+ * SCRUM (PR 5) — bumped to `'v3'` with the audit cleanup that trimmed the
+ * structural input set. The tagger has been stubbed since the unified
+ * prompt landed (see `validate.ts:7-15`), so `practiceTag` / `levelTag` /
+ * `secondaryPracticeTag` / `secondaryLevelTag` / `taggerConfidence` were
+ * always null on every live row and contributed nothing distinguishing.
+ * Removing them makes the hash describe what actually varies. Pre-v3
+ * hashes will never match post-v3 hashes by design — the audit harness
+ * should treat the version bump as a cohort boundary.
  */
-export const DETERMINISM_HASH_VERSION = 'v2';
+export const DETERMINISM_HASH_VERSION = 'v3';
 
 export interface StructuralInputs {
   responseMode: ResponseMode;
   systemTemplateId: string;
-  practiceTag: string | null;
-  levelTag: string | null;
-  /** Tagger fields, optional. */
-  secondaryPracticeTag?: string | null;
-  secondaryLevelTag?: string | null;
-  /** Tagger confidence ∈ [0, 1]. Rounded to 2 decimals to keep similar
-   *  confidences hashing the same (replay tolerance). */
-  taggerConfidence?: number | null;
   libraryVersions: LibraryVersionSet;
 }
 
@@ -50,14 +39,6 @@ export function computeDeterminismHash(inputs: StructuralInputs): string {
     hashVersion: DETERMINISM_HASH_VERSION,
     responseMode: inputs.responseMode,
     systemTemplateId: inputs.systemTemplateId,
-    practiceTag: inputs.practiceTag,
-    levelTag: inputs.levelTag,
-    secondaryPracticeTag: inputs.secondaryPracticeTag ?? null,
-    secondaryLevelTag: inputs.secondaryLevelTag ?? null,
-    taggerConfidence:
-      inputs.taggerConfidence === undefined || inputs.taggerConfidence === null
-        ? null
-        : Number(inputs.taggerConfidence.toFixed(2)),
     libraryVersions: {
       promptTemplates: inputs.libraryVersions.promptTemplates,
     },
