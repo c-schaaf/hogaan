@@ -20,6 +20,7 @@ import { Forgot } from './phases/Forgot';
 import { Home } from './phases/Home';
 import { Login } from './phases/Login';
 import { Onboarding, type OnboardingAnswers } from './phases/Onboarding';
+import { yearsToBand } from './phases/onboarding/data';
 import { Profile } from './phases/Profile';
 import { Reset } from './phases/Reset';
 import { Sessions } from './phases/Sessions';
@@ -250,10 +251,14 @@ export function Shell() {
 
   const handleOnboardingComplete = async (answers: OnboardingAnswers) => {
     try {
+      // SCRUM — experienceBand was previously dropped. Map the YEARS label
+      // the user picked to the canonical token before sending.
+      const band = yearsToBand(answers.years);
       await api.profile.patch({
         fullName: answers.name || me?.fullName || '',
         mappedPractices: answers.practices,
         finishOnboarding: true,
+        ...(band !== null ? { experienceBand: band } : {}),
       });
     } catch (err) {
       console.error('finish onboarding failed', err);

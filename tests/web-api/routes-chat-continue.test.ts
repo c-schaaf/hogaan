@@ -50,12 +50,14 @@ vi.mock('../../src/coaching/orchestrator.js', () => ({
 }));
 
 function fakeDb() {
-  return {
+  const stub = {
     select: () => ({ from: () => ({ where: () => ({ limit: () => Promise.resolve([]) }) }) }),
-    insert: () => ({ values: () => ({ returning: () => Promise.resolve([]) }) }),
+    insert: () => ({ values: () => ({ returning: () => Promise.resolve([{ id: 't1' }]) }) }),
     update: () => ({ set: () => ({ where: () => Promise.resolve([]) }) }),
     delete: () => ({ where: () => Promise.resolve([]) }),
+    transaction: async (cb: (tx: unknown) => Promise<unknown>) => cb(stub),
   };
+  return stub;
 }
 
 async function buildApp() {

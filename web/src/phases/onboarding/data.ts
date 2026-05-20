@@ -18,6 +18,33 @@ export const YEARS = [
   '10+ years',
 ] as const;
 
+/** Canonical experience tokens consumed by the prompt assembler. */
+export type ExperienceBand = '<5' | '5-10' | '10+';
+
+/**
+ * Map a free-form YEARS option to the canonical band. We bias the '3–5 years'
+ * boundary to '<5' so users with fewer than five completed years aren't told
+ * the coach perceives them as a 5–10 year leader. Returns null when the user
+ * skipped or picked nothing — caller should omit the field rather than write
+ * NULL through.
+ */
+export function yearsToBand(years: string | null | undefined): ExperienceBand | null {
+  if (years === null || years === undefined) return null;
+  switch (years) {
+    case 'Not yet — but I want to grow into it':
+    case 'Less than a year':
+    case '1–3 years':
+    case '3–5 years':
+      return '<5';
+    case '5–10 years':
+      return '5-10';
+    case '10+ years':
+      return '10+';
+    default:
+      return null;
+  }
+}
+
 export interface Reason {
   label: string;
   branch: 'challenge' | 'growth' | 'referred' | 'explore';

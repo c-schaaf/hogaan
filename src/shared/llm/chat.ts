@@ -59,6 +59,15 @@ export interface ChatResponse {
 const PRIMARY_TIMEOUT_DEFAULT_MS = 12000;
 const FALLBACK_TIMEOUT_DEFAULT_MS = 2000;
 
+/**
+ * Single source of truth for the primary model identifier. Today this is
+ * an alias (latest 4.5). Pinning to a dated id like 'claude-haiku-4-5-20251001'
+ * would lock production to a known snapshot and shield us from alias drift —
+ * do that here when we're ready to take the migration cost. The
+ * AnthropicChatRequest model union still type-narrows to the alias.
+ */
+const PRIMARY_MODEL_ID = 'claude-haiku-4-5' as const;
+
 let primaryBreaker:
   | ReturnType<
       typeof buildBreaker<
@@ -98,7 +107,7 @@ export async function chat(
   try {
     const result = await withRetry(() =>
       getPrimaryBreaker()(config, {
-        model: 'claude-haiku-4-5',
+        model: PRIMARY_MODEL_ID,
         systemPrompt: req.systemPrompt,
         messages: req.messages,
         maxTokens: req.maxTokens,

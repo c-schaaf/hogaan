@@ -36,7 +36,7 @@ vi.mock('../../src/web-api/session-title.js', () => ({
 }));
 
 function buildChatDb() {
-  return {
+  const stub = {
     select: () => ({
       from: () => ({
         where: () => ({
@@ -44,10 +44,12 @@ function buildChatDb() {
         }),
       }),
     }),
-    insert: () => ({ values: () => ({ returning: () => Promise.resolve([]) }) }),
+    insert: () => ({ values: () => ({ returning: () => Promise.resolve([{ id: 't1' }]) }) }),
     update: () => ({ set: () => ({ where: () => Promise.resolve([]) }) }),
     delete: () => ({ where: () => Promise.resolve([]) }),
+    transaction: async (cb: (tx: unknown) => Promise<unknown>) => cb(stub),
   };
+  return stub;
 }
 
 async function buildApp() {
