@@ -118,6 +118,16 @@ export function Shell() {
       } else {
         next = 'home';
       }
+      // SCRUM — if we're landing back in chat, rehydrate the active
+      // session id so a mid-conversation refresh reopens the transcript.
+      // Chat.tsx writes this on every sessionId change.
+      if (next === 'chat') {
+        const activeId = sessionStorage.getItem('hogaan.activeSessionId');
+        if (activeId !== null && activeId.length > 0) {
+          setOpenSessionId(activeId);
+          setChatOrigin('home');
+        }
+      }
       console.log('[shell] routing to', next, '(urlPhase:', urlPhase, 'stored:', stored, ')');
       setPhase(next);
     } catch (err) {
@@ -230,6 +240,10 @@ export function Shell() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    // Clear cross-session state so a different user signing in on the
+    // same browser doesn't inherit the previous user's active chat.
+    sessionStorage.removeItem('hogaan.activeSessionId');
+    sessionStorage.removeItem('shell-phase');
     setMe(null);
     setPhase('login');
   };
@@ -357,6 +371,10 @@ export function Shell() {
           }
           seed={chatSeed}
           openSessionId={openSessionId}
+          onOpenSession={(id) => {
+            setChatSeed(null);
+            setOpenSessionId(id);
+          }}
           onBack={() => {
             setOpenSessionId(null);
             setPhase(chatOrigin);
