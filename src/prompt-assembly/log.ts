@@ -25,13 +25,14 @@ export async function writePromptLog(
   bundle: OutputBundle,
 ): Promise<{ success: boolean }> {
   try {
+    // SCRUM (PR 5) — `practiceTag` / `levelTag` columns dropped in
+    // migration 0016. They were always null on the live path because the
+    // tagger is stubbed.
     await db.insert(promptLogs).values({
       ...(payload.userId !== undefined ? { userId: payload.userId } : {}),
       ...(payload.sessionId !== undefined ? { sessionId: payload.sessionId } : {}),
       ...(payload.turnId !== undefined ? { turnId: payload.turnId } : {}),
       responseMode: payload.responseMode,
-      ...(bundle.practiceTag !== null ? { practiceTag: bundle.practiceTag } : {}),
-      ...(bundle.levelTag !== null ? { levelTag: bundle.levelTag } : {}),
       promptTextEncrypted: encryptPlaintext(config, bundle.assembledPrompt),
       tokenCount: bundle.tokenCount,
       degradationFlags: bundle.degradationFlags,

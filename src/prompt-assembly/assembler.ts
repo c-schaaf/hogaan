@@ -94,16 +94,13 @@ export async function assemblePrompt(
   };
 
   // Determinism hash over STRUCTURAL inputs only — independent of dynamic
-  // memory/session/user-message content.
+  // memory/session/user-message content. SCRUM (PR 5) — bumped to v3 with
+  // the tagger fields removed since they have been null on every live
+  // row since the tagger was stubbed.
   const versionSet: LibraryVersionSet = toVersionSet(libs);
   const determinismHash = computeDeterminismHash({
     responseMode: validated.responseMode,
     systemTemplateId: template.id,
-    practiceTag: validated.practiceTag ?? null,
-    levelTag: validated.levelTag ?? null,
-    secondaryPracticeTag: payload.secondaryPracticeTag ?? null,
-    secondaryLevelTag: payload.secondaryLevelTag ?? null,
-    taggerConfidence: payload.taggerConfidence ?? null,
     libraryVersions: versionSet,
   });
 

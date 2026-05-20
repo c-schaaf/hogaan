@@ -129,7 +129,13 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
           userId,
           sessionId: asSessionId(sessionId),
           query: message,
-          memoryTopN: 3,
+          // SCRUM (launch-readiness D-2) — Voyage embed + memories table
+          // are disabled for launch. The writer was never wired on a live
+          // path so retrieval queries an empty table at the cost of one
+          // ~300ms Voyage call per turn. memoryTopN=0 skips the Voyage
+          // call entirely and recovers TTFT budget. Memory feature ships
+          // (writer + retrieval) in a post-launch follow-up PR.
+          memoryTopN: 0,
           recentTurnsLimit: 3,
         },
       );
@@ -534,9 +540,19 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   // step (see follow-up ticket).
   const SESSION_TURN_LIMIT = 200;
 
+  // SCRUM (launch-readiness audit #28) — Fastify's :id route param accepts
+  // arbitrary strings, so requests like `GET /api/sessions/` (trailing slash
+  // matching empty string) or `/api/sessions/not-a-uuid` fall through to
+  // DB queries that always return 0 rows, masking client bugs and wasting
+  // a query slot. Validate UUID shape at the handler top.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
   app.get<{ Params: { id: string } }>('/api/sessions/:id', async (req, reply) => {
     const session = await requireSupabaseSession(req, reply, opts, 'E1_SessionGet');
     if (session === null) return;
+    if (!UUID_RE.test(req.params.id)) {
+      return reply.code(400).send({ error: 'invalid_session_id' });
+    }
 
     const row = await opts.db
       .select({
@@ -586,6 +602,9 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   app.delete<{ Params: { id: string } }>('/api/sessions/:id', async (req, reply) => {
     const session = await requireSupabaseSession(req, reply, opts, 'E1_SessionDelete');
     if (session === null) return;
+    if (!UUID_RE.test(req.params.id)) {
+      return reply.code(400).send({ error: 'invalid_session_id' });
+    }
 
     const row = await opts.db
       .select({ id: sessions.id, userId: sessions.userId })

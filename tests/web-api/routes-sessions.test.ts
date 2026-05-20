@@ -10,7 +10,9 @@ import {
 
 const TEST_USER_ID = '00000000-0000-0000-0000-000000000001';
 const OTHER_USER_ID = '00000000-0000-0000-0000-000000000002';
-const SESSION_ID = 'sess-0000-0000-0000-000000000001';
+// SCRUM (PR 5) — the route now validates UUID shape; fixture ids must be
+// real UUIDs.
+const SESSION_ID = '11111111-1111-1111-1111-000000000001';
 
 vi.mock('../../src/web-api/supabase-session.js', () => ({
   requireSupabaseSession: vi.fn(),
@@ -295,9 +297,24 @@ describe('GET /api/sessions/:id', () => {
     } as never;
 
     const app = await buildApp(db);
-    const res = await app.inject({ method: 'GET', url: '/api/sessions/nonexistent-id' });
+    // Well-formed UUID that doesn't exist → 404. Non-UUID-shaped ids are
+    // rejected with 400 at the handler top (covered by the test below).
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/sessions/22222222-2222-2222-2222-222222222222',
+    });
 
     expect(res.statusCode).toBe(404);
+  });
+
+  // SCRUM (PR 5, audit #28) — handler now validates UUID shape before
+  // running any DB query. Trailing slash, empty id, and non-UUID strings
+  // all return 400 instead of falling through.
+  it('returns 400 on a non-UUID-shaped id', async () => {
+    const app = await buildApp();
+    const res = await app.inject({ method: 'GET', url: '/api/sessions/not-a-uuid' });
+    expect(res.statusCode).toBe(400);
+    expect(res.json<Record<string, unknown>>().error).toBe('invalid_session_id');
   });
 
   // SCRUM — the audit found GET /api/sessions/:id silently truncated long
