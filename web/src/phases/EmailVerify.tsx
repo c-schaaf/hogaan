@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { IconCheck, IconEnvelope } from '../components/Icons';
+import { humanizeAuthError } from '../lib/auth-errors';
 import { supabase } from '../lib/supabase';
 import { AuthCard } from './auth/AuthShell';
 
@@ -14,23 +15,37 @@ interface Props {
 export function EmailVerify({ email, mode = 'signup', onContinue, goSignup }: Props) {
   const isLogin = mode === 'login';
   const [resent, setResent] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
   const [counter, setCounter] = useState(0);
 
   const onResend = async () => {
     if (counter > 0) return;
-    setResent(true);
+    setResendError(null);
     setCounter(30);
-    if (isLogin) {
-      await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: window.location.origin,
-          shouldCreateUser: false,
-        },
-      });
-    } else {
-      await supabase.auth.resend({ type: 'signup', email });
+    // SCRUM — pre-fix, this awaited the supabase call but never inspected
+    // the `{ error }` field, so a quota / network / template failure still
+    // flashed "Sent — check your inbox." The user thought the link was
+    // coming and the support inbox filled up with "I never got the email"
+    // complaints. Capture the error and surface it via humanizeAuthError;
+    // only show the success toast when Supabase actually accepted the
+    // request.
+    const { error } = isLogin
+      ? await supabase.auth.signInWithOtp({
+          email,
+          options: {
+            emailRedirectTo: window.location.origin,
+            shouldCreateUser: false,
+          },
+        })
+      : await supabase.auth.resend({ type: 'signup', email });
+    if (error) {
+      setResendError(humanizeAuthError(error));
+      // Reset the countdown so the user can try again immediately rather
+      // than waiting 30s on a failure they didn't cause.
+      setCounter(0);
+      return;
     }
+    setResent(true);
     setTimeout(() => setResent(false), 2600);
   };
 
@@ -83,6 +98,7 @@ export function EmailVerify({ email, mode = 'signup', onContinue, goSignup }: Pr
             <IconCheck /> Sent — check your inbox.
           </div>
         )}
+        {resendError !== null && <div className="auth-form-error">{resendError}</div>}
         <div className="auth-row">
           <button type="button" className="auth-link muted" onClick={goSignup}>
             Use a different email

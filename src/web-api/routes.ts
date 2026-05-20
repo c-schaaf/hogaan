@@ -291,10 +291,19 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         { err: { message: msg, stack, kind: isAssembly ? 'prompt-assembly' : 'llm-or-other' } },
         'streaming turn failed',
       );
-      reportP2('streaming turn failed', {
-        source: 'PhaseC.WebApi.Stream',
-        extra: { error: msg, kind: isAssembly ? 'prompt-assembly' : 'llm-or-other' },
-      });
+      // SCRUM — pass the original error as the 3rd argument so the
+      // incident reporter forwards the stack to Sentry. Without it the
+      // dispatcher saw only the message string and grouped every
+      // continue-session-class failure under a single fingerprint,
+      // making them invisible in triage.
+      reportP2(
+        'streaming turn failed',
+        {
+          source: 'PhaseC.WebApi.Stream',
+          extra: { error: msg, kind: isAssembly ? 'prompt-assembly' : 'llm-or-other' },
+        },
+        err,
+      );
       try {
         // Echo the actual error message back to the client (dev-friendly).
         // Tighten this to a generic copy before launch.
@@ -617,7 +626,22 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     if (typeof u.fullNameEncrypted === 'string' && u.fullNameEncrypted.length > 0) {
       try {
         fullName = decryptPlaintext(opts.config, u.fullNameEncrypted);
-      } catch {
+      } catch (err) {
+        // SCRUM — pre-fix this was swallowed silently, so a rotated key or
+        // corrupted ciphertext made the user's name render as "" with no
+        // signal. Surface a P2 before the fallback so encryption drift
+        // gets a ticket instead of a confusing UX.
+        reportP2(
+          'profile fullName decrypt failed (rendering empty)',
+          {
+            source: 'PhaseC.WebApi.Profile',
+            extra: {
+              userId: u.id,
+              error: err instanceof Error ? err.message : String(err),
+            },
+          },
+          err,
+        );
         fullName = '';
       }
     }

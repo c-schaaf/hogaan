@@ -69,7 +69,15 @@ export function Signup({ prefill = {}, goVerify, goLogin }: Props) {
       <h1 className="auth-h">Welcome to Hogaan.</h1>
       <p className="auth-sub">Create an account. We'll have you in a conversation in 90 seconds.</p>
 
-      <div className="auth-form">
+      {/* SCRUM — see Login.tsx note. Real <form> + type="submit" makes
+          Enter on any field submit and plays well with password managers. */}
+      <form
+        className="auth-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
         <FloatingField
           label="Full name"
           value={name}
@@ -95,10 +103,9 @@ export function Signup({ prefill = {}, goVerify, goLogin }: Props) {
           autoComplete="new-password"
           error={errs.pw}
           showStrength
-          onSubmit={submit}
         />
         {formError && <div className="auth-form-error">{formError}</div>}
-        <button className="auth-cta" onClick={submit} disabled={loading || done}>
+        <button type="submit" className="auth-cta" disabled={loading || done}>
           {done ? (
             <>
               <IconCheck /> Confirmation link sent
@@ -117,7 +124,7 @@ export function Signup({ prefill = {}, goVerify, goLogin }: Props) {
             Sign in
           </button>
         </p>
-      </div>
+      </form>
       <div className="auth-foot-legal">
         By signing up you agree to our{' '}
         <a href="#" onClick={(e) => e.preventDefault()}>

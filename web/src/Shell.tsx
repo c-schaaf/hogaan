@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Tab } from './components/Nav';
 import { ApiError, api, type MeResponse } from './lib/api';
 import { readAuthErrorFromUrl } from './lib/auth-errors';
+import { devLog } from './lib/log';
 import { supabase } from './lib/supabase';
 import { Chat } from './phases/Chat';
 import { EmailVerify } from './phases/EmailVerify';
@@ -93,14 +94,14 @@ export function Shell() {
     if (routeAuthedInFlight.current) return;
     routeAuthedInFlight.current = true;
     try {
-      console.log('[shell] routeAuthed: fetching /api/profile');
+      devLog('[shell] routeAuthed: fetching /api/profile');
       const p = await api.profile.get();
-      console.log('[shell] /api/profile returned', { onboarded: p.onboarded, email: p.email });
+      devLog('[shell] /api/profile returned', { onboarded: p.onboarded, email: p.email });
       setMe(p);
       // Recovery flow: ?reset=1 lands here in a signed-in session because
       // Supabase signs the user in to apply the new password. Route to Reset.
       if (initialUrl.current.searchParams.get('reset') === '1') {
-        console.log('[shell] routing to reset (URL had ?reset=1)');
+        devLog('[shell] routing to reset (URL had ?reset=1)');
         setPhase('reset');
         return;
       }
@@ -129,7 +130,7 @@ export function Shell() {
           setChatOrigin('home');
         }
       }
-      console.log('[shell] routing to', next, '(urlPhase:', urlPhase, 'stored:', stored, ')');
+      devLog('[shell] routing to', next, '(urlPhase:', urlPhase, 'stored:', stored, ')');
       setPhase(next);
     } catch (err) {
       console.error('[shell] profile fetch failed', err);
@@ -158,7 +159,7 @@ export function Shell() {
     // login screen instead of silently landing on signup.
     const urlErr = readAuthErrorFromUrl();
     if (urlErr !== null) {
-      console.log('[shell] URL error param detected', urlErr);
+      devLog('[shell] URL error param detected', urlErr);
       const msg =
         urlErr.code === 'otp_expired'
           ? 'That sign-in link expired. Sign in with your password below.'
@@ -171,7 +172,7 @@ export function Shell() {
     }
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('[shell] auth event:', event, 'session?', !!session);
+      devLog('[shell] auth event:', event, 'session?', !!session);
       if (event === 'PASSWORD_RECOVERY') {
         setPhase('reset');
         return;

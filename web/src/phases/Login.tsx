@@ -64,7 +64,19 @@ export function Login({ prefill = {}, onSignedIn, goSignup, goForgot, banner }: 
       <h1 className="auth-h">Welcome back.</h1>
       <p className="auth-sub">Sign in with your email and password.</p>
 
-      <div className="auth-form">
+      {/* SCRUM — wrap the auth body in a real <form>. Pressing Enter on the
+          email field used to do nothing (the field had no onSubmit
+          handler); password Enter worked only because PasswordField wires
+          its own. Native form submission handles both fields, plays well
+          with password managers, and lets us use type="submit" on the
+          CTA. */}
+      <form
+        className="auth-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
         {banner && <div className="auth-form-error">{banner}</div>}
 
         <FloatingField
@@ -83,12 +95,11 @@ export function Login({ prefill = {}, onSignedIn, goSignup, goForgot, banner }: 
           onChange={setPw}
           autoComplete="current-password"
           error={errs.pw}
-          onSubmit={submit}
         />
 
         {errs.form && <div className="auth-form-error">{errs.form}</div>}
 
-        <button className="auth-cta" onClick={submit} disabled={loading}>
+        <button type="submit" className="auth-cta" disabled={loading}>
           {loading ? (
             <>
               <IconSpinner /> Signing in…
@@ -110,7 +121,7 @@ export function Login({ prefill = {}, onSignedIn, goSignup, goForgot, banner }: 
             Create an account
           </button>
         </p>
-      </div>
+      </form>
     </AuthCard>
   );
 }

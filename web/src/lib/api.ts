@@ -21,13 +21,9 @@ export interface ChatTurnRequest {
   private?: boolean;
 }
 
-export interface ChatTurnResponse {
-  responseText: string;
-  sessionId: string;
-  turnId: string | null;
-  crisis: boolean;
-  endEvent: string;
-}
+// SCRUM — ChatTurnResponse used to type the dead /api/chat/turn route. The
+// server route was removed in SCRUM-43; the client wrapper went with it in
+// PR 4 to keep the SDK from declaring a contract the backend doesn't honor.
 
 export interface SessionSummary {
   id: string;
@@ -187,8 +183,9 @@ function parseSseBlock(block: string): TurnStreamEvent | null {
 }
 
 export const api = {
-  turn: (body: ChatTurnRequest) =>
-    call<ChatTurnResponse>('/api/chat/turn', { method: 'POST', body }),
+  // SCRUM — `api.turn` (non-streaming) and its /api/chat/turn route were
+  // removed in SCRUM-43. The wrapper lingered in the client SDK and was
+  // a loaded gun for any new caller. Use `turnStream` instead.
   turnStream,
   sessions: {
     list: (opts: { before?: string; limit?: number } = {}) => {
