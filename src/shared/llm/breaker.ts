@@ -1,4 +1,9 @@
 import CircuitBreaker from 'opossum';
+import {
+  type BreakerProvider,
+  isBreakerOpenShared,
+  markBreakerOpenShared,
+} from './breaker-redis-sync.js';
 import { LlmAuthError, LlmCircuitOpenError, LlmContentFilterError } from './errors.js';
 
 export interface BreakerOptions {
@@ -93,9 +98,28 @@ export function buildBreaker<TArgs extends unknown[], T>(
       err instanceof LlmAuthError || err instanceof LlmContentFilterError,
   });
 
-  return (...args: TArgs) => {
+  // SCRUM (PR 7, launch-readiness D-7) — when the LOCAL breaker opens,
+  // mirror that into a shared Redis flag so every instance in the fleet
+  // sees the trip within ~1 second. `breaker-redis-sync` no-ops when no
+  // Redis bundle has been installed (tests / solo-instance deploys).
+  // The `Provider` union here is structurally identical to the
+  // `BreakerProvider` union in breaker-redis-sync; alias once for clarity.
+  const syncProvider: BreakerProvider = provider;
+  breaker.on('open', () => {
+    // resetTimeout is in ms; the Redis flag TTL is in seconds.
+    markBreakerOpenShared(syncProvider, Math.ceil(config.resetTimeout / 1000));
+  });
+
+  return async (...args: TArgs) => {
     if (breaker.opened) {
-      return Promise.reject(new LlmCircuitOpenError(provider));
+      throw new LlmCircuitOpenError(provider);
+    }
+    // SCRUM (PR 7, launch-readiness D-7) — also short-circuit when ANOTHER
+    // instance has tripped the shared breaker. ~1s local cache on the
+    // Redis read keeps the hot path cheap (one GET per provider per second
+    // per instance, independent of call volume).
+    if (await isBreakerOpenShared(syncProvider)) {
+      throw new LlmCircuitOpenError(provider);
     }
     return breaker.fire(...args);
   };

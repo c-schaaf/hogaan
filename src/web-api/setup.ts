@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { getDb } from '../shared/db/client.js';
+import { installRedisForBreakerSync } from '../shared/llm/breaker-redis-sync.js';
 import { getRedis } from '../shared/redis/client.js';
 import { buildRateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
@@ -49,6 +50,13 @@ export async function wireWebApiRoutes(
 
   const { db } = getDb(config);
   const redis = getRedis(config);
+  // SCRUM (PR 7, launch-readiness D-7) — install the Redis bundle so the
+  // LLM circuit-breaker sync (`src/shared/llm/breaker-redis-sync.ts`) can
+  // mirror local breaker trips into Redis and check the shared flag from
+  // sibling instances. Must run before any breaker is built — breakers
+  // are lazy-built on first call so this ordering only needs to precede
+  // the first LLM call, but it's cheapest right here at setup time.
+  installRedisForBreakerSync(redis);
   const rateLimiters = buildRateLimiters(redis, {
     perSecondLimit: 80,
     perDayLimit: 1000,
