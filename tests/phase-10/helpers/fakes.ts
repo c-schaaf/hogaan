@@ -37,6 +37,7 @@ export function fakeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     resendFromEmail: undefined,
     supabaseUrl: undefined,
     supabaseAnonKey: undefined,
+    supabaseJwtSecret: undefined,
     ...overrides,
   };
 }

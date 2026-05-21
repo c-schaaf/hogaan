@@ -38,6 +38,7 @@ function configWith(
     resendFromEmail: undefined,
     supabaseUrl: undefined,
     supabaseAnonKey: undefined,
+    supabaseJwtSecret: undefined,
   };
 }
 

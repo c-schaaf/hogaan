@@ -20,7 +20,8 @@ type OptionalKey =
   | 'RESEND_API_KEY'
   | 'RESEND_FROM_EMAIL'
   | 'SUPABASE_URL'
-  | 'SUPABASE_ANON_KEY';
+  | 'SUPABASE_ANON_KEY'
+  | 'SUPABASE_JWT_SECRET';
 
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'staging' | 'production';
@@ -46,6 +47,12 @@ export interface AppConfig {
   resendFromEmail: string | undefined;
   supabaseUrl: string | undefined;
   supabaseAnonKey: string | undefined;
+  /**
+   * Supabase project JWT secret — used by web-api read-side local JWT
+   * verify (PR 6 D-5) to avoid the ~80–150ms `getUser` round-trip on every
+   * `/api/*` call. Missing value falls back to remote `getUser`.
+   */
+  supabaseJwtSecret: string | undefined;
 }
 
 export class ConfigError extends Error {
@@ -117,6 +124,7 @@ export function loadConfig(): AppConfig {
     resendFromEmail: readOptional('RESEND_FROM_EMAIL'),
     supabaseUrl: readOptional('SUPABASE_URL'),
     supabaseAnonKey: readOptional('SUPABASE_ANON_KEY'),
+    supabaseJwtSecret: readOptional('SUPABASE_JWT_SECRET'),
   };
 }
 

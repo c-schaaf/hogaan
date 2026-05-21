@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import { reportP2 } from '../incident-handling/index.js';
 import type { LibraryVersionSet } from '../shared/types/index.js';
 import type { Database } from '../shared/db/client.js';
 import { libraryVersions } from '../shared/db/schema/library-versions.js';
@@ -72,27 +73,55 @@ export async function getActiveLibraryVersions(db: Database): Promise<ResolvedLi
     byName.set(r.libraryName, r);
   }
 
-  const requireRow = (
-    name:
-      | 'prompt_templates'
-      | 'voice_rules'
-      | 'cultural_framing'
-      | 'crisis_resources'
-      | 'scenarios',
-  ): (typeof rows)[number] => {
+  // SCRUM (PR 6, audit #16) — only `prompt_templates` is load-bearing on
+  // the coaching path (`assembler.ts` reads only `libs.promptTemplates`).
+  // The other four libraries are leftovers from the pre-unified-prompt
+  // design — their payloads are not used today. Hard-requiring all five
+  // on every turn means a seed gap on any new environment silently kills
+  // all chat with an opaque E6_LibraryUnavailable. We now require only
+  // `prompt_templates`; missing optional libraries log a P2 warning and
+  // fall back to an empty payload.
+  const promptTemplatesRow = byName.get('prompt_templates');
+  if (promptTemplatesRow === undefined) {
+    throw new LibraryResolverError(
+      `no active version for library prompt_templates — run seed-libraries`,
+    );
+  }
+
+  const optionalOrSynthetic = <T>(
+    name: 'voice_rules' | 'cultural_framing' | 'crisis_resources' | 'scenarios',
+    emptyPayload: T,
+  ): { version: string; hash: string; payload: T } => {
     const row = byName.get(name);
     if (row === undefined) {
-      throw new LibraryResolverError(`no active version for library ${name} — run seed-libraries`);
+      reportP2(`library ${name} missing — falling back to empty payload`, {
+        source: 'Libraries.Resolver',
+        extra: { libraryName: name },
+      });
+      return { version: 'absent', hash: '', payload: emptyPayload };
     }
-    return row;
+    return castRow<T>(row);
   };
 
   const resolved: ResolvedLibraries = {
-    promptTemplates: castRow<PromptTemplatesPayload>(requireRow('prompt_templates')),
-    voiceRules: castRow<VoiceRulesPayload>(requireRow('voice_rules')),
-    culturalFraming: castRow<CulturalFramingPayload>(requireRow('cultural_framing')),
-    crisisResources: castRow<CrisisResourcesPayload>(requireRow('crisis_resources')),
-    scenarios: castRow<ScenariosPayload>(requireRow('scenarios')),
+    promptTemplates: castRow<PromptTemplatesPayload>(promptTemplatesRow),
+    voiceRules: optionalOrSynthetic<VoiceRulesPayload>('voice_rules', {
+      rules: [],
+      heroPhraseFlags: [],
+      usefulToSocietyPatterns: [],
+    }),
+    culturalFraming: optionalOrSynthetic<CulturalFramingPayload>('cultural_framing', {
+      framings: [],
+    }),
+    crisisResources: optionalOrSynthetic<CrisisResourcesPayload>('crisis_resources', {
+      resources: [],
+      holdingMessage: '',
+      todoPhase2Expansion: '',
+    }),
+    scenarios: optionalOrSynthetic<ScenariosPayload>('scenarios', {
+      scenarios: [],
+      notes: '',
+    }),
     resolvedAt: new Date(),
   };
 
@@ -140,6 +169,9 @@ export function verifyIntegrity(resolved: ResolvedLibraries): void {
     ['crisis_resources', resolved.crisisResources],
     ['scenarios', resolved.scenarios],
   ] as const) {
+    // SCRUM (PR 6) — skip integrity for synthetic empty payloads created
+    // when an optional library was missing from the DB (version='absent').
+    if (row.version === 'absent') continue;
     const expected = canonicalHash(row.payload);
     if (expected !== row.hash) {
       throw new LibraryResolverError(

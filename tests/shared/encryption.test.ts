@@ -34,6 +34,7 @@ function configWithKey(key: string | undefined): AppConfig {
     resendFromEmail: undefined,
     supabaseUrl: undefined,
     supabaseAnonKey: undefined,
+    supabaseJwtSecret: undefined,
   };
 }
 

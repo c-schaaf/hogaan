@@ -7,25 +7,44 @@ import { buildTraceEmitter } from '../shared/trace/index.js';
 import { registerWebApiRoutes } from './routes.js';
 
 /**
- * Phase C wiring. Same gating as web-auth (DB + Redis + JWT + base URL)
- * plus the rate-limiter + trace emitter the coaching orchestrator needs.
+ * Phase C wiring. Validates required configuration; if anything required is
+ * missing the process exits with a structured stderr line so the deploy
+ * fails loudly. Optional config (e.g. monitoring DSNs) is checked elsewhere.
+ *
+ * SCRUM (PR 6, launch-readiness D-3) — removed the `jwtSecretBase64` gate.
+ * Web auth uses Supabase `getUser` / a Supabase-issued JWT (read-side local
+ * verify in PR 6 D-5 uses `SUPABASE_JWT_SECRET`, not the legacy
+ * `JWT_SECRET_BASE64`). Forgetting the unused secret used to de-register
+ * every `/api/*` route silently — the server booted and looked healthy
+ * while serving zero API. Now the function still gates on truly-required
+ * vars but does so by crashing the process with a clear log line instead
+ * of silently no-opting.
  */
+const REQUIRED_VARS: Array<[keyof AppConfig, string]> = [
+  ['databaseUrl', 'DATABASE_URL'],
+  ['upstashRedisRestUrl', 'UPSTASH_REDIS_REST_URL'],
+  ['upstashRedisRestToken', 'UPSTASH_REDIS_REST_TOKEN'],
+  ['publicBaseUrl', 'PUBLIC_BASE_URL'],
+  ['encryptionKeyBase64', 'ENCRYPTION_KEY_BASE64'],
+  ['supabaseUrl', 'SUPABASE_URL'],
+  ['supabaseAnonKey', 'SUPABASE_ANON_KEY'],
+];
+
 // eslint-disable-next-line @typescript-eslint/require-await -- async signature kept symmetric with other setup helpers
 export async function wireWebApiRoutes(
   app: FastifyInstance,
   config: AppConfig,
-): Promise<{ registered: boolean; reason?: string }> {
-  if (config.databaseUrl === undefined) {
-    return { registered: false, reason: 'DATABASE_URL not configured' };
-  }
-  if (config.upstashRedisRestUrl === undefined || config.upstashRedisRestToken === undefined) {
-    return { registered: false, reason: 'UPSTASH_REDIS_REST_URL/_TOKEN not configured' };
-  }
-  if (config.jwtSecretBase64 === undefined) {
-    return { registered: false, reason: 'JWT_SECRET_BASE64 not configured' };
-  }
-  if (config.publicBaseUrl === undefined) {
-    return { registered: false, reason: 'PUBLIC_BASE_URL not configured' };
+): Promise<{ registered: true }> {
+  const missing = REQUIRED_VARS.filter(([k]) => config[k] === undefined).map(([, name]) => name);
+  if (missing.length > 0) {
+    // Fail loudly so a misconfigured deploy doesn't boot into a non-
+    // functional state where every /api/* is a 404. `console.error` writes
+    // to stderr and is visible in Render's deploy logs even if the
+    // structured logger hasn't initialized yet.
+    console.error(
+      `[startup] FATAL — required environment variables missing: ${missing.join(', ')}. Refusing to register /api/* routes; exiting.`,
+    );
+    process.exit(1);
   }
 
   const { db } = getDb(config);
