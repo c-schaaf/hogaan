@@ -47,15 +47,16 @@ async function main(): Promise<void> {
 
     const result = await publishLibraryVersion(db, {
       libraryName: 'prompt_templates',
-      version: 'v3_leadership_tune1',
+      version: 'v3_leadership_tune2_plain_prose',
       payload: promptTemplatesV2Unified,
-      publishedBy: 'muhsin:scrum-50-brand-rewrite-2026-05-19',
+      publishedBy: 'muhsin:pr-c-voice-markdown-2026-05-23',
       notes:
-        'v3_leadership — SCRUM-50 brand-aligned rewrite repositioning Hogaan as a ' +
-        'transformational leadership coach (BELONGING / INSPIRING / AUTHENTIC voice; ' +
-        'INCLUSION / COMPASSION / INTEGRITY values) and removing the embedded ' +
-        'Crisis Protocol in favour of a one-line referral policy in §6. Rollback: ' +
-        'republish v2_unified_tune1 with makeActive:true.',
+        'v3_leadership tune2 — adds a §5 non-negotiable instructing the coach to ' +
+        'write in plain prose: no markdown emphasis (no *italics* / **bold**), ' +
+        'no em dashes (use commas, periods, or paragraph breaks), no bullet lists ' +
+        'unless the user asks. Brand-voice polish that stops the coach from ' +
+        'reading as generic AI. Rollback: republish v3_leadership_tune1 with ' +
+        'makeActive:true.',
       makeActive: true,
     });
 
