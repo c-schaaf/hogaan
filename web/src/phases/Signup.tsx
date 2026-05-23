@@ -35,12 +35,21 @@ export function Signup({ prefill = {}, goVerify, goLogin }: Props) {
     setErrs(e);
     if (Object.keys(e).length) return;
     setLoading(true);
+    // Prefer the deploy-time canonical URL (VITE_PUBLIC_BASE_URL) so that
+    // verification links always come back to the production origin — even
+    // when the user happened to sign up via a preview deploy or a non-
+    // canonical subdomain. Falls back to runtime origin in dev where the
+    // env var isn't set. `?onboarding=1` was set but never read anywhere,
+    // so it's dropped — onboarding routing is driven by users.status server-
+    // side per Shell.routeAuthed.
+    const canonicalBase =
+      (import.meta.env['VITE_PUBLIC_BASE_URL'] as string | undefined) ?? window.location.origin;
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password: pw,
       options: {
         data: { full_name: name.trim() },
-        emailRedirectTo: `${window.location.origin}/?onboarding=1`,
+        emailRedirectTo: `${canonicalBase}/`,
       },
     });
     setLoading(false);

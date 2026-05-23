@@ -10,9 +10,10 @@ interface Props {
   mode?: 'signup' | 'login';
   onContinue: () => void;
   goSignup: () => void;
+  goLogin?: () => void;
 }
 
-export function EmailVerify({ email, mode = 'signup', onContinue, goSignup }: Props) {
+export function EmailVerify({ email, mode = 'signup', onContinue, goSignup, goLogin }: Props) {
   const isLogin = mode === 'login';
   const [resent, setResent] = useState(false);
   const [resendError, setResendError] = useState<string | null>(null);
@@ -104,6 +105,20 @@ export function EmailVerify({ email, mode = 'signup', onContinue, goSignup }: Pr
             Use a different email
           </button>
         </div>
+        {/* SCRUM (PR B / launch-readiness 8d) — clicking a verification
+            link twice silently fails (token already consumed). Without an
+            affordance, users sit on this screen confused. This link gives
+            them a direct path: "Already verified? Sign in here." */}
+        {goLogin !== undefined && (
+          <div className="auth-row">
+            <span className="auth-help-row">
+              Already verified your email?{' '}
+              <button type="button" className="auth-link" onClick={goLogin}>
+                Sign in
+              </button>
+            </span>
+          </div>
+        )}
       </div>
       <div className="auth-foot-legal">
         Trouble? Email <a href="mailto:hamse24@gmail.com">hamse24@gmail.com</a>

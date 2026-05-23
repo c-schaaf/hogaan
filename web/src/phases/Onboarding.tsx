@@ -44,11 +44,24 @@ function loadPersisted(): PersistedState | null {
   }
 }
 
+let quotaWarned = false;
 function savePersisted(data: PersistedState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    /* ignore quota errors */
+  } catch (err) {
+    // Quota / private-mode / disabled-storage: warn once so we don't spam
+    // the console on every keystroke. The user's progress will be lost on
+    // reload — they need to finish onboarding in one sitting. Surfacing the
+    // failure (instead of silently swallowing) lets us spot the case in
+    // Sentry/dev tools and prompts the user via UI if/when we wire one up.
+    if (!quotaWarned) {
+      quotaWarned = true;
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[onboarding] cannot persist progress to localStorage — answers will reset on reload',
+        err,
+      );
+    }
   }
 }
 
