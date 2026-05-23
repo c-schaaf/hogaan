@@ -69,7 +69,17 @@ export function Shell() {
   const [chatSeed, setChatSeed] = useState<string | null>(null);
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
   const initialUrl = useRef(new URL(window.location.href));
-  const [linkError, setLinkError] = useState<string | null>(null);
+  // SCRUM (PR B / launch-readiness 8e) — persist the magic-link error to
+  // sessionStorage so a refresh on the login screen doesn't wipe the banner
+  // and leave the user with no idea why they're on signup. Cleared explicitly
+  // when the user dismisses (clicked the resend link, signed in, etc.).
+  const [linkError, setLinkError] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem('hogaan.linkError');
+    } catch {
+      return null;
+    }
+  });
   const lastAuthedTokenRef = useRef<string | null>(null);
   const phaseRef = useRef<Phase>('boot');
   const routeAuthedInFlight = useRef(false);
@@ -165,6 +175,11 @@ export function Shell() {
           ? 'That sign-in link expired. Sign in with your password below.'
           : urlErr.description || 'That sign-in link did not work.';
       setLinkError(msg);
+      try {
+        sessionStorage.setItem('hogaan.linkError', msg);
+      } catch {
+        /* sessionStorage unavailable — banner still visible until refresh */
+      }
       const clean = new URL(window.location.href);
       clean.search = '';
       clean.hash = '';
@@ -238,14 +253,34 @@ export function Shell() {
     // fire SIGNED_IN any moment - we don't need to route here, just clear
     // any stale error banner.
     setLinkError(null);
+    try {
+      sessionStorage.removeItem('hogaan.linkError');
+    } catch {
+      /* ignore */
+    }
   };
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     // Clear cross-session state so a different user signing in on the
-    // same browser doesn't inherit the previous user's active chat.
+    // same browser doesn't inherit the previous user's active chat or
+    // onboarding answers. (Shared-device privacy: User A's name + practice
+    // selections must not pre-fill for User B.)
     sessionStorage.removeItem('hogaan.activeSessionId');
     sessionStorage.removeItem('shell-phase');
+    sessionStorage.removeItem('hogaan.linkError');
+    try {
+      const toRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (key !== null && (key.startsWith('hogaan_') || key.startsWith('hogaan.'))) {
+          toRemove.push(key);
+        }
+      }
+      for (const k of toRemove) localStorage.removeItem(k);
+    } catch {
+      /* localStorage unavailable — best-effort cleanup */
+    }
     setMe(null);
     setPhase('login');
   };
@@ -300,6 +335,7 @@ export function Shell() {
           mode={verifyMode}
           onContinue={() => void routeAuthed()}
           goSignup={() => setPhase(verifyMode === 'login' ? 'login' : 'signup')}
+          goLogin={() => setPhase('login')}
         />
       );
       break;
