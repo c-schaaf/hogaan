@@ -102,7 +102,7 @@ async function main(): Promise<void> {
         .fill(0)
         .map((_, i) => (i === 0 ? 1 : 0));
       const userIdRow = await txn<{ id: string }[]>`
-      INSERT INTO users (phone_hash, status) VALUES ('verify-baseline-hash', 'provisional') RETURNING id
+      INSERT INTO users (status) VALUES ('provisional') RETURNING id
     `;
       const userId = userIdRow[0]?.id;
       if (userId === undefined) {
