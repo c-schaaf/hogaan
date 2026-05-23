@@ -20,6 +20,41 @@ interface BotParagraph {
 // tends to lead paragraphs with "An insight:" or "A first move:" /
 // "Here's a first move:". Highlight those leads in gold-deep italics so
 // the bubble reads as designed.
+//
+// SCRUM (PR C / launch-readiness 9) — also parse inline markdown emphasis
+// the LLM emits today (e.g. `*you*` italic, `**bold**` bold) so the chat
+// bubble doesn't show literal asterisks. The Layer-2 prompt change tells
+// the LLM to stop using emphasis at all, but rendering is the defense-in-
+// depth that keeps stale prompts or fallback-model output from leaking
+// asterisks to the user. Streaming-safe: unpaired trailing asterisks
+// (incomplete mid-stream) are rendered as literal text rather than
+// swallowed.
+function parseInlineEmphasis(text: string): ReactNode[] {
+  // Match **strong** first (greedy) then *emphasis*. Both are word-tight
+  // (no whitespace immediately inside the markers) so URLs and casual
+  // asterisks-with-spaces survive untouched.
+  const pattern = /\*\*([^*\n][^*\n]*?)\*\*|\*([^*\n][^*\n]*?)\*/g;
+  const nodes: ReactNode[] = [];
+  let cursor = 0;
+  let key = 0;
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(text)) !== null) {
+    if (m.index > cursor) {
+      nodes.push(<Fragment key={key++}>{text.slice(cursor, m.index)}</Fragment>);
+    }
+    if (m[1] !== undefined) {
+      nodes.push(<strong key={key++}>{m[1]}</strong>);
+    } else if (m[2] !== undefined) {
+      nodes.push(<em key={key++}>{m[2]}</em>);
+    }
+    cursor = m.index + m[0].length;
+  }
+  if (cursor < text.length) {
+    nodes.push(<Fragment key={key++}>{text.slice(cursor)}</Fragment>);
+  }
+  return nodes;
+}
+
 function renderResponse(text: string): BotParagraph {
   const trimmed = text.replace(/\r\n/g, '\n').trim();
   const paragraphs = trimmed.split(/\n{2,}|\n(?=[A-Z])/).filter((p) => p.trim().length > 0);
@@ -27,11 +62,13 @@ function renderResponse(text: string): BotParagraph {
     /^(An insight|A first move|Here's a first move|First move|Insight|Action|Story|Reflection)\s*:\s*/i;
   const nodes: ReactNode[] = paragraphs.map((p, i) => {
     const m = leadRegex.exec(p);
-    if (m === null) return <Fragment key={i}>{p}</Fragment>;
+    if (m === null) {
+      return <Fragment key={i}>{parseInlineEmphasis(p)}</Fragment>;
+    }
     const rest = p.slice(m[0].length);
     return (
       <Fragment key={i}>
-        <em className="chat-em">{m[1]}:</em> {rest}
+        <em className="chat-em">{m[1]}:</em> {parseInlineEmphasis(rest)}
       </Fragment>
     );
   });
@@ -305,9 +342,16 @@ export function Chat({
         private: privateMode,
       })) {
         if (ev.type === 'start') {
+          // SSE stream is OPEN but no tokens have arrived yet. The
+          // pre-fix code dropped the thinking spinner here, opening a
+          // visible gap between the spinner vanishing and the first
+          // `delta` arriving — the chat-bubble-disappears bug. Keep the
+          // spinner up until the first real token streams in.
           setSessionId(ev.sessionId);
-          setThinking(false); // first byte received — drop the spinner
         } else if (ev.type === 'delta') {
+          if (!receivedDeltas) {
+            setThinking(false); // first real byte — now safe to drop spinner
+          }
           receivedDeltas = true;
           streamingText += ev.text;
           upsertStreamingBot(streamingText);
