@@ -31,7 +31,8 @@
     "paths": {
       "@/*": ["src/*"]
     },
-    "outDir": "dist"
+    "outDir": "dist",
+    "ignoreDeprecations": "5.0"
   },
   "include": ["src/**/*", "tests/**/*"],
   "exclude": ["node_modules", "dist", "drizzle", "tests/e2e", "tests/web-api"]
