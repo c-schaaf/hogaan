@@ -13,10 +13,39 @@ import { chatStream } from '../shared/llm/chat.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import { checkRateLimit, type RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
-import type { TraceEmitter } from '../shared/trace/index.js';
-import { asSessionId, asUserId } from '../shared/types/index.js';
+import { emitTurnTrace, type TraceEmitter } from '../shared/trace/index.js';
+import {
+  asSessionId,
+  asUserId,
+  type LibraryVersionSet,
+  noDegradation,
+} from '../shared/types/index.js';
+import { createHash } from 'node:crypto';
 import { generateSessionTitle } from './session-title.js';
 import { requireSupabaseSession } from './supabase-session.js';
+
+/**
+ * Per-turn trace identifier. Opaque sha256 prefix of the internal userId —
+ * never plaintext PII (Hard Rule #3).
+ */
+function hashUserId(userId: string): string {
+  return createHash('sha256').update(userId).digest('hex').slice(0, 16);
+}
+
+/**
+ * Placeholder library version set used when a turn fails before prompt
+ * assembly resolves real versions. The shape matches LibraryVersionSet so the
+ * downstream consumer (Axiom dataset schema) stays stable; the empty version
+ * strings let dashboards filter these rows out as "pre-assembly failures".
+ */
+function emptyLibraryVersions(): LibraryVersionSet {
+  return {
+    promptTemplates: { version: '', hash: '' },
+    voiceRules: { version: '', hash: '' },
+    culturalFraming: { version: '', hash: '' },
+    resolvedAt: new Date(),
+  };
+}
 
 export interface WebApiRoutesOpts {
   config: AppConfig;
@@ -68,6 +97,12 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
 
     const t0 = Date.now();
     const userId = asUserId(session.userId);
+
+    // Hoisted so the catch block can emit a TurnTrace with whatever state was
+    // resolved before the failure. See trace emission below.
+    let traceSessionId: string | undefined;
+    let traceLibraryVersions: LibraryVersionSet | undefined;
+    let traceContextPartial = false;
 
     // SCRUM — per-user + global rate limit on the stream endpoint.
     // The hand-off to reply.hijack() happens *after* this check so we can
@@ -121,6 +156,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         ...(clientSessionId !== undefined ? { sessionId: clientSessionId } : {}),
       });
       const sessionId = resolved.sessionId;
+      traceSessionId = sessionId;
 
       // ---- Context fetch (profile + recent turns + memory) -----------
       const ctx = await fetchCoachingContext(
@@ -143,6 +179,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       // continuity issues can be correlated with degraded turns. The
       // underlying P2 incident is still emitted by context-fetch itself.
       if (ctx.partialFailure) {
+        traceContextPartial = true;
         req.log.warn(
           { userId, sessionId, requestId: req.id },
           'coaching context fetch was partial — turn may be degraded',
@@ -186,6 +223,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         retrievedMemories: ctx.memories,
         historyInMessages: priorMessages.length > 0,
       });
+      traceLibraryVersions = promptBundle.libraryVersions;
 
       sendEvent('start', { sessionId });
 
@@ -276,6 +314,32 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       sendEvent('end', { turnId, sessionId, latencyMs });
       reply.raw.end();
 
+      // Emit one TurnTrace per turn to Axiom (Process #2 §12c). Fire-and-
+      // forget so it never blocks the response. PII-safe: userIdHash, never
+      // raw userId (CLAUDE.md Hard Rule #3).
+      emitTurnTrace(opts.traceEmitter, req.id, {
+        userIdHash: hashUserId(userId),
+        sessionId,
+        turnId: turnId ?? '',
+        terminalEvent: persistFailed
+          ? 'Process_2.Step_StreamPersistFailed'
+          : 'Process_2.Step_StreamComplete',
+        // chatStream is Haiku-only today (no llama fallback in the streaming
+        // path). If/when fallback wiring lands, switch this to final.modelUsed
+        // and update the fallbackPath/fallbackModelUsed mapping accordingly.
+        modelUsed: final?.modelUsed ?? 'claude-haiku-4-5',
+        fallbackPath: 'none',
+        latencyMs,
+        qaOutcome: 'skipped',
+        degradationFlags: {
+          ...noDegradation(),
+          contextFetchPartial: traceContextPartial,
+        },
+        libraryVersions: traceLibraryVersions ?? emptyLibraryVersions(),
+        determinismHash: null,
+        retryCount: 0,
+      });
+
       // SCRUM — fire title generation only on the genuine first turn.
       // resolved.isNew covers a freshly-created session; resolved.turnCount
       // is the count BEFORE this turn was inserted, so === 0 means "this
@@ -318,6 +382,29 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         reply.raw.end();
       } catch {
         // Connection already closed; nothing to do.
+      }
+      // Emit a TurnTrace for the failed turn too, with whatever state was
+      // resolved before the throw. Wrapped so an emit failure here can never
+      // mask the original error.
+      try {
+        emitTurnTrace(opts.traceEmitter, req.id, {
+          userIdHash: hashUserId(userId),
+          sessionId: traceSessionId ?? '',
+          turnId: '',
+          terminalEvent: isAssembly
+            ? 'Process_2.Step_StreamPromptAssemblyFailed'
+            : 'Process_2.Step_StreamFailed',
+          modelUsed: 'none',
+          fallbackPath: 'service-unavailable',
+          latencyMs: Date.now() - t0,
+          qaOutcome: 'service-unavailable',
+          degradationFlags: { ...noDegradation(), contextFetchPartial: traceContextPartial },
+          libraryVersions: traceLibraryVersions ?? emptyLibraryVersions(),
+          determinismHash: null,
+          retryCount: 0,
+        });
+      } catch {
+        /* swallow — trace loss is non-blocking */
       }
       return reply;
     }
