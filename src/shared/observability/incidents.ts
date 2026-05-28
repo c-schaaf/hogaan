@@ -129,6 +129,31 @@ export function reportIncident(
   });
 }
 
+/**
+ * Attach the authenticated user's internal id to the current Sentry scope.
+ *
+ * Without this, every Sentry issue shows "0 users" — there is no way to
+ * answer "which beta tester hit this error?" or compute true impact.
+ *
+ * Privacy: only the internal UUID is sent — opaque, never PII. Plaintext
+ * email / phone / name never reach Sentry (hard rule #3).
+ *
+ * No-op when Sentry is uninitialized (dev, test, or SENTRY_DSN unset).
+ *
+ * Concurrency note: in @sentry/node v10 this writes to the current scope.
+ * Without an explicit Fastify integration the scope can theoretically leak
+ * between concurrent requests sharing an isolation context. Acceptable
+ * for v1 — even slightly mis-attributed user context beats "0 users"
+ * entirely. Follow-up: wire `Sentry.fastifyIntegration()` for per-request
+ * isolation.
+ */
+export function setSentryUser(userId: string): void {
+  if (!initialized) {
+    return;
+  }
+  Sentry.setUser({ id: userId });
+}
+
 export async function shutdownSentry(timeoutMs: number = 2000): Promise<void> {
   if (!initialized) {
     return;

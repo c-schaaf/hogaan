@@ -16,7 +16,7 @@
  */
 
 export { reportIncident, type IncidentContext } from '../shared/observability/incidents.js';
-export { initSentry, shutdownSentry } from '../shared/observability/incidents.js';
+export { initSentry, setSentryUser, shutdownSentry } from '../shared/observability/incidents.js';
 export { startHeartbeat } from '../shared/observability/heartbeat.js';
 
 import { reportIncident, type IncidentContext } from '../shared/observability/incidents.js';
