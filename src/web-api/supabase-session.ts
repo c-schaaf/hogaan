@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { eq } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { reportP0, reportP2 } from '../incident-handling/index.js';
+import { reportP0, reportP2, setSentryUser } from '../incident-handling/index.js';
 import type { Database } from '../shared/db/client.js';
 import { auditLog } from '../shared/db/schema/audit-log.js';
 import { users } from '../shared/db/schema/users.js';
@@ -291,6 +291,11 @@ export async function readSupabaseSession(
     );
     throw err;
   }
+
+  // Attach internal user id to the Sentry scope so any incident reported
+  // for the rest of this request includes the "user affected" field. Opaque
+  // UUID only — never plaintext email or other PII (hard rule #3).
+  setSentryUser(userId);
 
   return { userId, email, supabaseUserId, fullName };
 }
