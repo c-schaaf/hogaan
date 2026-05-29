@@ -13,9 +13,11 @@ Positioning: a pocket coach for the moments leadership programs miss — hard
 conversations, stalled decisions, team dynamics. Audience: managers, founders,
 and team leads who lack access to elite human coaching budgets.
 
-End users sign in at hogaanai.com, complete onboarding, and converse with the
-coach in the browser. **Leadership coaching only — not therapy, not crisis
-support.** The AI disclaimer covers safety framing.
+End users sign in at app.hogaanai.com, complete onboarding, and converse with
+the coach in the browser. The bare hogaanai.com domain is reserved for the
+marketing landing page (separate track; not in this repo). **Leadership
+coaching only — not therapy, not crisis support.** The AI disclaimer covers
+safety framing.
 
 ## What's shipped vs. on the roadmap
 
@@ -101,7 +103,7 @@ for the user's explicit go.** Never chain stages without approval.
 | G4.5 | Risk audit *(conditional — see triggers below)* | Audit table | Residual risks acceptable? |
 | G5 | PR open | Branch + PR per convention; AC checklist; BPMN delta; rollback note; CLAUDE.md delta if conventions changed | PR self-contained? Living docs updated in same PR? |
 | G6 | Merge | GitHub CI all green; squash-merge | Ready to deploy? |
-| G7 | Deploy verification | Render deploy succeeded; Sentry quiet 10 min; smoke check on hogaanai.com; turn-latency p99 still ≤ 3s | Production healthy? |
+| G7 | Deploy verification | Render deploy succeeded; Sentry quiet 10 min; smoke check on app.hogaanai.com; turn-latency p99 still ≤ 3s | Production healthy? |
 | G8 | Close | Jira moved to Done, AC ticked, learnings → CLAUDE.md if pipeline-relevant | Done done? |
 
 If any gate fails, loop back — never bypass. Never use `--no-verify` or skip

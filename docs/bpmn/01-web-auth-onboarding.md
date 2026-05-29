@@ -6,7 +6,7 @@
 ## Purpose
 
 Take a new user from "never heard of Hogaan" to "ready to chat with the coach"
-in a single browser session at hogaanai.com.
+in a single browser session at app.hogaanai.com.
 
 ## Entry points
 
