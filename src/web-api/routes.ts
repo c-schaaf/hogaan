@@ -373,14 +373,24 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         retryCount: 0,
       });
 
-      // SCRUM — fire title generation only on the genuine first turn.
-      // resolved.isNew covers a freshly-created session; resolved.turnCount
-      // is the count BEFORE this turn was inserted, so === 0 means "this
-      // was the first persisted turn". Private sessions never get a title
-      // (matches the no-persistence contract). Persist failures also skip
-      // titling — we don't want a title on a session whose first turn
-      // didn't make it to the DB.
-      if (!isPrivate && !persistFailed && (resolved.isNew || resolved.turnCount === 0)) {
+      // SCRUM-F9: fire title generation on the user's 3rd message (when
+      // resolved.turnCount === 2, meaning 2 turns already persisted, this
+      // is the 3rd). Pre-fix this fired on the 1st turn of every session,
+      // adding a second Anthropic call per session start (~30% per-session
+      // cost overhead). Many sessions die after one turn (one-shot
+      // questions, accidental "New Chat" clicks), so titling them is
+      // wasted spend. Deferring to turn 3 saves roughly half of title-gen
+      // calls while still titling any session the user has clearly
+      // invested in.
+      //
+      // Title quality: generateSessionTitle now fetches the session's
+      // FIRST user message internally (see session-title.ts), so the
+      // title still summarises the opening topic, not the current turn.
+      // The `message` arg below is kept as a safety fallback only.
+      //
+      // Private sessions never get a title (matches the no-persistence
+      // contract). Persist failures also skip titling.
+      if (!isPrivate && !persistFailed && resolved.turnCount === 2) {
         void generateSessionTitle(opts.config, opts.db, sessionId, message);
       }
       return reply;
