@@ -86,6 +86,24 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     if (message.length === 0) {
       return reply.code(400).send({ error: 'message_required' });
     }
+    // SCRUM-F3: cap user message length. Pre-fix the only check was non-empty,
+    // and the Fastify bodyLimit allowed up to 256KB — a single message could
+    // inflate per-turn Anthropic token cost by ~9x AND get re-included in
+    // prior-turn history on every subsequent turn of the session, compounding
+    // the cost. 4500 chars ≈ 700 words at typical English density, which
+    // covers any realistic coaching prompt (most are 50-300 words) with
+    // generous headroom for pasted context like an email to react to.
+    // The user-facing copy is intentionally in Hogaan's first-person voice
+    // (no em dashes, contractions, plain language — system-prompt rules) so
+    // the chat bubble reads like a gentle nudge from the coach, not an
+    // HTTP error from a server.
+    if (message.length > 4500) {
+      return reply.code(400).send({
+        error: 'message_too_long',
+        message:
+          'That message is longer than I can take in one go. Try trimming it under 700 words.',
+      });
+    }
     const isPrivate = req.body?.private === true;
     // SCRUM-53: honor the client's sessionId so "Continue past session"
     // attaches the new turn to the named session instead of starting a

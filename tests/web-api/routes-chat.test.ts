@@ -99,4 +99,64 @@ describe('POST /api/chat/turn/stream', () => {
     });
     expect([404, 405]).toContain(res.statusCode);
   });
+
+  describe('SCRUM-F3 — message length cap', () => {
+    it('accepts a message at exactly 4500 chars (the inclusive limit)', async () => {
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/chat/turn/stream',
+        payload: { message: 'a'.repeat(4500) },
+      });
+      // Should NOT be 400 message_too_long — exactly at limit is allowed.
+      // (May 500 due to mocks downstream, but won't be the length check.)
+      if (res.statusCode === 400) {
+        expect(res.json<Record<string, unknown>>().error).not.toBe('message_too_long');
+      }
+    });
+
+    it('returns 400 + friendly first-person copy when message exceeds 4500 chars', async () => {
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/chat/turn/stream',
+        payload: { message: 'a'.repeat(4501) },
+      });
+      expect(res.statusCode).toBe(400);
+      const body = res.json<{ error: string; message: string }>();
+      expect(body.error).toBe('message_too_long');
+      // Voice copy is load-bearing — Hamse-owned territory; assert verbatim
+      // so a drift requires deliberate test update + voice review.
+      expect(body.message).toBe(
+        'That message is longer than I can take in one go. Try trimming it under 700 words.',
+      );
+    });
+
+    it('does NOT leak the raw character ceiling (4500) into the user-facing copy', async () => {
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/chat/turn/stream',
+        payload: { message: 'a'.repeat(10000) },
+      });
+      const body = res.json<{ message: string }>();
+      // User sees "700 words" — the 4500-char implementation detail is internal.
+      expect(body.message).not.toContain('4500');
+      expect(body.message).not.toContain('char');
+    });
+
+    it('measures the trimmed message (trailing whitespace does not count)', async () => {
+      const app = await buildApp();
+      // 4500 'a's + 100 trailing spaces — should be accepted because trim()
+      // brings it back to 4500.
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/chat/turn/stream',
+        payload: { message: 'a'.repeat(4500) + ' '.repeat(100) },
+      });
+      if (res.statusCode === 400) {
+        expect(res.json<Record<string, unknown>>().error).not.toBe('message_too_long');
+      }
+    });
+  });
 });
