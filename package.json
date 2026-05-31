@@ -36,6 +36,7 @@
     "@anthropic-ai/sdk": "^0.92.0",
     "@axiomhq/js": "^1.6.0",
     "@fastify/formbody": "^8.0.2",
+    "@fastify/helmet": "^13.0.2",
     "@fastify/sensible": "^6.0.1",
     "@fastify/static": "^8.0.0",
     "@fastify/view": "^11.1.1",

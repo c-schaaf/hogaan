@@ -83,4 +83,111 @@ describe('app', () => {
       await app.close();
     }
   });
+
+  /**
+   * SCRUM-F7: defence-in-depth security headers. Helmet wires HSTS,
+   * X-Frame-Options, Referrer-Policy, X-Content-Type-Options, and a
+   * report-only CSP. These tests pin the headers we explicitly chose so
+   * any future contributor who tries to weaken them (e.g. removing
+   * helmet, or relaxing the CSP frame-ancestors) trips the suite.
+   *
+   * CSP is intentionally shipped in REPORT-ONLY mode for the first
+   * deploy — the header name is `content-security-policy-report-only`,
+   * not `content-security-policy`. The follow-up PR flips this to
+   * enforcement after 24h of observation.
+   */
+  describe('security headers (SCRUM-F7)', () => {
+    it('sets Strict-Transport-Security with 1-year max-age + includeSubDomains', async () => {
+      const app = await buildApp(testConfig);
+      try {
+        const res = await app.inject({ method: 'GET', url: '/healthz' });
+        const hsts = res.headers['strict-transport-security'];
+        expect(typeof hsts).toBe('string');
+        expect(hsts).toContain('max-age=31536000');
+        expect(hsts).toContain('includeSubDomains');
+      } finally {
+        await app.close();
+      }
+    });
+
+    it('sets X-Frame-Options: DENY to block clickjacking', async () => {
+      const app = await buildApp(testConfig);
+      try {
+        const res = await app.inject({ method: 'GET', url: '/healthz' });
+        expect(res.headers['x-frame-options']).toBe('DENY');
+      } finally {
+        await app.close();
+      }
+    });
+
+    it('sets Referrer-Policy to strict-origin-when-cross-origin', async () => {
+      const app = await buildApp(testConfig);
+      try {
+        const res = await app.inject({ method: 'GET', url: '/healthz' });
+        expect(res.headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
+      } finally {
+        await app.close();
+      }
+    });
+
+    it('sets X-Content-Type-Options: nosniff to block MIME-sniffing attacks', async () => {
+      const app = await buildApp(testConfig);
+      try {
+        const res = await app.inject({ method: 'GET', url: '/healthz' });
+        expect(res.headers['x-content-type-options']).toBe('nosniff');
+      } finally {
+        await app.close();
+      }
+    });
+
+    it('sets CSP in report-only mode (header name is -Report-Only, not enforcing) for safe rollout', async () => {
+      const app = await buildApp(testConfig);
+      try {
+        const res = await app.inject({ method: 'GET', url: '/healthz' });
+        // First deploy: report-only. The enforce-mode header should NOT
+        // be present yet — flipping to enforce is a follow-up PR.
+        expect(res.headers['content-security-policy-report-only']).toBeTruthy();
+        expect(res.headers['content-security-policy']).toBeUndefined();
+      } finally {
+        await app.close();
+      }
+    });
+
+    it('CSP policy blocks iframe-embedding via frame-ancestors none', async () => {
+      const app = await buildApp(testConfig);
+      try {
+        const res = await app.inject({ method: 'GET', url: '/healthz' });
+        const csp = res.headers['content-security-policy-report-only'];
+        expect(typeof csp).toBe('string');
+        // Belt with X-Frame-Options DENY; suspenders here.
+        expect(csp).toContain("frame-ancestors 'none'");
+      } finally {
+        await app.close();
+      }
+    });
+
+    it('CSP policy allows Supabase Auth origin for the client SDK', async () => {
+      const app = await buildApp(testConfig);
+      try {
+        const res = await app.inject({ method: 'GET', url: '/healthz' });
+        const csp = res.headers['content-security-policy-report-only'];
+        expect(typeof csp).toBe('string');
+        // The web SPA calls supabase.auth.getSession() from the browser —
+        // a too-strict connect-src would block that and break login.
+        expect(csp).toContain('*.supabase.co');
+      } finally {
+        await app.close();
+      }
+    });
+
+    it('does NOT leak server identity via X-Powered-By', async () => {
+      const app = await buildApp(testConfig);
+      try {
+        const res = await app.inject({ method: 'GET', url: '/healthz' });
+        expect(res.headers['x-powered-by']).toBeUndefined();
+      } finally {
+        await app.close();
+      }
+    });
+  });
 });
