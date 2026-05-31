@@ -123,7 +123,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       const userMessage =
         rateDecision.reason === 'per_user_daily'
           ? "You've hit today's limit. Try again tomorrow."
-          : "The coach is briefly unavailable. Please try again later.";
+          : 'The coach is briefly unavailable. Please try again later.';
       return reply.code(429).send({
         error: 'rate_limited',
         reason: rateDecision.reason,
@@ -139,7 +139,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         error: 'rate_limited',
         reason: rateDecision.reason,
         retryAfterMs: rateDecision.retryAfterMs,
-        message: "The coach is busy right now. Try again in a moment.",
+        message: 'The coach is busy right now. Try again in a moment.',
       });
     }
 
