@@ -146,6 +146,7 @@ export function fakeRateLimiters(): RateLimiters {
     perSecond: passThrough,
     perDay: passThrough,
     perUser: passThrough,
+    perUserDay: passThrough,
   } as unknown as RateLimiters;
 }
 

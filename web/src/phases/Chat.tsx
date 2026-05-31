@@ -8,7 +8,7 @@ import {
   ChatIconMoon,
   ChatIconSend,
 } from '../components/Icons';
-import { api, type SessionSummary } from '../lib/api';
+import { api, ApiError, type SessionSummary } from '../lib/api';
 
 interface BotParagraph {
   paras: ReactNode[];
@@ -364,11 +364,15 @@ export function Chat({
     } catch (err) {
       setThinking(false);
       console.error('stream turn failed', err);
-      const errorBubbleParas = [
-        <>
-          Something went wrong on my side just now. Take a breath and try again - I'm still here.
-        </>,
-      ];
+      // SCRUM-F2: when the server provides a friendly message (e.g. 429
+      // rate-limit "You've hit today's limit"), surface that verbatim
+      // instead of the generic catch-all copy. ApiError carries the
+      // message field; any other thrown shape falls back to generic.
+      const friendlyMessage =
+        err instanceof ApiError && !err.message.startsWith('stream open failed')
+          ? err.message
+          : "Something went wrong on my side just now. Take a breath and try again - I'm still here.";
+      const errorBubbleParas = [<>{friendlyMessage}</>];
       if (receivedDeltas) {
         // Mid-stream failure: replace the partial reply bubble in place
         // rather than appending a second bubble. Preserve its id so React

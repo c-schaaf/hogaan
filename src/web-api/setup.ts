@@ -57,10 +57,22 @@ export async function wireWebApiRoutes(
   // are lazy-built on first call so this ordering only needs to precede
   // the first LLM call, but it's cheapest right here at setup time.
   installRedisForBreakerSync(redis);
+  // SCRUM-F2 calibration:
+  //   - perUserPerDay (200): generous per-user daily cap; covers any realistic
+  //     human usage (median ~5-20 turns/day) with 4x headroom. One user
+  //     hitting it = either a bug or an abuser, both of which we want to know
+  //     about. Friendly UI message at this cap.
+  //   - perDay (100k): GLOBAL runaway fuse. Invisible at any realistic scale
+  //     (5 testers = 50/day; 1000 paying users = 10k/day). Only fires in a
+  //     true cost-DoS scenario (~$500 worst-case Anthropic spend in 24h).
+  //   - perSecond (80): unchanged spike protection.
+  //   - perUserPerHour (50): unchanged anti-spam (catches automation faster
+  //     than the daily cap).
   const rateLimiters = buildRateLimiters(redis, {
     perSecondLimit: 80,
-    perDayLimit: 1000,
+    perDayLimit: 100_000,
     perUserPerHourLimit: 50,
+    perUserPerDayLimit: 200,
   });
   const traceEmitter = buildTraceEmitter(config);
 
