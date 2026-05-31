@@ -375,9 +375,16 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         err,
       );
       try {
-        // Echo the actual error message back to the client (dev-friendly).
-        // Tighten this to a generic copy before launch.
-        sendEvent('error', { message: `stream failed: ${msg.slice(0, 300)}` });
+        // F4 (beta pre-flight): fixed generic copy. Raw exception text never
+        // reaches the browser — it would leak Drizzle / Anthropic / postgres-js
+        // internals, and any user-supplied content interpolated into a future
+        // error path would cross-contaminate other users' screens. The
+        // correlationId lets support resolve the user's incident against
+        // Sentry / Axiom without exposing internals.
+        sendEvent('error', {
+          message: 'The coach is briefly unavailable. Please try again.',
+          correlationId: req.id,
+        });
         sendEvent('end', { turnId: null, sessionId: null, latencyMs: Date.now() - t0 });
         reply.raw.end();
       } catch {
