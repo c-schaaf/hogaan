@@ -60,7 +60,14 @@ describe('Signup', () => {
     fireEvent.change(nameInput(), { target: { value: 'Hamse' } });
     fireEvent.change(emailInput(), { target: { value: 'notanemail' } });
     fireEvent.change(passwordInput(), { target: { value: 'password123' } });
-    fireEvent.click(screen.getByText('Create my account'));
+    // Submit the form directly. Clicking the submit button doesn't work in
+    // jsdom when the email input has type="email" and a non-empty invalid
+    // value — HTML5 email validation blocks the submit before JS sees it.
+    // fireEvent.submit bypasses the implicit constraint check and exercises
+    // the JS validator (Signup.tsx:24-30), which is what we actually want
+    // to test.
+    const form = emailInput().closest('form') as HTMLFormElement;
+    fireEvent.submit(form);
     await waitFor(() => {
       expect(screen.getByText("That email doesn't look right.")).toBeTruthy();
     });
