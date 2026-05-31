@@ -12,15 +12,33 @@ vi.mock('../../src/incident-handling/index.js', () => ({
 
 const SESSION_ID = 'sess-0000-0000-0000-000000000001';
 
-function buildDb(opts: { existingTitle?: string | null; updateSpy?: ReturnType<typeof vi.fn> }) {
-  const { existingTitle = null, updateSpy = vi.fn().mockResolvedValue([]) } = opts;
+function buildDb(opts: {
+  existingTitle?: string | null;
+  updateSpy?: ReturnType<typeof vi.fn>;
+  firstTurnMessage?: string | null;
+}) {
+  const {
+    existingTitle = null,
+    updateSpy = vi.fn().mockResolvedValue([]),
+    firstTurnMessage = null,
+  } = opts;
+
+  // The mock returns the SAME shape for every SELECT chain. Pre-F9 the only
+  // SELECT in this function read `sessions.title`. After F9 there's a second
+  // SELECT that reads `turns.userMessage` (to fetch the session's first
+  // message). The chain now supports `where().orderBy().limit()` AND
+  // `where().limit()`, and the returned row carries BOTH fields so the
+  // calling code picks whichever it asked for.
+  const queryResult = Promise.resolve([{ title: existingTitle, userMessage: firstTurnMessage }]);
+  const whereChain = {
+    limit: () => queryResult,
+    orderBy: () => ({ limit: () => queryResult }),
+  };
 
   return {
     select: () => ({
       from: () => ({
-        where: () => ({
-          limit: () => Promise.resolve([{ title: existingTitle }]),
-        }),
+        where: () => whereChain,
       }),
     }),
     update: () => ({ set: (vals: unknown) => ({ where: () => updateSpy(vals) }) }),

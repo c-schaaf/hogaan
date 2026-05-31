@@ -99,12 +99,25 @@ async function buildApp(resolved: { isNew: boolean; turnCount: number }) {
   return app;
 }
 
-describe('POST /api/chat/turn/stream — title generation gating', () => {
+/**
+ * SCRUM-F9: title generation now fires on the user's 3rd message
+ * (resolved.turnCount === 2 — i.e. two turns already persisted before
+ * the current one). This skips title-gen entirely on sessions that die
+ * after 1 or 2 turns — saving roughly half of all title-gen Anthropic
+ * calls, since one-shot questions are common (especially after the
+ * "homepage always opens a new session" product decision).
+ *
+ * Title quality is preserved: generateSessionTitle now fetches the
+ * session's FIRST user message from the turns table internally, so the
+ * title still summarises the opening topic even though the call fires
+ * on a later turn.
+ */
+describe('POST /api/chat/turn/stream — title generation gating (SCRUM-F9)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('fires title generation on a brand-new session (isNew=true)', async () => {
+  it('does NOT fire title generation on the brand-new first turn (isNew=true, turnCount=0)', async () => {
     const app = await buildApp({ isNew: true, turnCount: 0 });
     await app.inject({
       method: 'POST',
@@ -112,21 +125,45 @@ describe('POST /api/chat/turn/stream — title generation gating', () => {
       payload: { message: 'first message' },
     });
     const { generateSessionTitle } = await import('../../src/web-api/session-title.js');
-    expect(vi.mocked(generateSessionTitle)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(generateSessionTitle)).not.toHaveBeenCalled();
   });
 
-  it('does NOT fire title generation on a continued session (isNew=false, turnCount>0)', async () => {
-    const app = await buildApp({ isNew: false, turnCount: 4 });
+  it('does NOT fire title generation on the 2nd turn (turnCount=1)', async () => {
+    const app = await buildApp({ isNew: false, turnCount: 1 });
     await app.inject({
       method: 'POST',
       url: '/api/chat/turn/stream',
-      payload: { message: 'continued message', sessionId: SESSION_ID },
+      payload: { message: 'second message', sessionId: SESSION_ID },
     });
     const { generateSessionTitle } = await import('../../src/web-api/session-title.js');
     expect(vi.mocked(generateSessionTitle)).not.toHaveBeenCalled();
   });
 
-  it('fires title generation on a re-attached but empty session (isNew=false, turnCount=0)', async () => {
+  it('FIRES title generation on the 3rd turn (turnCount=2) — the F9 trigger', async () => {
+    const app = await buildApp({ isNew: false, turnCount: 2 });
+    await app.inject({
+      method: 'POST',
+      url: '/api/chat/turn/stream',
+      payload: { message: 'third message', sessionId: SESSION_ID },
+    });
+    const { generateSessionTitle } = await import('../../src/web-api/session-title.js');
+    expect(vi.mocked(generateSessionTitle)).toHaveBeenCalledTimes(1);
+  });
+
+  it('does NOT re-fire title generation on later turns (turnCount=4)', async () => {
+    const app = await buildApp({ isNew: false, turnCount: 4 });
+    await app.inject({
+      method: 'POST',
+      url: '/api/chat/turn/stream',
+      payload: { message: 'fifth message', sessionId: SESSION_ID },
+    });
+    const { generateSessionTitle } = await import('../../src/web-api/session-title.js');
+    expect(vi.mocked(generateSessionTitle)).not.toHaveBeenCalled();
+  });
+
+  it('still skips title generation on a re-attached empty session (turnCount=0) — pre-F9 this fired', async () => {
+    // Regression guard against the prior gating where `turnCount === 0`
+    // also triggered title-gen on a re-attached empty session.
     const app = await buildApp({ isNew: false, turnCount: 0 });
     await app.inject({
       method: 'POST',
@@ -134,6 +171,6 @@ describe('POST /api/chat/turn/stream — title generation gating', () => {
       payload: { message: 'first real turn', sessionId: SESSION_ID },
     });
     const { generateSessionTitle } = await import('../../src/web-api/session-title.js');
-    expect(vi.mocked(generateSessionTitle)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(generateSessionTitle)).not.toHaveBeenCalled();
   });
 });
