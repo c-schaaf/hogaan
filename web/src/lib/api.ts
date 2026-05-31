@@ -138,7 +138,21 @@ export async function* turnStream(body: ChatTurnRequest): AsyncGenerator<TurnStr
     body: JSON.stringify(body),
   });
   if (!resp.ok || resp.body === null) {
-    throw new ApiError(resp.status, `stream open failed: ${resp.status}`);
+    // SCRUM-F2: on 429 (and any future user-actionable error), parse the
+    // JSON body so the UI can render the server's `message` field instead
+    // of a generic "stream open failed". For non-JSON or unexpected
+    // shapes, fall back to the generic copy — the catch block in the chat
+    // UI surfaces its own friendly fallback already.
+    let friendlyMessage: string | undefined;
+    try {
+      const body = (await resp.json()) as { message?: unknown };
+      if (typeof body.message === 'string' && body.message.length > 0) {
+        friendlyMessage = body.message;
+      }
+    } catch {
+      /* not JSON or already consumed — use the default copy */
+    }
+    throw new ApiError(resp.status, friendlyMessage ?? `stream open failed: ${resp.status}`);
   }
 
   // Manual TextDecoder (more reliable across browsers / dev proxies than

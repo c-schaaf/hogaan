@@ -114,7 +114,21 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       'Normal',
     );
     if (rateDecision.decision === 'REJECT') {
-      return reply.code(429).send({ error: 'rate_limited', reason: rateDecision.reason });
+      // SCRUM-F2: per_user_daily is the only REJECT reason a real user will
+      // hit (their own 200/day cap). per_day is the global runaway fuse and
+      // should be vanishingly rare — but if it fires, the user-facing copy
+      // is intentionally the same ("try again later") because there's
+      // nothing actionable they can do either way. Tighten only if user
+      // research shows they want the distinction.
+      const userMessage =
+        rateDecision.reason === 'per_user_daily'
+          ? "You've hit today's limit. Try again tomorrow."
+          : 'The coach is briefly unavailable. Please try again later.';
+      return reply.code(429).send({
+        error: 'rate_limited',
+        reason: rateDecision.reason,
+        message: userMessage,
+      });
     }
     if (rateDecision.decision === 'QUEUE') {
       // Streaming + queueing is awkward; surface the back-pressure to the
@@ -125,6 +139,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         error: 'rate_limited',
         reason: rateDecision.reason,
         retryAfterMs: rateDecision.retryAfterMs,
+        message: 'The coach is busy right now. Try again in a moment.',
       });
     }
 

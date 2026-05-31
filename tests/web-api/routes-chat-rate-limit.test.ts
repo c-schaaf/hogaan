@@ -46,6 +46,7 @@ function buildLimiters(opts: {
   perDay?: 'success' | 'fail';
   perSecond?: 'success' | 'fail';
   perUser?: 'success' | 'fail';
+  perUserDay?: 'success' | 'fail';
 }): RateLimiters {
   const make = (outcome: 'success' | 'fail') => ({
     limit: () =>
@@ -61,6 +62,7 @@ function buildLimiters(opts: {
     perSecond: make(opts.perSecond ?? 'success'),
     perDay: make(opts.perDay ?? 'success'),
     perUser: make(opts.perUser ?? 'success'),
+    perUserDay: make(opts.perUserDay ?? 'success'),
   } as unknown as RateLimiters;
 }
 
@@ -84,7 +86,22 @@ describe('POST /api/chat/turn/stream — rate-limit enforcement', () => {
     vi.clearAllMocks();
   });
 
-  it('returns 429 + reason:per_day when the daily cap is exceeded', async () => {
+  it('returns 429 + reason:per_user_daily with friendly message when the per-user daily cap is hit (SCRUM-F2)', async () => {
+    const app = await buildApp(buildLimiters({ perUserDay: 'fail' }));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/chat/turn/stream',
+      payload: { message: 'hello' },
+    });
+    expect(res.statusCode).toBe(429);
+    const body = res.json<{ error: string; reason: string; message: string }>();
+    expect(body.error).toBe('rate_limited');
+    expect(body.reason).toBe('per_user_daily');
+    // Friendly copy the chat UI surfaces verbatim — wording matters.
+    expect(body.message).toBe("You've hit today's limit. Try again tomorrow.");
+  });
+
+  it('returns 429 + reason:per_day with generic message when the global runaway fuse fires', async () => {
     const app = await buildApp(buildLimiters({ perDay: 'fail' }));
     const res = await app.inject({
       method: 'POST',
@@ -92,12 +109,13 @@ describe('POST /api/chat/turn/stream — rate-limit enforcement', () => {
       payload: { message: 'hello' },
     });
     expect(res.statusCode).toBe(429);
-    const body = res.json<{ error: string; reason: string }>();
+    const body = res.json<{ error: string; reason: string; message: string }>();
     expect(body.error).toBe('rate_limited');
     expect(body.reason).toBe('per_day');
+    expect(body.message).toBe('The coach is briefly unavailable. Please try again later.');
   });
 
-  it('returns 429 + reason:per_user when the user hourly cap is exceeded', async () => {
+  it('returns 429 + reason:per_user when the user hourly anti-spam cap is exceeded', async () => {
     const app = await buildApp(buildLimiters({ perUser: 'fail' }));
     const res = await app.inject({
       method: 'POST',
@@ -105,8 +123,22 @@ describe('POST /api/chat/turn/stream — rate-limit enforcement', () => {
       payload: { message: 'hello' },
     });
     expect(res.statusCode).toBe(429);
-    const body = res.json<{ error: string; reason: string }>();
+    const body = res.json<{ error: string; reason: string; message: string }>();
     expect(body.error).toBe('rate_limited');
     expect(body.reason).toBe('per_user');
+    expect(body.message).toBe('The coach is busy right now. Try again in a moment.');
+  });
+
+  it('per_user_daily takes precedence over per_day in REJECT ordering', async () => {
+    // Both global and per-user-daily failing — the per-user-daily reason
+    // is what surfaces, because that's the one a real user can act on.
+    const app = await buildApp(buildLimiters({ perDay: 'fail', perUserDay: 'fail' }));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/chat/turn/stream',
+      payload: { message: 'hello' },
+    });
+    expect(res.statusCode).toBe(429);
+    expect(res.json<{ reason: string }>().reason).toBe('per_user_daily');
   });
 });
