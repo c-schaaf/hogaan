@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { eq } from 'drizzle-orm';
 import type { FastifyReply, FastifyRequest } from 'fastify';
@@ -8,6 +8,23 @@ import { auditLog } from '../shared/db/schema/audit-log.js';
 import { users } from '../shared/db/schema/users.js';
 import { type AppConfig, requireConfig } from '../shared/secrets/config.js';
 import { verifySupabaseJwtLocal } from './local-jwt.js';
+
+/**
+ * SCRUM-F5: opaque deterministic fingerprint of an email address. Same email
+ * always produces the same 16-char hex prefix; the email cannot be recovered
+ * from the hash. Used in log lines and Sentry extras so debugging can still
+ * correlate per-user incidents without persisting plaintext PII into
+ * Render logs or Sentry's searchable index (Hard Rule #3).
+ *
+ * Mirrors the `userIdHash` helper used by the trace path in routes.ts. The
+ * two helpers stay separate (rather than a single shared utility) because
+ * they apply to semantically distinct identifiers — email vs internal UUID —
+ * and intermingling them risks one accidentally being used where the other
+ * is expected. Cost of duplication is six lines.
+ */
+function hashEmail(email: string): string {
+  return createHash('sha256').update(email.toLowerCase().trim()).digest('hex').slice(0, 16);
+}
 
 /**
  * Phase B-bis — Supabase Auth session validation for /api/* routes.
@@ -214,7 +231,8 @@ export async function readSupabaseSession(
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       req.log.error(
-        { error: errMsg, supabaseUserId, email },
+        // SCRUM-F5: hashed email, never plaintext (Hard Rule #3).
+        { error: errMsg, supabaseUserId, emailHash: hashEmail(email) },
         'supabase-session: JIT insert into public.users failed',
       );
       reportP2('supabase-session: insert race', {
@@ -249,12 +267,14 @@ export async function readSupabaseSession(
           'supabase-session: orphan-email collision on JIT (refusing to relink)',
           {
             source: 'PhaseBbis.SupabaseSession.OrphanEmail',
-            extra: { supabaseUserId, email, requestId: req.id },
+            // SCRUM-F5: hashed email, never plaintext (Hard Rule #3).
+            extra: { supabaseUserId, emailHash: hashEmail(email), requestId: req.id },
           },
           err,
         );
         req.log.error(
-          { supabaseUserId, email },
+          // SCRUM-F5: hashed email, never plaintext (Hard Rule #3).
+          { supabaseUserId, emailHash: hashEmail(email) },
           'supabase-session: orphan-email collision — refusing to relink, returning null',
         );
         return null;
