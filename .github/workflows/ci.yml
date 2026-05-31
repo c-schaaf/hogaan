@@ -61,12 +61,20 @@ jobs:
         run: pnpm build
 
   # E2E (Playwright) runs in its own job so the heavier browser-based suite
-  # doesn't block fast feedback on lint/typecheck/unit. Still required to pass
-  # before merge — wire as a required check in branch protection.
+  # doesn't block fast feedback on lint/typecheck/unit.
+  #
+  # ADVISORY ONLY (continue-on-error: true) until CI-side env wiring lands.
+  # The Playwright config's webServer expects `pnpm dev`, which boots the
+  # full backend and needs DATABASE_URL / ANTHROPIC_API_KEY / JWT_SECRET_BASE64
+  # / encryption keys etc. — none of which exist in the CI runner today.
+  # Follow-up ticket: wire a minimal staging-style env (or a mock-services
+  # boot mode) so this job can be flipped to required. Tracked alongside F1
+  # (streaming fallback) and F8 (k6 load test) in the 90-day risk register.
   e2e:
-    name: End-to-end (Playwright)
+    name: End-to-end (Playwright) — ADVISORY
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    continue-on-error: true
 
     env:
       NODE_ENV: test
@@ -92,5 +100,5 @@ jobs:
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run Playwright tests
+      - name: Run Playwright tests (advisory)
         run: pnpm test:e2e

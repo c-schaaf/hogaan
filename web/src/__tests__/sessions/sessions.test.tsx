@@ -118,7 +118,9 @@ describe('Sessions', () => {
     fireEvent.change(input, { target: { value: 'zzznomatch' } });
 
     await waitFor(() => {
-      expect(screen.getByText(/No sessions match "zzznomatch"/)).toBeTruthy();
+      // UI copy is "No session titles match "{query}"." — body-search is coming
+      // soon, so the empty-state explicitly scopes itself to title matches.
+      expect(screen.getByText(/No session titles match "zzznomatch"/)).toBeTruthy();
     });
   });
 
