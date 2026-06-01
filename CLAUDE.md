@@ -150,8 +150,15 @@ Procedures · Audit Questions · Audit Evidence · Control Recommendations.
 
 ## Hard Rules — checked at G4 and G4.5
 
-1. **Latency budget is a product requirement.** Total turn time p99 ≤ 3000 ms.
-   No multi-step orchestration that breaches this.
+1. **Latency budget is a product requirement.** Total turn time p99 ≤ 3000 ms
+   in normal operation. **Documented fallback windows** (SCRUM-F1: Anthropic
+   stream-open failure routes to non-streaming Groq via `chat()`) may run up
+   to **4500 ms** p99 — this is the deliberate trade-off for serving a
+   response instead of an error during an Anthropic outage. Fallback turns
+   are tagged in TurnTrace (`fallbackPath: 'fast-model'`) and tracked on a
+   separate dashboard; they do NOT count toward the 3000 ms p99 alert. No
+   multi-step orchestration that breaches the 3000 ms budget on the normal
+   path.
 2. **Voice Rules and library content are Hamse-owned.** Do not edit
    `src/libraries/seed/` content without his sign-off. Every change is a new
    library version, logged per-prompt for traceability.

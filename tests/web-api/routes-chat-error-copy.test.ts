@@ -40,6 +40,7 @@ vi.mock('../../src/prompt-assembly/index.js', () => ({
   PromptAssemblyError: class PromptAssemblyError extends Error {},
 }));
 vi.mock('../../src/shared/llm/chat.js', () => ({
+  chat: vi.fn().mockRejectedValue(new Error('chat() fallback also failed')),
   chatStream: vi.fn(),
 }));
 vi.mock('../../src/web-api/session-title.js', () => ({
