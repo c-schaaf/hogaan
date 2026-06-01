@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:38.972Z",
-  "testId": "phase-12/voice-fidelity/T39-crisis-false-positive",
-  "controlId": "T5.VoiceFidelity.T39_CrisisFalsePositive",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Leadership-conflict phrasing with \"end\" + \"kill\" cognates must NOT trigger crisis fast-path. Drives keyword discipline.",
-  "phase": "phase-12"
-}

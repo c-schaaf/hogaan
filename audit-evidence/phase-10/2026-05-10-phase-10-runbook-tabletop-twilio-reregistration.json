@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:42.180Z",
-  "testId": "phase-10/runbook-tabletop/twilio-reregistration",
-  "controlId": "T1.BackupAndDR.TwilioSenderReregistration",
-  "tier": "T1",
-  "outcome": "pass",
-  "description": "Runbook references library_versions, prompt_templates, verify-phase-8 modes, FreeForm-in-window mitigation",
-  "phase": "phase-10"
-}

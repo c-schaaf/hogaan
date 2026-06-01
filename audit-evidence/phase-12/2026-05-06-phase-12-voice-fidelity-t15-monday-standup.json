@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T20:50:39.703Z",
-  "testId": "phase-12/voice-fidelity/T15-monday-standup",
-  "controlId": "T5.VoiceFidelity.T15_MondayStandup",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Recurring team-meeting framing → team level. Approved keywords: \"standup\", \"stand-up\", \"team meeting\", \"one-on-ones\".",
-  "phase": "phase-12"
-}

@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:42.162Z",
-  "testId": "phase-10/runbook-tabletop/render-failover",
-  "controlId": "T1.BackupAndDR.RenderOutageFailover",
-  "tier": "T1",
-  "outcome": "pass",
-  "description": "Runbook references DATABASE_URL, ENCRYPTION_KEY_BASE64, JWT_SECRET_BASE64, SPONSOR_PORTAL_BASE_URL, verify scripts",
-  "phase": "phase-10"
-}

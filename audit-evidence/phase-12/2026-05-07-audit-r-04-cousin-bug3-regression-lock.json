@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-07T07:28:54.781Z",
-  "testId": "audit/R-04-cousin-bug3-regression-lock",
-  "controlId": "T3.Audit.R04Cousin_Bug3RegressionLock",
-  "tier": "T3",
-  "outcome": "pass",
-  "description": "Locks the contract that on a fail-closed LLM error, the orchestrator returns the FALLBACK_DEGRADED template (not an empty string). This is the symptom Bug 3 surfaces in production logs.",
-  "phase": "phase-12"
-}

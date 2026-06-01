@@ -23,11 +23,14 @@ Welcome. If you are new to this repo, **read in this order:**
 ## What's elsewhere in this folder
 
 - `runbooks/` — operational runbooks (incident response, on-call, deploy).
-- `qa-prompts/` — content-quality QA prompts used by Hamse and content reviewers.
 - `voice-framework-workspace.md` — Hamse's working notes on the voice/voice-rules library.
-- `Hogaan_PRD_v1.docx` — legacy PRD. Predates 2026-05-13 simplifications and
-  the audience broadening. **Do not treat as source of truth.** It's retained
-  for historical reference only; CLAUDE.md + the BPMNs above are canonical.
+
+(Removed 2026-06-01: `qa-prompts/` — one-off bug-hunt chunks from earlier
+phases, served their purpose. `Hogaan_PRD_v1.docx` — legacy PRD about the
+WhatsApp era, was actively misleading new contributors. `design-prompts/` —
+forward-looking marketing-site design briefs, never committed; lived locally
+only. `audit-evidence/` — 723 historical test-evidence JSON files; the
+`withEvidence` helper still writes locally but no longer commits.)
 
 ## How docs stay accurate
 

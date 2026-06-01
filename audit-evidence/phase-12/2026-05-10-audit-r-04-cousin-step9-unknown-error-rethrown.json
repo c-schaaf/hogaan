@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T21:02:32.400Z",
-  "testId": "audit/R-04-cousin-step9-unknown-error-rethrown",
-  "controlId": "T3.Audit.R04Cousin_UnknownErrorRethrown",
-  "tier": "T3",
-  "outcome": "pass",
-  "description": "R-04 cousin negative control: a generic Error from chat() must NOT be caught by the Step 9 isFailClosedLlmError branch. The orchestrator preserves bug-report semantics for genuinely unknown failures.",
-  "phase": "phase-12"
-}

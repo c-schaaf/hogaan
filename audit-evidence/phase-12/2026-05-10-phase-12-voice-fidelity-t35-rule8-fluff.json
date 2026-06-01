@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:29.531Z",
-  "testId": "phase-12/voice-fidelity/T35-rule8-fluff",
-  "controlId": "T5.VoiceFidelity.T35_Rule8Fluff",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Voice Rule 8 — warm-but-not-fluffy. Motivational fluff phrases (\"you've got this\", \"believe in yourself\", \"champion\") flagged via heroPhraseFlags. Semantic warmth assessment deferred to voice-smoke.",
-  "phase": "phase-12"
-}

@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T19:56:37.718Z",
-  "testId": "phase-12/voice-fidelity/T50-role-taxonomy",
-  "controlId": "T5.VoiceFidelity.T50_RoleTaxonomy",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Phase 12 R15 — 5-role taxonomy (Student/Professional/Leader/CommunityLeader/Advocate). Order matters: CommunityLeader > Advocate > Leader > Student > Professional, so \"community organizer\" hits CommunityLeader before \"advocate\" can match.",
-  "phase": "phase-12"
-}

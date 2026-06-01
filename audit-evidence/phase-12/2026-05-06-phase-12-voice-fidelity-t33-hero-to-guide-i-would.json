@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T20:03:30.589Z",
-  "testId": "phase-12/voice-fidelity/T33-hero-to-guide-i-would",
-  "controlId": "T5.VoiceFidelity.T33_HeroToGuide",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Voice Rule 4 — hero-to-guide. Phrases like \"I would tell\" / \"I would do\" indicate the bot is solving for the user, not asking. heroPhraseFlags catches both.",
-  "phase": "phase-12"
-}

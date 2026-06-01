@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-14T19:36:45.055Z",
-  "testId": "phase-10/bpmn-coverage/process-2/e8-media-not-supported",
-  "controlId": "T2.Process2.E8_MediaNotSupported",
-  "tier": "T2",
-  "outcome": "pass",
-  "description": "Inbound with mediaUrls + empty body fires Process #2 Step 1 fast-path media_only branch → polite text-only response sent → E8_MediaNotSupported. No LLM call attempted.",
-  "phase": "phase-10"
-}

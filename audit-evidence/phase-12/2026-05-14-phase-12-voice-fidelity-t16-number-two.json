@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-14T19:36:33.678Z",
-  "testId": "phase-12/voice-fidelity/T16-number-two",
-  "controlId": "T5.VoiceFidelity.T16_NumberTwo",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Deputy / second-in-command relationship → team level (relationship-as-unit). Approved keywords: \"number two\", \"my deputy\", \"my second\", \"my right hand\".",
-  "phase": "phase-12"
-}

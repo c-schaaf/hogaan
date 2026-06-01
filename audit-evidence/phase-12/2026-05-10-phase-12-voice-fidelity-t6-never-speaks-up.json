@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:16.277Z",
-  "testId": "phase-12/voice-fidelity/T6-never-speaks-up",
-  "controlId": "T5.VoiceFidelity.T6_NeverSpeaksUp",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "\"never speaks up\" variant catches the inclusion practice. Approved keywords: \"never speaks up\", \"never speak up\".",
-  "phase": "phase-12"
-}

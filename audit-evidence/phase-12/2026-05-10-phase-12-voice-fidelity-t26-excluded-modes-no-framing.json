@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:29.502Z",
-  "testId": "phase-12/voice-fidelity/T26-excluded-modes-no-framing",
-  "controlId": "T5.VoiceFidelity.T26_ExcludedModesNoFraming",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Voice Rule 7 anti-dilution — terse modes get no Somali term injected. Excludes: ClarifyingQuestion, MetaResponse, ProfileUpdateAcknowledgment.",
-  "phase": "phase-12"
-}

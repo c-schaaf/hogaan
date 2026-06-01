@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-14T11:36:45.621Z",
-  "testId": "phase-10/bpmn-coverage/process-11/e7-suppressed-optout",
-  "controlId": "T2.Process11.E7_SuppressedRecipient",
-  "tier": "T2",
-  "outcome": "pass",
-  "description": "sendOutbound returns E7_SuppressedRecipient when the recipient phone is on the suppression list — fail-closed; no Twilio dispatch",
-  "phase": "phase-10"
-}

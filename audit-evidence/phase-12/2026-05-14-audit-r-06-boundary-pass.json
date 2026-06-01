@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-14T19:36:42.076Z",
-  "testId": "audit/R-06-boundary-pass",
-  "controlId": "T3.Audit.R06_LatencyBudget_Boundary",
-  "tier": "T3",
-  "outcome": "pass",
-  "description": "R-06 boundary: an elapsed-time of exactly 15000ms ships normally. The deadline predicate is strict `>`, not `>=`. Locks the boundary semantics.",
-  "phase": "phase-12"
-}

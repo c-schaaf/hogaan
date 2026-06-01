@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-14T19:36:33.625Z",
-  "testId": "phase-12/voice-fidelity/T2-feel-pointless",
-  "controlId": "T5.VoiceFidelity.T2_FeelPointless",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Existential meaning question with \"pointless\" / \"why am i even\" → purpose practice. Approved keywords (verbatim): \"pointless\", \"why am i even\".",
-  "phase": "phase-12"
-}

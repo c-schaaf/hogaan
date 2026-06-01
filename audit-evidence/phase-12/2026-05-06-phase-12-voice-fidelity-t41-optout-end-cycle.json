@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T19:37:23.982Z",
-  "testId": "phase-12/voice-fidelity/T41-optout-end-cycle",
-  "controlId": "T5.VoiceFidelity.T41_OptOutFalsePositive_End",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Phase 12 R18 — \"end\" was removed from opt-out keywords; coaching-context \"end this cycle\" must not opt-out.",
-  "phase": "phase-12"
-}

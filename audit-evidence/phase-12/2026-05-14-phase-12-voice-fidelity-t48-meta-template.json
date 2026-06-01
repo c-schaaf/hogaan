@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-14T19:37:00.555Z",
-  "testId": "phase-12/voice-fidelity/T48-meta-template",
-  "controlId": "T5.VoiceFidelity.T48_MetaTemplate",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "\"Are you AI?\" routes to META_TEMPLATE. Word-count in MetaQuestion band 30–100 (R32). Must include BRAND_FRAMEWORK_ATTRIBUTION canonical token (R36) — never ad-hoc framework wording. Voice Rule 11 formatting-discipline: no markdown headers, no bullets.",
-  "phase": "phase-12"
-}

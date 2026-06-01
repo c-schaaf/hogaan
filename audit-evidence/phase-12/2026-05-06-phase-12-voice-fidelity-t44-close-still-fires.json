@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T19:41:06.448Z",
-  "testId": "phase-12/voice-fidelity/T44-close-still-fires",
-  "controlId": "T5.VoiceFidelity.T44_CloseStillFires",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Trailing-question guard must not regress the existing R22 close-token behavior — bare acknowledgments still close.",
-  "phase": "phase-12"
-}
