@@ -63,18 +63,43 @@ describe('Phase 10.5 — Runbook tabletop: Supabase PITR drill', () => {
         controlId: 'T1.BackupAndDR.SupabasePITRDrill',
         tier: 'T1',
         description:
-          'Runbook references the 7-day Pro-tier PITR window, staging drill, and reconciliation matrix',
+          'Runbook references the 7-day Pro-tier PITR window, current-schema tables, the real incident decision matrix, and current real URLs',
       },
       async () => {
         const md = await readRunbook('supabase-pitr-drill');
+
+        // Structural invariants that survive any rewrite — these are
+        // properties of the system itself, not a snapshot of phrasing.
         expect(md).toContain('PITR');
-        // 7-day window is a known property of the Pro tier
-        expect(md).toContain('7 days');
-        // Drill is on staging
+        expect(md).toContain('7 days'); // Pro-tier window
         expect(md.toLowerCase()).toContain('staging');
-        // Verification scripts
-        expect(md).toContain('verify-phase-7.ts');
-        expect(md).toContain('verify-phase-9.ts');
+
+        // SCRUM-F12: the runbook MUST reference current-schema tables only.
+        // Pre-rewrite the runbook talked about phone_hash and
+        // whatsapp_messages — both dropped in drizzle/0009. A drift back
+        // to those names means the runbook is out of sync with the code.
+        expect(md).toContain('users');
+        expect(md).toContain('sessions');
+        expect(md).toContain('turns');
+        expect(md).not.toMatch(/phone_hash/);
+        expect(md).not.toMatch(/whatsapp_messages/);
+        expect(md).not.toMatch(/Twilio/i);
+
+        // Real URLs inlined (same discipline as the F11 observability
+        // runbook rewrite) — a placeholder like `[Supabase URL]` is a
+        // 3am footgun.
+        expect(md).toContain('supabase.com/dashboard');
+        expect(md).toContain('dashboard.render.com');
+
+        // Decision matrix for the cutover step must still exist — it's
+        // the load-bearing call ("accept loss vs. replay") and the
+        // single hardest moment of a real incident.
+        expect(md.toLowerCase()).toContain('decision matrix');
+
+        // Honesty: the runbook acknowledges it has not been live-drilled
+        // yet (F12 Part 2). When the first drill happens, this assertion
+        // gets relaxed in the same PR that removes the disclaimer.
+        expect(md.toLowerCase()).toContain('not been live-drilled');
       },
     );
   });
