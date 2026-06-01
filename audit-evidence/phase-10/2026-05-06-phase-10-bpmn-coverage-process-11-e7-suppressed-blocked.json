@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T09:59:58.535Z",
-  "testId": "phase-10/bpmn-coverage/process-11/e7-suppressed-blocked",
-  "controlId": "T2.Process11.E7_SuppressedRecipient",
-  "tier": "T2",
-  "outcome": "pass",
-  "description": "sendOutbound returns E7_SuppressedRecipient (reason=recipient_blocked) when the phone is on the block list — fail-closed",
-  "phase": "phase-10"
-}

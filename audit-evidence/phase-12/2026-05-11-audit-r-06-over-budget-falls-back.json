@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-11T07:18:48.560Z",
-  "testId": "audit/R-06-over-budget-falls-back",
-  "controlId": "T3.Audit.R06_LatencyBudget_OverBudget",
-  "tier": "T3",
-  "outcome": "pass",
-  "description": "R-06: when elapsed time at the deadline check exceeds LATENCY_BUDGET_MS (15000ms), orchestrator routes to FALLBACK_DEGRADED + E11_ServiceUnavailable instead of shipping the coaching response.",
-  "phase": "phase-12"
-}

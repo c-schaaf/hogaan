@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:39.002Z",
-  "testId": "phase-12/voice-fidelity/T45-goodbye",
-  "controlId": "T5.VoiceFidelity.T45_Goodbye",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Classic goodbye-shaped token closes session unambiguously.",
-  "phase": "phase-12"
-}

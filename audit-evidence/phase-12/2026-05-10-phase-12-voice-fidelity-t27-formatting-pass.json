@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:29.512Z",
-  "testId": "phase-12/voice-fidelity/T27-formatting-pass",
-  "controlId": "T5.VoiceFidelity.T27_FormattingPass",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Voice Rule 11 — clean prose with at most one *bold* segment passes formatting check.",
-  "phase": "phase-12"
-}

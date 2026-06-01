@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-14T19:36:39.273Z",
-  "testId": "phase-10/checklist/synthetic-p0",
-  "controlId": "T1.AccessControl.P0Alerting",
-  "tier": "T1",
-  "outcome": "pass",
-  "description": "Synthetic P0 incident fires through reportP0 without throwing. In production this routes to Sentry + BetterStack pager.",
-  "phase": "phase-10"
-}

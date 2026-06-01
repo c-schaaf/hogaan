@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T09:59:54.164Z",
-  "testId": "phase-10/bpmn-coverage/process-12/e6-blocked-user",
-  "controlId": "T2.Process12.E6_BlockedUser",
-  "tier": "T2",
-  "outcome": "pass",
-  "description": "Identity orchestrator returns E6_BlockedUser when the inbound phone is on the block list. Suppression check at Step 3 short-circuits before lookup. Audit row is written at Step 8 with the E6 endEvent.",
-  "phase": "phase-10"
-}

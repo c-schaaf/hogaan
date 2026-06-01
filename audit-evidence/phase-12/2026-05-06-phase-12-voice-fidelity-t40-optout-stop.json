@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T19:37:23.971Z",
-  "testId": "phase-12/voice-fidelity/T40-optout-stop",
-  "controlId": "T5.VoiceFidelity.T40_OptOutStop",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "WhatsApp Business STOP keyword fires opt-out parser; triggers suppression list + status=opted_out (Phase 12 R17).",
-  "phase": "phase-12"
-}

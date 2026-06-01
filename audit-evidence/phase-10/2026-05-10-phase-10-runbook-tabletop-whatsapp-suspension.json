@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:42.152Z",
-  "testId": "phase-10/runbook-tabletop/whatsapp-suspension",
-  "controlId": "T1.BackupAndDR.WhatsAppAccountSuspension",
-  "tier": "T1",
-  "outcome": "pass",
-  "description": "Runbook references E11_AccountSuspended terminal event, Sentry source tag, suppression_list mitigation",
-  "phase": "phase-10"
-}

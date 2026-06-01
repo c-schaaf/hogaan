@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T10:00:00.511Z",
-  "testId": "phase-10/crisis-redteam/category-coverage",
-  "controlId": "T3.CrisisHandling.CategoryCoverage",
-  "tier": "T3",
-  "outcome": "pass",
-  "description": "Each Tier A category is represented by at least one phrase",
-  "phase": "phase-10"
-}

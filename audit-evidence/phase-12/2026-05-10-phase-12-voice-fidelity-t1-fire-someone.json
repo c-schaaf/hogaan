@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:16.234Z",
-  "testId": "phase-12/voice-fidelity/T1-fire-someone",
-  "controlId": "T5.VoiceFidelity.T1_FireSomeone",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Hard call about firing — should land on integrity OR accountability practice. Keyword \"had to fire\" routes to accountability.",
-  "phase": "phase-12"
-}

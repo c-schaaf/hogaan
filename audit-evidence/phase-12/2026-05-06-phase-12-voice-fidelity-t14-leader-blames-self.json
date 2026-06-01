@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T20:41:46.661Z",
-  "testId": "phase-12/voice-fidelity/T14-leader-blames-self",
-  "controlId": "T5.VoiceFidelity.T14_LeaderBlamesSelf",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Phase 12 T14 — leader-responsibility phrase (\"because of me\") forces level=self even when \"my team\" team-keyword is also present. The leader is the unit when accepting blame.",
-  "phase": "phase-12"
-}

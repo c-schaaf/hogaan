@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:42.170Z",
-  "testId": "phase-10/runbook-tabletop/supabase-pitr",
-  "controlId": "T1.BackupAndDR.SupabasePITRDrill",
-  "tier": "T1",
-  "outcome": "pass",
-  "description": "Runbook references the 7-day Pro-tier PITR window, staging drill, and reconciliation matrix",
-  "phase": "phase-10"
-}

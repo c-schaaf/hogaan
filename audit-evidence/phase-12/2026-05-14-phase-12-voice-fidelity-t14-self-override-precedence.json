@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-14T19:36:33.618Z",
-  "testId": "phase-12/voice-fidelity/T14-self-override-precedence",
-  "controlId": "T5.VoiceFidelity.T14_SelfOverridePrecedence",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "T14 deterministic precedence proof — a message with multiple team-level signals AND a self-override phrase still lands at level=self. Drives the SELF_OVERRIDE_PHRASES rule in tagPracticeAndLevel.",
-  "phase": "phase-12"
-}

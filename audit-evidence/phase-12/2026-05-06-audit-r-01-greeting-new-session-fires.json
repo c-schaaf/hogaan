@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T23:29:43.775Z",
-  "testId": "audit/R-01-greeting-new-session-fires",
-  "controlId": "T3.Audit.R01_GreetingNewSessionFires",
-  "tier": "T3",
-  "outcome": "pass",
-  "description": "R-01 regression: genuinely new sessions still get the welcome template. Guards against over-correction.",
-  "phase": "phase-12"
-}

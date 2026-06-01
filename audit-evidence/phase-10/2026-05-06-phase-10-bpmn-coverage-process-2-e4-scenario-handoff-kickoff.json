@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T09:59:59.255Z",
-  "testId": "phase-10/bpmn-coverage/process-2/e4-scenario-handoff-kickoff",
-  "controlId": "T2.Process2.E4_ScenarioHandoff",
-  "tier": "T2",
-  "outcome": "pass",
-  "description": "Triage classifies intent=ScenarioRequest with no active scenario. Orchestrator delegates to runScenarioTurn which kicks off a new scenario; orchestrator finalizes with E4_ScenarioHandoff. The scenario subprocess delivered step 1 verbatim — no main coaching pipeline triggered.",
-  "phase": "phase-10"
-}

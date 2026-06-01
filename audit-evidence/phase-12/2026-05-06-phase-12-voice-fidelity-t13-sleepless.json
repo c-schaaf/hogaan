@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-06T19:49:31.003Z",
-  "testId": "phase-12/voice-fidelity/T13-sleepless",
-  "controlId": "T5.VoiceFidelity.T13_Sleepless",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Personal sleeplessness about decision → level=self via \"i'm sleepless\".",
-  "phase": "phase-12"
-}

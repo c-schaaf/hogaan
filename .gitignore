@@ -21,7 +21,19 @@ drizzle/meta/
 .claude/
 
 # Test output artifacts (do not commit; regenerated each run)
-audit-evidence/phase-10/
-audit-evidence/phase-12/
+# Broadened from `audit-evidence/phase-10|12/` to the whole folder after the
+# 2026-06-01 bloat purge — 723 historical evidence files were removed; the
+# withEvidence helper still writes locally but never commits.
+audit-evidence/
 test-results/
 playwright-report/
+
+# One-off Jira ticket exports (Hamse/PM artifacts, never load-bearing in code).
+# Re-exporting these into the repo root is intentional bloat — keep them in
+# external tooling (Notion / Linear / Jira itself).
+jira-*.csv
+jira-tickets.md
+
+# Stale product docs (the v1 PRD describes WhatsApp; removed 2026-06-01).
+# If a future PRD needs to live in the repo, give it a clearer name + path.
+docs/Hogaan_PRD_*.docx

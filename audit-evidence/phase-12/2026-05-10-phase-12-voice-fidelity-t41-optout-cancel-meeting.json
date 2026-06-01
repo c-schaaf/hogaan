@@ -1,9 +1,0 @@
-{
-  "recordedAt": "2026-05-10T20:31:38.984Z",
-  "testId": "phase-12/voice-fidelity/T41-optout-cancel-meeting",
-  "controlId": "T5.VoiceFidelity.T41_OptOutFalsePositive_Cancel",
-  "tier": "T5",
-  "outcome": "pass",
-  "description": "Phase 12 R18 — \"cancel\" was removed from opt-out keywords; coaching-context cancel must not opt-out.",
-  "phase": "phase-12"
-}
