@@ -9,7 +9,7 @@ import { decryptPlaintext, encryptPlaintext } from '../shared/db/encryption.js';
 import { sessions } from '../shared/db/schema/sessions.js';
 import { turns } from '../shared/db/schema/turns.js';
 import { users } from '../shared/db/schema/users.js';
-import { chatStream } from '../shared/llm/chat.js';
+import { chat, chatStream } from '../shared/llm/chat.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import { checkRateLimit, type RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
@@ -260,24 +260,69 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
 
       sendEvent('start', { sessionId });
 
+      const chatMessages = [...priorMessages, { role: 'user' as const, content: message }];
       const stream = chatStream(opts.config, {
         systemPrompt: promptBundle.assembledPrompt,
-        messages: [...priorMessages, { role: 'user', content: message }],
+        messages: chatMessages,
         maxTokens: 600,
         temperature: 0.7,
       });
 
       let accumulated = '';
-      let final;
-      // Manual iteration so we can capture the generator's return value.
-      while (true) {
-        const next = await stream.next();
-        if (next.done === true) {
-          final = next.value;
-          break;
+      let receivedDeltas = false;
+      let final: { modelUsed: 'claude-haiku-4-5' | 'llama-3.3-70b' | 'safe-template' | 'none' } & {
+        fallbackPath?: 'none' | 'fast-model' | 'safe-template' | 'service-unavailable';
+      } = { modelUsed: 'claude-haiku-4-5' };
+
+      try {
+        // Manual iteration so we can capture the generator's return value.
+        while (true) {
+          const next = await stream.next();
+          if (next.done === true) {
+            final = { ...next.value, fallbackPath: 'none' };
+            break;
+          }
+          accumulated += next.value;
+          receivedDeltas = true;
+          sendEvent('delta', { text: next.value });
         }
-        accumulated += next.value;
-        sendEvent('delta', { text: next.value });
+      } catch (streamErr) {
+        // SCRUM-F1: Anthropic streaming failed. If we haven't sent any words
+        // to the user yet, fall back to non-streaming `chat()` — which uses
+        // Anthropic Haiku first, then Groq Llama 3.3 on failure, then a safe
+        // template if everything dies. Deliver the entire response as ONE
+        // SSE delta + end so the existing client SSE loop handles it as a
+        // (slightly delayed) normal turn.
+        //
+        // Mid-stream failures (after at least one delta was sent to the
+        // browser) cannot be recovered — we've already shown the user
+        // partial text. Re-throw to land in the outer catch and the SSE
+        // error event path.
+        if (receivedDeltas) {
+          throw streamErr;
+        }
+        req.log.warn(
+          { requestId: req.id, err: streamErr instanceof Error ? streamErr.message : 'unknown' },
+          'F1: Anthropic stream open failed; attempting non-streaming fallback (Groq via chat())',
+        );
+        const fallbackResp = await chat(
+          opts.config,
+          {
+            systemPrompt: promptBundle.assembledPrompt,
+            messages: chatMessages,
+            maxTokens: 600,
+            temperature: 0.7,
+          },
+          'The coach is having trouble responding right now. Please try rephrasing or come back in a moment.',
+        );
+        accumulated = fallbackResp.text;
+        // Deliver the entire fallback response as a single delta so the
+        // client's existing SSE loop renders it correctly.
+        sendEvent('delta', { text: fallbackResp.text });
+        final = {
+          modelUsed: fallbackResp.modelUsed,
+          fallbackPath: fallbackResp.fallbackPath,
+        };
       }
 
       // ---- Persist turn row ------------------------------------------
@@ -357,16 +402,21 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         terminalEvent: persistFailed
           ? 'Process_2.Step_StreamPersistFailed'
           : 'Process_2.Step_StreamComplete',
-        // chatStream is Haiku-only today (no llama fallback in the streaming
-        // path). If/when fallback wiring lands, switch this to final.modelUsed
-        // and update the fallbackPath/fallbackModelUsed mapping accordingly.
-        modelUsed: final?.modelUsed ?? 'claude-haiku-4-5',
-        fallbackPath: 'none',
+        // SCRUM-F1: the streaming handler now falls through to non-streaming
+        // chat() (with Groq fallback) on Anthropic stream-open failures.
+        // final.modelUsed and final.fallbackPath carry the real values from
+        // whichever provider actually answered.
+        modelUsed: final.modelUsed,
+        fallbackPath: final.fallbackPath ?? 'none',
         latencyMs,
         qaOutcome: 'skipped',
         degradationFlags: {
           ...noDegradation(),
           contextFetchPartial: traceContextPartial,
+          // SCRUM-F1: dashboards can filter on this to see "what % of turns
+          // were served by Groq instead of Anthropic during a window" — the
+          // single most actionable Anthropic-outage signal we have.
+          fallbackModelUsed: final.modelUsed === 'llama-3.3-70b',
         },
         libraryVersions: traceLibraryVersions ?? emptyLibraryVersions(),
         determinismHash: null,

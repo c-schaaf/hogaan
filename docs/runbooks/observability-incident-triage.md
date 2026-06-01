@@ -220,7 +220,7 @@ If your test turn shows up, the gap was transient and you're fine. If it doesn't
 
 ## 7. Anthropic API outage or sustained rate limit
 
-**Symptom:** Sentry shows a spike of Anthropic errors. Axiom shows turns failing with `terminalEvent` mentioning Anthropic. **There is no fallback on the streaming path** (Risk Register F1) — when Anthropic is down, every coaching turn fails.
+**Symptom:** Sentry shows a spike of Anthropic errors. Axiom shows turns landing with `fallbackPath = 'fast-model'` and `modelUsed = 'llama-3.3-70b'`. **As of SCRUM-F1, the streaming path now falls back automatically to non-streaming Groq Llama when Anthropic's stream-open fails.** Users still get a response — slightly slower (~3000-3700ms instead of streaming), in a less polished voice (Llama < Haiku on Hogaan voice fidelity). They notice the voice more than the latency.
 
 **First check:** Open https://status.anthropic.com. Is this their incident or just us?
 
@@ -230,11 +230,18 @@ If your test turn shows up, the gap was transient and you're fine. If it doesn't
 - API key was rotated and prod env wasn't updated.
 
 **Fix:**
-1. If Anthropic status confirms an outage: **wait** is the right answer. Tell the 5 testers via text or email: "Anthropic (the AI provider we use) is having an outage. The coach won't respond until they're back. We'll update you when it's fixed." Then **call Hamse** so he hears it from you, not a tester.
+1. If Anthropic status confirms an outage: **fallback should be doing its job.** Run this Axiom query to confirm Groq is serving requests:
+   ```
+   ['hogaan']
+   | where _time > ago(30m)
+   | summarize total=count(), fallback=countif(fallbackPath == "fast-model")
+   | extend fallbackPct = (fallback * 100.0) / total
+   ```
+   If `fallbackPct` is climbing (5%+ of recent turns), the fallback is working. **Wait** is the right answer plus a courtesy heads-up: text the 5 testers "Our primary AI provider is having an outage — Hogaan is running on backup right now, so responses may sound slightly different until they're back." Then **call Hamse** so he hears it from you, not a tester noticing the voice shift.
 2. If Anthropic is up but we're seeing 429s: open the Anthropic console, check Usage. If we're at the tier ceiling, request a limit increase (usually approved in under an hour).
 3. If we're seeing 401/403 (auth errors): the API key is bad. Rotate it in the Anthropic console, update `ANTHROPIC_API_KEY` in https://dashboard.render.com/web/srv-d8arufbbc2fs7399vqr0 → Environment, redeploy.
 4. If a recent deploy correlates with the spike (and Anthropic is healthy): roll back. Something we shipped is mis-calling the API.
-5. Confirm errors stop and successful turns resume before declaring done.
+5. Confirm successful (non-fallback) turns resume before declaring done. Fallback alone is "degraded service," not "resolved."
 
 **Escalate when:**
 - Anthropic outage > 1 hour with no ETA → **call Hamse**. He decides whether to email testers a deeper apology or pause the beta.
@@ -253,10 +260,10 @@ If your test turn shows up, the gap was transient and you're fine. If it doesn't
 
 ## Honest gaps you can't fix in the moment (know these going in)
 
-- **No streaming LLM fallback** (F1). When Anthropic is down, coaching is down. Period.
-- **One shared rate limit** (F2). A burst of activity from one user can starve the rest.
-- **No max length on user messages** (F3). A huge message can blow up a turn.
-- **No load test has been run** (F8). We don't know the real ceiling.
-- **No proven backup-restore drill.** Supabase backups exist but haven't been tested end-to-end.
+- **No load test has been run yet** (F8). We don't know the real ceiling.
+- **No proven backup-restore drill** (F12). Supabase backups exist but haven't been tested end-to-end.
+- **No GDPR-complete account deletion** (F6). Deleting a user from public.users leaves their Supabase Auth identity behind.
+
+Closed in earlier PRs (no longer gaps): F1 streaming fallback (Anthropic outages now route to Groq automatically), F2 per-user rate limit (200/day), F3 message length cap (4500 chars).
 
 *Last updated: 2026-05-31.*

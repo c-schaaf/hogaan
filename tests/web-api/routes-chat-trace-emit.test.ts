@@ -30,6 +30,7 @@ vi.mock('../../src/prompt-assembly/index.js', () => ({
   PromptAssemblyError: class PromptAssemblyError extends Error {},
 }));
 vi.mock('../../src/shared/llm/chat.js', () => ({
+  chat: vi.fn().mockRejectedValue(new Error('chat() not used in this test path')),
   chatStream: vi.fn(),
 }));
 vi.mock('../../src/web-api/session-title.js', () => ({

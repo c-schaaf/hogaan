@@ -79,7 +79,29 @@ This is your morning coffee checklist. You (Muhsin) open it once a day, run five
 
 **Threshold:**
 - **Any row at all during beta** → open one of the failing `traceId`s, cross-reference with Sentry, decide if a tester saw it. If yes → Recipe 1.
-- **Honest reality:** Anthropic Haiku is the only model on the live streaming path. If `modelUsed = claude-haiku-4-5` shows failures, you have no fallback — Recipe 7.
+- **SCRUM-F1 update:** the streaming path now falls back to Groq Llama automatically when Anthropic stream-open fails. So a turn with `modelUsed = llama-3.3-70b` and `fallbackPath = fast-model` is NOT a failure — it's a successful degraded response.
+
+---
+
+### 4b. Axiom — fallback rate (Anthropic outage early-warning)
+
+**Where:** https://app.axiom.co/hogaan-df5k/datasets/hogaan
+
+**Paste this into Axiom:**
+```
+['hogaan']
+| where _time > ago(24h)
+| where terminalEvent == "Process_2.Step_StreamComplete"
+| summarize total=count(), fallback=countif(fallbackPath == "fast-model")
+| extend fallbackPct = (fallback * 100.0) / total
+```
+**This asks Axiom:** of every successful turn in the last 24 hours, what % were served by Groq Llama (because Anthropic was down) instead of Anthropic Haiku?
+
+**Threshold:**
+- **Steady state:** 0% — Anthropic should serve every turn when healthy.
+- **fallbackPct > 5%** in any 24h window → Anthropic is having problems even if Sentry is quiet. Recipe 7.
+- **fallbackPct = 100%** → Anthropic is down. Already in Recipe 7 territory; check Anthropic status.
+- **Voice quality note:** Llama is meaningfully less polished than Haiku on Hogaan voice. Testers WILL notice the difference. If fallback rate is sustained, text testers proactively: "Our primary AI provider is having an outage — responses may sound slightly different until they're back."
 
 ---
 
@@ -170,9 +192,10 @@ Run the five daily checks first, then:
 
 ## Honest gaps (so you remember them under pressure)
 
-- **No load test has been run.** We don't know the real turn-volume ceiling. If volume spikes, you are in unknown territory.
-- **No LLM fallback on the streaming path.** When Anthropic is down, every coaching turn fails. There is no autopilot recovery. (Risk Register F1.)
-- **One shared rate limit** across all users (F2). One noisy user can starve the others.
-- **No proven backup-restore drill.** Supabase backups exist but haven't been test-restored.
+- **No load test has been run** (F8). We don't know the real turn-volume ceiling. If volume spikes, you are in unknown territory.
+- **No proven backup-restore drill** (F12). Supabase backups exist but haven't been test-restored.
+- **No GDPR-complete account deletion** (F6). The Supabase Auth identity is left behind when a user deletes their account.
+
+Closed in earlier PRs (no longer gaps): F1 streaming fallback (Anthropic outages now route to Groq automatically — see Check 4b above), F2 per-user rate limit (200/day), F3 message length cap (4500 chars).
 
 *Last updated: 2026-05-31.*
