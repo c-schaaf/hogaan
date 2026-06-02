@@ -12,9 +12,6 @@ import type { RedisBundle } from './client.js';
  *     the global perDay also served as the per-user cap, so one user could
  *     starve every other paying customer for the day).
  *
- * Critical-priority messages (crisis resources) bypass perUser caps but NOT
- * perDay — that escalation path is the caller's responsibility.
- *
  * Numerics live in config; this module exposes builders, not hard-coded values.
  */
 
@@ -66,16 +63,12 @@ export type RateDecision =
   | { decision: 'QUEUE'; reason: 'per_second' | 'per_user'; retryAfterMs: number }
   | { decision: 'REJECT'; reason: 'per_day' | 'per_user_daily' };
 
-export type Priority = 'Normal' | 'High' | 'Critical';
-
 /**
  * Decision logic:
  *   - All limits OK → PROCEED
- *   - perUserPerDay hit + Normal/High → REJECT (user has hit their daily cap)
+ *   - perUserPerDay hit → REJECT (user has hit their daily cap)
  *   - perDay hit (global runaway fuse) → REJECT (catastrophic blast-radius)
- *   - perSecond OR perUser hit + Normal/High → QUEUE (transient, will recover)
- *   - perUser hit + Critical → bypasses to PROCEED
- *   - Critical never bypasses perDay or perUserPerDay (deliberate hard ceiling)
+ *   - perSecond OR perUser hit → QUEUE (transient, will recover)
  *
  * Ordering of REJECT reasons matters for diagnostics: per_user_daily is the
  * one a real user will encounter; per_day is the runaway-fuse and should be
@@ -85,7 +78,6 @@ export async function checkRateLimit(
   limiters: RateLimiters,
   globalKey: string,
   userKey: string,
-  priority: Priority,
 ): Promise<RateDecision> {
   const [perSecond, perDay, perUser, perUserDay] = await Promise.all([
     limiters.perSecond.limit(globalKey),
@@ -94,7 +86,7 @@ export async function checkRateLimit(
     limiters.perUserDay.limit(userKey),
   ]);
 
-  if (!perUserDay.success && priority !== 'Critical') {
+  if (!perUserDay.success) {
     return { decision: 'REJECT', reason: 'per_user_daily' };
   }
 
@@ -102,7 +94,7 @@ export async function checkRateLimit(
     return { decision: 'REJECT', reason: 'per_day' };
   }
 
-  if (!perUser.success && priority !== 'Critical') {
+  if (!perUser.success) {
     const retryAfterMs = Math.max(0, perUser.reset - Date.now());
     return { decision: 'QUEUE', reason: 'per_user', retryAfterMs };
   }

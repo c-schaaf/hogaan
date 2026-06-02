@@ -1,0 +1,23 @@
+# gitleaks config — extends the bundled default ruleset and layers an
+# allowlist over it for known-safe test fixtures. fail-on-leak behaviour is
+# controlled by gitleaks-action's default (non-zero exit on any finding).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Hogaan repo allowlist: test fixtures, .env.example, audit-evidence"
+
+paths = [
+  '''(^|/)\.env\.example$''',
+  '''(^|/)tests/''',
+  '''(^|/)audit-evidence/''',
+]
+
+regexes = [
+  '''test_anthropic_key''',
+  '''fake-api-key''',
+  '''abc123''',
+  '''sk-test''',
+  '''gsk-test''',
+]
