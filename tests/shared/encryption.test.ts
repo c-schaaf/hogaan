@@ -82,4 +82,24 @@ describe('encryption', () => {
     expect(a).toMatch(/^[0-9a-f]{64}$/);
     expect(hashPhone('+252612345679')).not.toBe(a);
   });
+
+  it('pins wire format: base64( iv(12) || tag(16) || ciphertext(N) )', () => {
+    resetEncryptionCache();
+    const cfg = configWithKey(Buffer.alloc(32, 0x42).toString('base64'));
+    const plaintext = 'wire-format-pin';
+    const ciphertext = encryptPlaintext(cfg, plaintext);
+    const buf = Buffer.from(ciphertext, 'base64');
+    expect(buf.length).toBe(12 + 16 + Buffer.byteLength(plaintext, 'utf8'));
+  });
+
+  it('rejects ciphertext encrypted under a previous key after rotation', () => {
+    const keyA = Buffer.alloc(32, 0x11).toString('base64');
+    const keyB = Buffer.alloc(32, 0x22).toString('base64');
+    resetEncryptionCache();
+    const cfgA = configWithKey(keyA);
+    const ctUnderA = encryptPlaintext(cfgA, 'hello');
+    resetEncryptionCache();
+    const cfgB = configWithKey(keyB);
+    expect(() => decryptPlaintext(cfgB, ctUnderA)).toThrow(DecryptError);
+  });
 });

@@ -189,5 +189,31 @@ describe('app', () => {
         await app.close();
       }
     });
+
+    it('rejects request bodies larger than 256 KB with 413', async () => {
+      const app = await buildApp(testConfig);
+      try {
+        const oversized = 'x'.repeat(300_000);
+        const res = await app.inject({
+          method: 'POST',
+          url: '/healthz',
+          headers: { 'content-type': 'application/json' },
+          payload: JSON.stringify({ blob: oversized }),
+        });
+        expect(res.statusCode).toBe(413);
+      } finally {
+        await app.close();
+      }
+    });
+
+    it.todo(
+      'enforces CSP after the report-only window closes — content-security-policy is set, content-security-policy-report-only is unset',
+    );
+  });
+
+  describe('/readyz', () => {
+    it.todo('/readyz with real DB ping returns 200');
+    it.todo('/readyz with DB ping throwing returns 503');
+    it.todo('/readyz with Redis ping timing out returns degraded');
   });
 });

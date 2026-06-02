@@ -118,4 +118,69 @@ describe('GET /api/sessions/search', () => {
     // limit is page+1 so the route can detect hasMore without a count query.
     expect(lastSelect.limitArg).toBe(3);
   });
+
+  // SCRUM — LIKE-escape negative tests. The route escapes %, _, and \\ in
+  // the user query before wrapping in `%...%` so a search for "50%" matches
+  // the literal string, not "anything containing 50". The bound ilike
+  // pattern is captured via the lastSelect.whereArgs spy and pulled out of
+  // the SQL chunk tree as a Param value.
+  it('escapes literal % so the bound pattern is %\\%% (not %%%)', async () => {
+    const { app, lastSelect } = await buildApp([]);
+    const res = await app.inject({ method: 'GET', url: '/api/sessions/search?q=%25' });
+    expect(res.statusCode).toBe(200);
+    const params = collectParamValues(lastSelect.whereArgs);
+    expect(params).toContain('%\\%%');
+    expect(params).not.toContain('%%%');
+  });
+
+  it('escapes literal _ so the bound pattern is %\\_% (not %_%)', async () => {
+    const { app, lastSelect } = await buildApp([]);
+    const res = await app.inject({ method: 'GET', url: '/api/sessions/search?q=_' });
+    expect(res.statusCode).toBe(200);
+    const params = collectParamValues(lastSelect.whereArgs);
+    expect(params).toContain('%\\_%');
+    expect(params).not.toContain('%_%');
+  });
+
+  it('escapes literal \\ so the bound pattern is %\\\\% (not %\\%)', async () => {
+    const { app, lastSelect } = await buildApp([]);
+    // %5C is the URL-encoded backslash; the route sees a single \ in q.
+    const res = await app.inject({ method: 'GET', url: '/api/sessions/search?q=%5C' });
+    expect(res.statusCode).toBe(200);
+    const params = collectParamValues(lastSelect.whereArgs);
+    expect(params).toContain('%\\\\%');
+    expect(params).not.toContain('%\\%');
+  });
 });
+
+/**
+ * Walk a drizzle SQL expression's `queryChunks` recursively and pull every
+ * bound value out. `eq()` binds via a `Param` node whose `.value` is the
+ * literal; `ilike()` inlines the pattern directly as a raw string chunk in
+ * the SQL tree. Both are returned so the caller can assert on either.
+ */
+function collectParamValues(sql: unknown): unknown[] {
+  const out: unknown[] = [];
+  const visit = (node: unknown): void => {
+    if (node === null) return;
+    if (typeof node === 'string') {
+      out.push(node);
+      return;
+    }
+    if (typeof node !== 'object') return;
+    const ctor = (node as { constructor?: { name?: string } }).constructor?.name;
+    if (ctor === 'Param') {
+      out.push((node as { value: unknown }).value);
+      return;
+    }
+    // StringChunk wraps the literal SQL fragments (' = ', ' ilike ', etc.).
+    // Skip — they would flood the result with non-bound noise.
+    if (ctor === 'StringChunk') return;
+    const chunks = (node as { queryChunks?: unknown[] }).queryChunks;
+    if (Array.isArray(chunks)) {
+      for (const c of chunks) visit(c);
+    }
+  };
+  visit(sql);
+  return out;
+}

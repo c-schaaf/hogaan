@@ -27,12 +27,9 @@ test.describe('Bottom navigation (mobile)', () => {
     const profileTab = page
       .locator('[class*="nav"] button', { hasText: /profile/i })
       .or(page.locator('[aria-label*="profile" i]'));
-    if ((await profileTab.count()) > 0) {
-      await profileTab.first().click();
-      await expect(page.locator('[class*="pr-"]')).toBeVisible({ timeout: 5000 });
-    } else {
-      test.skip();
-    }
+    await expect(profileTab.first()).toBeVisible({ timeout: 5000 });
+    await profileTab.first().click();
+    await expect(page.locator('[class*="pr-"]')).toBeVisible({ timeout: 5000 });
   });
 
   test('tapping a suggestion chip opens chat', async ({ page }) => {

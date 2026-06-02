@@ -15,12 +15,9 @@ test.describe('Back button in Chat', () => {
 
     // Click back button
     const back = page.locator('[class*="ch-back"], button[aria-label*="back" i]').first();
-    if (await back.isVisible()) {
-      await back.click();
-      await expect(page.locator('[class*="hm-"]')).toBeVisible({ timeout: 5000 });
-    } else {
-      test.skip();
-    }
+    await expect(back).toBeVisible({ timeout: 5000 });
+    await back.click();
+    await expect(page.locator('[class*="hm-"]')).toBeVisible({ timeout: 5000 });
   });
 
   test('back from chat (opened from sessions) returns to sessions', async ({ page }) => {
@@ -41,11 +38,8 @@ test.describe('Back button in Chat', () => {
     await page.waitForSelector('[class*="ch-"]', { timeout: 5000 });
 
     const back = page.locator('[class*="ch-back"], button[aria-label*="back" i]').first();
-    if (await back.isVisible()) {
-      await back.click();
-      await expect(page.locator('[class*="ses-"]')).toBeVisible({ timeout: 5000 });
-    } else {
-      test.skip();
-    }
+    await expect(back).toBeVisible({ timeout: 5000 });
+    await back.click();
+    await expect(page.locator('[class*="ses-"]')).toBeVisible({ timeout: 5000 });
   });
 });

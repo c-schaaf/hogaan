@@ -54,7 +54,7 @@ describe('Phase 10.8 — Pre-launch checklist', () => {
         details: {
           provingTests: [
             'tests/shared/encryption.test.ts',
-            'tests/prompt-assembly/framings.test.ts',
+            'tests/prompt-assembly/pii-discipline.test.ts',
           ],
           claudeMdRule: 'CLAUDE.md hard rule #4',
         },
