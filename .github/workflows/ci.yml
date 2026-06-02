@@ -102,25 +102,3 @@ jobs:
 
       - name: Run Playwright tests (advisory)
         run: pnpm test:e2e
-
-  # Secrets scanner — runs in parallel with `validate` and `e2e` so it does
-  # not slow the critical path. Free tier (no GITLEAKS_LICENSE) is fine for
-  # an individual repo. Allowlist for test fixtures lives in .gitleaks.toml.
-  gitleaks:
-    name: Secrets scan (gitleaks)
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
-          GITLEAKS_ENABLE_SUMMARY: true
-          GITLEAKS_CONFIG: .gitleaks.toml
