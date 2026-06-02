@@ -423,12 +423,16 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         }
       }
 
+      // SCRUM-B9 (Issue 2 follow-up): set the "completed" flag BEFORE we
+      // end the response. In production HTTP/1.1, Node's IncomingMessage
+      // emits 'close' immediately after `reply.raw.end()` completes — if
+      // streamCompleted is still false at that moment, the close listener
+      // wrongly calls streamController.abort() on every happy-path turn,
+      // adding 2000+ms tail latency observed in the post-deploy audit.
+      // Setting the flag first eliminates the race.
+      streamCompleted = true;
       sendEvent('end', { turnId, sessionId, latencyMs });
       reply.raw.end();
-      // SCRUM-B9: the stream finished naturally; any late "close" event
-      // from req.raw (e.g. the browser closing after the final byte) must
-      // NOT abort a controller whose work is already done.
-      streamCompleted = true;
 
       // Emit one TurnTrace per turn to Axiom (Process #2 §12c). Fire-and-
       // forget so it never blocks the response. PII-safe: userIdHash, never
@@ -505,6 +509,10 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         },
         err,
       );
+      // SCRUM-B9 (Issue 2 follow-up): mark complete BEFORE writing the
+      // error envelope + end(), so the post-end close event from req.raw
+      // does not trigger a spurious abort. Same race as the happy path.
+      streamCompleted = true;
       try {
         // F4 (beta pre-flight): fixed generic copy. Raw exception text never
         // reaches the browser — it would leak Drizzle / Anthropic / postgres-js
@@ -521,9 +529,6 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       } catch {
         // Connection already closed; nothing to do.
       }
-      // SCRUM-B9: error path has finished writing; suppress any spurious
-      // abort triggered by the natural close that follows reply.raw.end().
-      streamCompleted = true;
       // Emit a TurnTrace for the failed turn too, with whatever state was
       // resolved before the throw. Wrapped so an emit failure here can never
       // mask the original error.
