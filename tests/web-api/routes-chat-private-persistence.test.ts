@@ -121,25 +121,43 @@ describe('POST /api/chat/turn/stream — private session persistence gate', () =
   it('does NOT open a persistence transaction when private:true', async () => {
     const db = buildTrackingDb();
     const app = await buildApp(db);
-    await app.inject({
+    const res = await app.inject({
       method: 'POST',
       url: '/api/chat/turn/stream',
       payload: { message: 'private reflection', private: true },
     });
 
     expect(db.transaction).not.toHaveBeenCalled();
+
+    // SCRUM — private:true still streams the coach's reply to the user; only
+    // persistence is gated. Assert the SSE frames actually went out and that
+    // session resolution happened exactly once for the test user.
+    expect(res.payload).toContain('event: delta');
+    expect(res.payload).toContain('ok');
+    const { resolveSession } = await import('../../src/session-lifecycle/index.js');
+    expect(vi.mocked(resolveSession)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(resolveSession).mock.calls[0]![1]).toMatchObject({ userId: TEST_USER_ID });
   });
 
   it('does NOT insert into any table when private:true', async () => {
     const db = buildTrackingDb();
     const app = await buildApp(db);
-    await app.inject({
+    const res = await app.inject({
       method: 'POST',
       url: '/api/chat/turn/stream',
       payload: { message: 'private reflection', private: true },
     });
 
     expect(db.insert).not.toHaveBeenCalled();
+
+    // SCRUM — same SSE-frame assertions as the transaction-gate test: the
+    // private path must still deliver the streamed reply and resolve the
+    // session for the requesting user.
+    expect(res.payload).toContain('event: delta');
+    expect(res.payload).toContain('ok');
+    const { resolveSession } = await import('../../src/session-lifecycle/index.js');
+    expect(vi.mocked(resolveSession)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(resolveSession).mock.calls[0]![1]).toMatchObject({ userId: TEST_USER_ID });
   });
 
   it('DOES open a transaction (insert + bump) when private:false', async () => {

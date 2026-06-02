@@ -16,14 +16,11 @@ test.describe('Private mode', () => {
     const toggle = page
       .locator('[class*="privacy"], [class*="priv"], [aria-label*="private" i]')
       .first();
-    if (await toggle.isVisible()) {
-      await toggle.click();
-      await expect(page.getByText(/private|nothing.*saved|not.*saved/i)).toBeVisible({
-        timeout: 3000,
-      });
-    } else {
-      test.skip();
-    }
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await toggle.click();
+    await expect(page.getByText(/private|nothing.*saved|not.*saved/i)).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   test('private turn sends private=true in request body', async ({ page }) => {
@@ -39,15 +36,12 @@ test.describe('Private mode', () => {
     });
 
     const toggle = page.locator('[class*="privacy"], [class*="priv"]').first();
-    if (await toggle.isVisible()) {
-      await toggle.click();
-      const input = page.locator('[class*="ch-"] textarea, [class*="ch-"] input').last();
-      await input.fill('Private question');
-      await input.press('Enter');
-      await page.waitForTimeout(500);
-      expect(requestBody?.private).toBe(true);
-    } else {
-      test.skip();
-    }
+    await expect(toggle).toBeVisible({ timeout: 5000 });
+    await toggle.click();
+    const input = page.locator('[class*="ch-"] textarea, [class*="ch-"] input').last();
+    await input.fill('Private question');
+    await input.press('Enter');
+    await page.waitForTimeout(500);
+    expect(requestBody?.private).toBe(true);
   });
 });

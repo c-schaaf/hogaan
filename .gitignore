@@ -24,7 +24,7 @@ drizzle/meta/
 # Broadened from `audit-evidence/phase-10|12/` to the whole folder after the
 # 2026-06-01 bloat purge — 723 historical evidence files were removed; the
 # withEvidence helper still writes locally but never commits.
-audit-evidence/
+/audit-evidence/
 test-results/
 playwright-report/
 
