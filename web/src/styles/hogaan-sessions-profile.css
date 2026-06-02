@@ -146,6 +146,10 @@
   border: 1px solid var(--hairline);
   border-radius: 18px;
   padding: 16px 18px;
+  /* Buttons don't auto-fill their flex parent on width like divs do — explicit
+     100% is required so the card spans the full container after PR #69's
+     fluid-width fix. Without this, the button collapses to its content size. */
+  width: 100%;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
