@@ -125,12 +125,23 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     // SCRUM — per-user + global rate limit on the stream endpoint.
     // The hand-off to reply.hijack() happens *after* this check so we can
     // still return a proper 429 status code with a JSON body if rejected.
-    const rateDecision = await checkRateLimit(
-      opts.rateLimiters,
-      'web-chat',
-      `web-chat:${userId}`,
-      'Normal',
-    );
+    // SCRUM-B5: fail-OPEN on Upstash outage — a rate-limiter throw must not
+    // block the chat turn. The Anthropic console spend cap is the
+    // compensating control if the limiter is unavailable.
+    let rateDecision: Awaited<ReturnType<typeof checkRateLimit>>;
+    try {
+      rateDecision = await checkRateLimit(opts.rateLimiters, 'web-chat', `web-chat:${userId}`);
+    } catch (err) {
+      reportP2(
+        'rate-limit check failed (fail-open)',
+        {
+          source: 'Process_2.Step_3.RateLimit',
+          extra: { err: err instanceof Error ? err.message : String(err) },
+        },
+        err,
+      );
+      rateDecision = { decision: 'PROCEED' };
+    }
     if (rateDecision.decision === 'REJECT') {
       // SCRUM-F2: per_user_daily is the only REJECT reason a real user will
       // hit (their own 200/day cap). per_day is the global runaway fuse and
@@ -179,6 +190,16 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     const sendEvent = (event: string, data: unknown): void => {
       reply.raw.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
+
+    // SCRUM-B9: SSE backpressure / client-disconnect cleanup. If the browser
+    // closes the connection mid-stream, abort the LLM call so we free the DB
+    // pool slot and stop Anthropic billing. Idempotent — abort() on an
+    // already-aborted controller is a no-op.
+    const streamController = new AbortController();
+    let streamCompleted = false;
+    req.raw.on('close', () => {
+      if (!streamCompleted) streamController.abort();
+    });
 
     try {
       // ---- Session resolution ----------------------------------------
@@ -277,6 +298,19 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       try {
         // Manual iteration so we can capture the generator's return value.
         while (true) {
+          // SCRUM-B9: client disconnected mid-stream — close the generator
+          // (which closes the underlying Anthropic stream) and bail out.
+          // Best-effort raw end in case the underlying socket is still
+          // half-open; ignore errors since the peer is already gone.
+          if (streamController.signal.aborted) {
+            await stream.return(final as never);
+            try {
+              reply.raw.end();
+            } catch {
+              /* socket already closed */
+            }
+            return reply;
+          }
           const next = await stream.next();
           if (next.done === true) {
             final = { ...next.value, fallbackPath: 'none' };
@@ -391,6 +425,10 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
 
       sendEvent('end', { turnId, sessionId, latencyMs });
       reply.raw.end();
+      // SCRUM-B9: the stream finished naturally; any late "close" event
+      // from req.raw (e.g. the browser closing after the final byte) must
+      // NOT abort a controller whose work is already done.
+      streamCompleted = true;
 
       // Emit one TurnTrace per turn to Axiom (Process #2 §12c). Fire-and-
       // forget so it never blocks the response. PII-safe: userIdHash, never
@@ -483,6 +521,9 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       } catch {
         // Connection already closed; nothing to do.
       }
+      // SCRUM-B9: error path has finished writing; suppress any spurious
+      // abort triggered by the natural close that follows reply.raw.end().
+      streamCompleted = true;
       // Emit a TurnTrace for the failed turn too, with whatever state was
       // resolved before the throw. Wrapped so an emit failure here can never
       // mask the original error.

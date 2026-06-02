@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { reportIncident, shutdownSentry } from '../../../src/shared/observability/incidents.js';
+import * as Sentry from '@sentry/node';
+import {
+  initSentry,
+  reportIncident,
+  shutdownSentry,
+} from '../../../src/shared/observability/incidents.js';
+import type { AppConfig } from '../../../src/shared/secrets/config.js';
 
 vi.mock('@sentry/node', () => ({
   init: vi.fn(),
@@ -55,12 +61,17 @@ describe('incidents — phone redaction (PHONE_RE truth table)', () => {
     expect(out).toBe('emailHash=a1b2c3d4e5f67890 fired');
   });
 
-  it('PHONE_RE false-positive lock-in: an emailHash containing a 10+ digit run IS mangled', () => {
-    // Lock in the known imperfection: any hex hash that happens to include a
-    // 10+ contiguous digit run looks like a phone number and gets redacted.
-    // This is the F5 audit row #14 concern — flagged for follow-up, not fixed.
+  it('B4 fix: an emailHash containing a 10+ digit run adjacent to hex chars is left intact', () => {
+    // Post-B4: PHONE_RE uses non-hex/alphanumeric word boundaries so an
+    // emailHash whose contiguous digit run abuts hex letters no longer
+    // false-positives. F5 incident→user correlation key survives.
     const out = callAndExtractMessage('emailHash=1234567890abcdef fired');
-    expect(out).toBe('emailHash=<phone-redacted>abcdef fired');
+    expect(out).toBe('emailHash=1234567890abcdef fired');
+  });
+
+  it('B4 regression: a phone number adjacent to a hex string still redacts when separated by whitespace', () => {
+    const out = callAndExtractMessage('hash=abcdef0123 +254722178177 next');
+    expect(out).toBe('hash=abcdef0123 <phone-redacted> next');
   });
 });
 
@@ -186,5 +197,114 @@ describe('reportIncident — formatErrForDev shape coverage', () => {
     const raw = warnSpy.mock.calls[0]?.[0] as string;
     const payload = JSON.parse(raw) as { err: { value: string } };
     expect(payload.err).toEqual({ value: '<unserializable>' });
+  });
+});
+
+describe('B10: Sentry beforeSend scrubs PII from extra, tags, message', () => {
+  type BeforeSend = (event: Sentry.Event) => Sentry.Event | null;
+
+  function fakeConfig(): AppConfig {
+    return {
+      nodeEnv: 'test',
+      port: 0,
+      logLevel: 'error',
+      publicBaseUrl: undefined,
+      databaseUrl: undefined,
+      redisUrl: undefined,
+      upstashRedisRestUrl: undefined,
+      upstashRedisRestToken: undefined,
+      encryptionKeyBase64: undefined,
+      jwtSecretBase64: undefined,
+      jwtIssuer: undefined,
+      jwtAudience: undefined,
+      anthropicApiKey: undefined,
+      groqApiKey: undefined,
+      voyageApiKey: undefined,
+      sentryDsn: 'https://fake@sentry.io/1',
+      axiomToken: undefined,
+      axiomDataset: undefined,
+      betterstackHeartbeatUrl: undefined,
+      resendApiKey: undefined,
+      resendFromEmail: undefined,
+      supabaseUrl: undefined,
+      supabaseAnonKey: undefined,
+      supabaseJwtSecret: undefined,
+    };
+  }
+
+  async function captureBeforeSend(): Promise<BeforeSend> {
+    await shutdownSentry();
+    vi.mocked(Sentry.init).mockClear();
+    initSentry(fakeConfig());
+    const call = vi.mocked(Sentry.init).mock.calls[0];
+    expect(call).toBeDefined();
+    const options = call?.[0] as { beforeSend?: BeforeSend } | undefined;
+    expect(options?.beforeSend).toBeTypeOf('function');
+    return options!.beforeSend!;
+  }
+
+  afterEach(async () => {
+    await shutdownSentry();
+  });
+
+  it('scrubs extra.email value via PII key match', async () => {
+    const beforeSend = await captureBeforeSend();
+    const event: Sentry.Event = { extra: { email: 'leak@example.com', other: 'safe' } };
+    const out = beforeSend(event);
+    expect(out).not.toBeNull();
+    expect(out!.extra?.['email']).toBe('<redacted>');
+    expect(out!.extra?.['other']).toBe('safe');
+  });
+
+  it('scrubs tags.user_email value via PII key match', async () => {
+    const beforeSend = await captureBeforeSend();
+    const event: Sentry.Event = { tags: { user_email: 'leak@example.com', route: '/api/chat' } };
+    const out = beforeSend(event);
+    expect(out).not.toBeNull();
+    expect(out!.tags?.['user_email']).toBe('<redacted>');
+    expect(out!.tags?.['route']).toBe('/api/chat');
+  });
+
+  it('scrubs email-shaped substrings from event.message', async () => {
+    const beforeSend = await captureBeforeSend();
+    const event: Sentry.Event = { message: 'user leak@example.com hit error' };
+    const out = beforeSend(event);
+    expect(out).not.toBeNull();
+    expect(out!.message).toBe('user <email-redacted> hit error');
+  });
+
+  it('recursively scrubs nested PII keys inside extra (e.g. extra.user.email)', async () => {
+    const beforeSend = await captureBeforeSend();
+    const event: Sentry.Event = {
+      extra: { user: { email: 'leak@example.com', role: 'admin' } },
+    };
+    const out = beforeSend(event);
+    expect(out).not.toBeNull();
+    const user = (out!.extra as Record<string, unknown>)['user'] as Record<string, unknown>;
+    expect(user['email']).toBe('<redacted>');
+    expect(user['role']).toBe('admin');
+  });
+
+  it('scrubs email-shaped strings inside arrays under non-PII keys', async () => {
+    const beforeSend = await captureBeforeSend();
+    const event: Sentry.Event = {
+      extra: { items: ['leak@example.com', 'safe'] },
+    };
+    const out = beforeSend(event);
+    expect(out).not.toBeNull();
+    const items = (out!.extra as Record<string, unknown>)['items'] as unknown[];
+    expect(items[0]).toBe('<email-redacted>');
+    expect(items[1]).toBe('safe');
+  });
+
+  it('leaves benign keys whose name CONTAINS "email" untouched (e.g. email_template_id)', async () => {
+    const beforeSend = await captureBeforeSend();
+    const event: Sentry.Event = {
+      extra: { email_template_id: 'tpl_abc123', email_count: 42 },
+    };
+    const out = beforeSend(event);
+    expect(out).not.toBeNull();
+    expect(out!.extra?.['email_template_id']).toBe('tpl_abc123');
+    expect(out!.extra?.['email_count']).toBe(42);
   });
 });

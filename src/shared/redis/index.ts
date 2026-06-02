@@ -12,6 +12,5 @@ export {
   type RateLimitConfig,
   type RateLimiters,
   type RateDecision,
-  type Priority,
 } from './rate-limit.js';
 export { enqueue, popDue, size, type QueueOptions } from './queue.js';

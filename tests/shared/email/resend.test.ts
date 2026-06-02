@@ -100,9 +100,25 @@ describe('sendEmail (Resend transport)', () => {
     });
   });
 
-  it.todo(
-    '422 rejection: reportP1 extra.detail must NOT contain recipient email — Batch B prod bug: src/shared/email/resend.ts L74-84 forwards raw 200-char body slice to extra.detail, leaking recipient PII when Resend echoes the address in its error body',
-  );
+  it('422 rejection: reportP1 extra.detail must NOT contain recipient email (scrubbed)', async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      mockFetchResponse({
+        status: 422,
+        textBody: 'validation_error: invalid recipient leader@example.com is not allowed',
+      }),
+    );
+
+    const result = await sendEmail(makeConfig(), baseOpts);
+
+    expect(result).toEqual({ ok: false, reason: 'resend_422' });
+    expect(reportP1Spy).toHaveBeenCalledTimes(1);
+    const ctx = reportP1Spy.mock.calls[0]![1] as {
+      extra?: Record<string, unknown>;
+    };
+    const detail = ctx.extra?.['detail'] as string;
+    expect(detail).not.toContain('leader@example.com');
+    expect(detail).toContain('<email-redacted>');
+  });
 
   it('422 rejection: still returns ok:false with sanitized reason and fires reportP1', async () => {
     vi.mocked(fetch).mockResolvedValue(
@@ -141,20 +157,16 @@ describe('sendEmail (Resend transport)', () => {
     expect(ctx.extra).toEqual({ error: 'ECONNRESET' });
   });
 
-  it.todo(
-    'AbortSignal timeout returns reason="resend_timeout" — Batch B prod bug: src/shared/email/resend.ts L65-71 catches AbortError under the generic network-error branch, so timeouts are not distinguishable from connection failures',
-  );
-
-  it('AbortSignal timeout currently surfaces as resend_network_error (documents current behaviour, deterministic)', async () => {
+  it('AbortSignal timeout returns reason="resend_timeout" with distinct reportP1 message', async () => {
     const abortErr = new Error('The operation was aborted');
     abortErr.name = 'AbortError';
     vi.mocked(fetch).mockRejectedValue(abortErr);
 
     const result = await sendEmail(makeConfig(), baseOpts);
 
-    expect(result).toEqual({ ok: false, reason: 'resend_network_error' });
+    expect(result).toEqual({ ok: false, reason: 'resend_timeout' });
     expect(reportP1Spy).toHaveBeenCalledTimes(1);
-    expect(reportP1Spy.mock.calls[0]![0]).toBe('Resend network error');
+    expect(reportP1Spy.mock.calls[0]![0]).toBe('Resend timeout (5s elapsed)');
   });
 
   it('missing resendApiKey returns resend_not_configured WITHOUT calling fetch', async () => {

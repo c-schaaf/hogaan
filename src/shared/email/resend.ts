@@ -63,11 +63,13 @@ export async function sendEmail(config: AppConfig, opts: SendOptions): Promise<S
       signal: AbortSignal.timeout(5000),
     });
   } catch (err) {
-    reportP1('Resend network error', {
+    const isAbort = err instanceof Error && err.name === 'AbortError';
+    const message = isAbort ? 'Resend timeout (5s elapsed)' : 'Resend network error';
+    reportP1(message, {
       source: opts.source,
       extra: { error: err instanceof Error ? err.message : String(err) },
     });
-    return { ok: false, reason: 'resend_network_error' };
+    return { ok: false, reason: isAbort ? 'resend_timeout' : 'resend_network_error' };
   }
 
   if (!resp.ok) {
@@ -77,10 +79,14 @@ export async function sendEmail(config: AppConfig, opts: SendOptions): Promise<S
     } catch {
       // ignore
     }
+    const scrubbedDetail = detail.replace(
+      /[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+      '<email-redacted>',
+    );
     reportP1('Resend rejected send', {
       source: opts.source,
       tags: { status: String(resp.status) },
-      extra: { detail },
+      extra: { detail: scrubbedDetail },
     });
     return { ok: false, reason: `resend_${resp.status}` };
   }

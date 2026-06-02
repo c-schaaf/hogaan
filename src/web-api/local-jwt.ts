@@ -56,12 +56,17 @@ export async function verifySupabaseJwtLocal(
 ): Promise<LocalSupabaseClaims | null> {
   const secret = getSecret(config);
   if (secret === undefined) return null;
+  const projectUrl = config.supabaseUrl;
+  if (projectUrl === undefined || projectUrl.length === 0) return null;
+  const issuer = `${projectUrl.replace(/\/$/, '')}/auth/v1`;
 
   try {
     const { payload } = await jwtVerify(token, secret, {
       // Supabase issues tokens signed HS256 by default. Pin the algorithm
       // to prevent a "none" downgrade attack.
       algorithms: ['HS256'],
+      issuer,
+      audience: 'authenticated',
     });
     const sub = typeof payload['sub'] === 'string' ? payload['sub'] : null;
     const email = typeof payload['email'] === 'string' ? payload['email'] : null;

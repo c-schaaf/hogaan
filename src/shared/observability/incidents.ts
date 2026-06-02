@@ -22,9 +22,14 @@ export function initSentry(config: AppConfig): void {
     tracesSampleRate: config.nodeEnv === 'production' ? 0.1 : 1.0,
     sendDefaultPii: false,
     beforeSend(event) {
-      // Strip anything that looks like a phone number from messages/extras.
       if (event.message !== undefined) {
-        event.message = redactPhones(event.message);
+        event.message = redactEmails(redactPhones(event.message));
+      }
+      if (event.extra !== undefined) {
+        event.extra = scrubPiiContainer(event.extra);
+      }
+      if (event.tags !== undefined) {
+        event.tags = scrubPiiContainer(event.tags) as typeof event.tags;
       }
       return event;
     },
@@ -32,9 +37,52 @@ export function initSentry(config: AppConfig): void {
   initialized = true;
 }
 
-const PHONE_RE = /\+?\d{10,15}/g;
+const PHONE_RE = /(?<![a-zA-Z0-9])\+?\d{10,15}(?![a-zA-Z0-9])/g;
 function redactPhones(s: string): string {
   return s.replace(PHONE_RE, '<phone-redacted>');
+}
+
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+function redactEmails(s: string): string {
+  return s.replace(EMAIL_RE, '<email-redacted>');
+}
+
+// Exact-match (case-insensitive) PII key names. Anchored so keys like
+// `email_template_id` are NOT silently redacted as PII.
+const PII_KEYS = new Set([
+  'email',
+  'user_email',
+  'useremail',
+  'phone',
+  'user_phone',
+  'userphone',
+  'phone_number',
+  'phonenumber',
+]);
+
+function scrubPiiValue(v: unknown): unknown {
+  if (typeof v === 'string') {
+    return redactEmails(redactPhones(v));
+  }
+  if (Array.isArray(v)) {
+    return v.map(scrubPiiValue);
+  }
+  if (v !== null && typeof v === 'object') {
+    return scrubPiiContainer(v as Record<string, unknown>);
+  }
+  return v;
+}
+
+function scrubPiiContainer<T extends Record<string, unknown>>(obj: T): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (PII_KEYS.has(k.toLowerCase())) {
+      out[k] = '<redacted>';
+    } else {
+      out[k] = scrubPiiValue(v);
+    }
+  }
+  return out;
 }
 
 function formatErrForDev(

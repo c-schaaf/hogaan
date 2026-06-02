@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
+import type { FastifyRequest } from 'fastify';
 import { registerWebApiRoutes } from '../../src/web-api/routes.js';
 import {
   fakeConfig,
@@ -157,6 +158,188 @@ describe('POST /api/chat/turn/stream', () => {
       if (res.statusCode === 400) {
         expect(res.json<Record<string, unknown>>().error).not.toBe('message_too_long');
       }
+    });
+  });
+
+  // SCRUM-B9: SSE backpressure / client-disconnect cleanup. When the
+  // browser drops the connection mid-stream, the LLM call's AbortController
+  // must fire so we free the DB pool slot and stop Anthropic billing.
+  describe('SCRUM-B9 — client-disconnect cleanup', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('aborts the LLM AbortController when the client closes the connection mid-stream', async () => {
+      const { chatStream } = await import('../../src/shared/llm/chat.js');
+      const { resolveSession } = await import('../../src/session-lifecycle/index.js');
+      const { fetchCoachingContext } = await import('../../src/coaching/context-fetch.js');
+      const { assemblePrompt } = await import('../../src/prompt-assembly/index.js');
+      const { requireSupabaseSession } = await import('../../src/web-api/supabase-session.js');
+
+      vi.mocked(requireSupabaseSession).mockResolvedValue({ userId: TEST_USER_ID } as never);
+      vi.mocked(resolveSession).mockResolvedValue({
+        sessionId: '00000000-0000-0000-0000-0000000000aa',
+        turnCount: 0,
+      } as never);
+      vi.mocked(fetchCoachingContext).mockResolvedValue({
+        profile: {},
+        sessionTurns: [],
+        memories: [],
+        partialFailure: false,
+      } as never);
+      vi.mocked(assemblePrompt).mockResolvedValue({
+        assembledPrompt: 'system',
+        libraryVersions: {
+          promptTemplates: { version: 'v', hash: 'h' },
+          voiceRules: { version: 'v', hash: 'h' },
+          culturalFraming: { version: 'v', hash: 'h' },
+          resolvedAt: new Date(),
+        },
+      } as never);
+
+      // The chat stream yields one delta then blocks until the test allows
+      // it to continue. The test triggers the client-close BEFORE releasing
+      // the second yield — so the route's next loop iteration sees the
+      // aborted signal and bails. The generator is created OUTSIDE the
+      // mockImplementation so we can hold a reference and spy on its
+      // .return() — the SDK iterator cleanup path that releases the
+      // upstream connection (the real Anthropic-billing-stop signal).
+      let releaseSecondDelta: (() => void) | undefined;
+      const secondDeltaGate = new Promise<void>((resolve) => {
+        releaseSecondDelta = resolve;
+      });
+      const gen = (async function* (): AsyncGenerator<string, unknown, void> {
+        yield 'first ';
+        await secondDeltaGate;
+        yield 'second';
+        return {
+          modelUsed: 'claude-haiku-4-5',
+          text: 'first second',
+          inputTokens: 1,
+          outputTokens: 2,
+        };
+      })();
+      const streamReturnSpy = vi.spyOn(gen, 'return');
+      vi.mocked(chatStream).mockReturnValue(gen as never);
+
+      // Spy on AbortController.prototype.abort so we can assert it was
+      // called once for this route invocation.
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+
+      // Hook on onRequest so the test can grab req.raw for the streaming
+      // turn and emit 'close' on it mid-flight.
+      let capturedReq: FastifyRequest | undefined;
+      const app = Fastify({ logger: false });
+      app.addHook('onRequest', async (req) => {
+        if (req.url === '/api/chat/turn/stream') {
+          capturedReq = req;
+        }
+      });
+      registerWebApiRoutes(app, {
+        config: fakeConfig(),
+        db: buildChatDb() as never,
+        redis: fakeRedis(),
+        rateLimiters: fakeRateLimiters(),
+        traceEmitter: fakeTraceEmitter(),
+      });
+      await app.ready();
+
+      const injectPromise = app.inject({
+        method: 'POST',
+        url: '/api/chat/turn/stream',
+        payload: { message: 'hello' },
+      });
+
+      // Wait until the request handler has captured the raw socket AND the
+      // first delta has gone out. A small polling loop avoids depending on
+      // wall-clock timing.
+      const waitForCapture = async (): Promise<void> => {
+        for (let i = 0; i < 50; i++) {
+          if (capturedReq !== undefined) return;
+          await new Promise((r) => setImmediate(r));
+        }
+        throw new Error('request never reached the route handler');
+      };
+      await waitForCapture();
+      // Yield a couple of microtask ticks so the first `yield 'first '`
+      // can flush through to sendEvent before we trip the close.
+      for (let i = 0; i < 10; i++) await new Promise((r) => setImmediate(r));
+
+      // Trigger the client-disconnect: this is what Node emits when the
+      // browser drops the TCP connection.
+      capturedReq?.raw.emit('close');
+      // Release the gate so the generator can move forward; the route's
+      // loop will see signal.aborted=true and call stream.return().
+      releaseSecondDelta?.();
+
+      await injectPromise;
+
+      expect(abortSpy).toHaveBeenCalled();
+      // The actual cleanup happens via the iterator-protocol `.return()` —
+      // that's what closes the underlying SDK connection. Calling abort()
+      // alone is symbolic; without stream.return() the upstream HTTP
+      // socket leaks. Pin both to prevent a future regression that drops
+      // the stream.return() call from the route.
+      expect(streamReturnSpy).toHaveBeenCalled();
+    });
+
+    it('happy path: stream completes naturally without abort being triggered', async () => {
+      const { chatStream } = await import('../../src/shared/llm/chat.js');
+      const { resolveSession } = await import('../../src/session-lifecycle/index.js');
+      const { fetchCoachingContext } = await import('../../src/coaching/context-fetch.js');
+      const { assemblePrompt } = await import('../../src/prompt-assembly/index.js');
+      const { requireSupabaseSession } = await import('../../src/web-api/supabase-session.js');
+
+      vi.mocked(requireSupabaseSession).mockResolvedValue({ userId: TEST_USER_ID } as never);
+      vi.mocked(resolveSession).mockResolvedValue({
+        sessionId: '00000000-0000-0000-0000-0000000000aa',
+        turnCount: 0,
+      } as never);
+      vi.mocked(fetchCoachingContext).mockResolvedValue({
+        profile: {},
+        sessionTurns: [],
+        memories: [],
+        partialFailure: false,
+      } as never);
+      vi.mocked(assemblePrompt).mockResolvedValue({
+        assembledPrompt: 'system',
+        libraryVersions: {
+          promptTemplates: { version: 'v', hash: 'h' },
+          voiceRules: { version: 'v', hash: 'h' },
+          culturalFraming: { version: 'v', hash: 'h' },
+          resolvedAt: new Date(),
+        },
+      } as never);
+      vi.mocked(chatStream).mockImplementation(async function* (): AsyncGenerator<
+        string,
+        unknown,
+        void
+      > {
+        yield 'hello there';
+        return {
+          modelUsed: 'claude-haiku-4-5',
+          text: 'hello there',
+          inputTokens: 1,
+          outputTokens: 2,
+        };
+      } as never);
+
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+
+      const app = await buildApp();
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/chat/turn/stream',
+        payload: { message: 'hello' },
+      });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.headers['content-type']).toContain('text/event-stream');
+      // The happy-path SSE body contains an end event and our delta.
+      expect(res.body).toContain('event: delta');
+      expect(res.body).toContain('event: end');
+      // Abort must NOT have been called on the happy path.
+      expect(abortSpy).not.toHaveBeenCalled();
     });
   });
 });
