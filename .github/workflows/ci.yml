@@ -60,45 +60,10 @@ jobs:
       - name: Build
         run: pnpm build
 
-  # E2E (Playwright) runs in its own job so the heavier browser-based suite
-  # doesn't block fast feedback on lint/typecheck/unit.
-  #
-  # ADVISORY ONLY (continue-on-error: true) until CI-side env wiring lands.
-  # The Playwright config's webServer expects `pnpm dev`, which boots the
-  # full backend and needs DATABASE_URL / ANTHROPIC_API_KEY / JWT_SECRET_BASE64
-  # / encryption keys etc. — none of which exist in the CI runner today.
-  # Follow-up ticket: wire a minimal staging-style env (or a mock-services
-  # boot mode) so this job can be flipped to required. Tracked alongside F1
-  # (streaming fallback) and F8 (k6 load test) in the 90-day risk register.
-  e2e:
-    name: End-to-end (Playwright) — ADVISORY
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    continue-on-error: true
-
-    env:
-      NODE_ENV: test
-      PORT: 3000
-      LOG_LEVEL: error
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
-
-      - name: Run Playwright tests (advisory)
-        run: pnpm test:e2e
+  # NOTE: the Playwright e2e job was removed from CI on 2026-06-02. It
+  # could never boot the dev server in CI (no DATABASE_URL / ANTHROPIC_API_KEY
+  # / encryption keys) so it produced a permanent red "ADVISORY" check
+  # that trained the team to ignore CI noise. The `pnpm test:e2e` script
+  # remains for local use against a running dev server. Re-add a CI job
+  # alongside the Batch C live-stack work (mock-services boot mode or
+  # staging-style env wiring).
