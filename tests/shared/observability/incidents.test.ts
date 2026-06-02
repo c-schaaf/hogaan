@@ -307,4 +307,26 @@ describe('B10: Sentry beforeSend scrubs PII from extra, tags, message', () => {
     expect(out!.extra?.['email_template_id']).toBe('tpl_abc123');
     expect(out!.extra?.['email_count']).toBe(42);
   });
+
+  it('strips event.request entirely to prevent Sentry auto-captured POST body / headers from leaking PII (Hard Rule #3)', async () => {
+    // Real-world failure (release 96f2f94, Sentry issues 7511244599 / 7511244354):
+    // Sentry SDK auto-captures the POST body for /api/chat/turn/stream into
+    // event.request.data — which carries the user's raw coaching prompt. The
+    // beforeSend hook scrubbed extra/tags/message but left event.request alone,
+    // so the prompt (PII per Hard Rule #3: only first name is allowed past the
+    // trust boundary) was shipped to Sentry. Equivalent risk: request.headers
+    // carries session cookies. Mitigation: drop the entire request object.
+    const beforeSend = await captureBeforeSend();
+    const event: Sentry.Event = {
+      request: {
+        method: 'POST',
+        url: 'https://app.hogaanai.com/api/chat/turn/stream',
+        data: { message: 'My direct report just told me she is quitting because of my manager...' },
+        headers: { cookie: 'sb-access-token=eyJhbGciOiJIUzI1NiIs...' },
+      },
+    };
+    const out = beforeSend(event);
+    expect(out).not.toBeNull();
+    expect(out!.request).toBeUndefined();
+  });
 });
