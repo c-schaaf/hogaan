@@ -341,5 +341,113 @@ describe('POST /api/chat/turn/stream', () => {
       // Abort must NOT have been called on the happy path.
       expect(abortSpy).not.toHaveBeenCalled();
     });
+
+    // Issue 2: Every-turn 4.5-6.5s post-deploy regression. Root cause: in
+    // production HTTP/1.1, Node's IncomingMessage emits 'close' immediately
+    // after `reply.raw.end()` (the response is "done"). With the previous
+    // ordering (`reply.raw.end()` then `streamCompleted = true`), the close
+    // handler observed `streamCompleted === false` and called
+    // `streamController.abort()` on every successful turn. This was the
+    // tail-latency contract violation that the audit caught.
+    //
+    // Lock the contract: by the time `req.raw` emits 'close' on the happy
+    // path, `streamCompleted` MUST already be true, so the close listener
+    // does NOT call abort() and does NOT call stream.return(). The fix is
+    // to set `streamCompleted = true` BEFORE `reply.raw.end()` (and before
+    // emitting the final 'end' SSE event for symmetry with the abort path).
+    it('happy path: late req.raw close (post-end) does NOT abort or call stream.return', async () => {
+      const { chatStream } = await import('../../src/shared/llm/chat.js');
+      const { resolveSession } = await import('../../src/session-lifecycle/index.js');
+      const { fetchCoachingContext } = await import('../../src/coaching/context-fetch.js');
+      const { assemblePrompt } = await import('../../src/prompt-assembly/index.js');
+      const { requireSupabaseSession } = await import('../../src/web-api/supabase-session.js');
+
+      vi.mocked(requireSupabaseSession).mockResolvedValue({ userId: TEST_USER_ID } as never);
+      vi.mocked(resolveSession).mockResolvedValue({
+        sessionId: '00000000-0000-0000-0000-0000000000aa',
+        turnCount: 0,
+      } as never);
+      vi.mocked(fetchCoachingContext).mockResolvedValue({
+        profile: {},
+        sessionTurns: [],
+        memories: [],
+        partialFailure: false,
+      } as never);
+      vi.mocked(assemblePrompt).mockResolvedValue({
+        assembledPrompt: 'system',
+        libraryVersions: {
+          promptTemplates: { version: 'v', hash: 'h' },
+          voiceRules: { version: 'v', hash: 'h' },
+          culturalFraming: { version: 'v', hash: 'h' },
+          resolvedAt: new Date(),
+        },
+      } as never);
+
+      // Generator that yields a single delta and returns naturally — the
+      // happy path. We hold a reference so we can spy on `.return()` and
+      // assert it is NEVER called.
+      const gen = (async function* (): AsyncGenerator<string, unknown, void> {
+        yield 'hello';
+        return {
+          modelUsed: 'claude-haiku-4-5',
+          text: 'hello',
+          inputTokens: 1,
+          outputTokens: 1,
+        };
+      })();
+      const streamReturnSpy = vi.spyOn(gen, 'return');
+      vi.mocked(chatStream).mockReturnValue(gen as never);
+
+      const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+
+      // Capture the FastifyRequest so we can simulate Node's production
+      // behavior: after `reply.raw.end()` completes, IncomingMessage emits
+      // 'close'. We replay that emission immediately after `reply.raw.end()`
+      // by hooking onResponse — onResponse fires AFTER the route handler
+      // has returned and AFTER reply.raw.end() has been called.
+      let capturedReq: FastifyRequest | undefined;
+      const app = Fastify({ logger: false });
+      app.addHook('onRequest', async (req) => {
+        if (req.url === '/api/chat/turn/stream') {
+          capturedReq = req;
+        }
+      });
+      // Fire the close event the moment Fastify reports the response is
+      // complete. In production this corresponds to the keep-alive socket
+      // signalling that the request lifecycle has ended — Node fires this
+      // immediately after end() in HTTP/1.1.
+      app.addHook('onResponse', async (req) => {
+        if (req.url === '/api/chat/turn/stream') {
+          req.raw.emit('close');
+        }
+      });
+      registerWebApiRoutes(app, {
+        config: fakeConfig(),
+        db: buildChatDb() as never,
+        redis: fakeRedis(),
+        rateLimiters: fakeRateLimiters(),
+        traceEmitter: fakeTraceEmitter(),
+      });
+      await app.ready();
+
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/chat/turn/stream',
+        payload: { message: 'hello' },
+      });
+
+      // Sanity: the request completed normally.
+      expect(res.statusCode).toBe(200);
+      expect(capturedReq).toBeDefined();
+
+      // CONTRACT: on the happy path, the late 'close' event must NOT
+      // trigger the abort handler. If `streamCompleted` is not set BEFORE
+      // `reply.raw.end()` then the close listener observes `false`, calls
+      // `streamController.abort()`, and any downstream cleanup (e.g.
+      // stream.return() on the SDK iterator) runs spuriously — that was
+      // the regression.
+      expect(abortSpy).not.toHaveBeenCalled();
+      expect(streamReturnSpy).not.toHaveBeenCalled();
+    });
   });
 });

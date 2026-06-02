@@ -31,6 +31,14 @@ export function initSentry(config: AppConfig): void {
       if (event.tags !== undefined) {
         event.tags = scrubPiiContainer(event.tags) as typeof event.tags;
       }
+      // Hard Rule #3: the Sentry SDK auto-captures the POST body into
+      // event.request.data for HTTP-triggered errors. For
+      // /api/chat/turn/stream that body is the user's raw coaching prompt,
+      // which is PII and must never reach Sentry. event.request.headers can
+      // also carry session cookies. Drop the whole object — we already have
+      // the route/method via tags and never need the body or headers for
+      // triage.
+      delete event.request;
       return event;
     },
   });
