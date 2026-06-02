@@ -27,8 +27,8 @@
   min-height: 0;
 }
 .ses-inner {
-  max-width: 560px;
-  margin: 0 auto;
+  /* Fluid on mobile + tablet; desktop override caps at 1080px. */
+  width: 100%;
   padding: 18px 18px 24px;
 }
 
@@ -338,8 +338,8 @@
   min-height: 0;
 }
 .pr-inner {
-  max-width: 560px;
-  margin: 0 auto;
+  /* Fluid on mobile + tablet; desktop override caps at 1080px. */
+  width: 100%;
   padding: 18px 18px 24px;
 }
 
