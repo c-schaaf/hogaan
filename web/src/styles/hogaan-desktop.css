@@ -707,7 +707,8 @@
     padding: 48px 56px 32px;
   }
   .ses-inner {
-    max-width: 720px;
+    /* Match .pr-inner so Sessions and Profile have identical desktop framing. */
+    max-width: 1080px;
     margin: 0;
     padding: 0;
   }
