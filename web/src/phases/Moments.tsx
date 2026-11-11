@@ -70,14 +70,14 @@ export function Moments({
     <PageFrame
       title="Moments"
       subtitle="Conversations you are preparing for. After each one, Hogaan can check in so you can reflect."
-      active="home"
+      active="moments"
       onNav={onNav}
     >
       <ErrorLine message={error} />
       {due.length > 0 && (
         <Card title="Ready to reflect">
           {due.map((m) => (
-            <div className="pr-field" key={m.id}>
+            <div className="pr-field mo-row" key={m.id}>
               <div className="pr-field-label">{fmt(m.happensAt)}</div>
               <div className="pr-field-value" style={{ gap: 8 }}>
                 <span>
@@ -100,7 +100,7 @@ export function Moments({
           </p>
         )}
         {later.map((m) => (
-          <div className="pr-field" key={m.id}>
+          <div className="pr-field mo-row" key={m.id}>
             <div className="pr-field-label">
               {m.source === 'conversation'
                 ? 'From a conversation'
@@ -188,7 +188,7 @@ export function Moments({
       {done.length > 0 && (
         <Card title="Reflected">
           {done.map((m) => (
-            <div className="pr-field" key={m.id}>
+            <div className="pr-field mo-row" key={m.id}>
               <div className="pr-field-label">{fmt(m.happensAt)}</div>
               <div className="pr-field-value">
                 <span>

@@ -281,7 +281,7 @@ export function NavIcon({
   name,
   active,
 }: {
-  name: 'home' | 'sessions' | 'profile';
+  name: 'home' | 'sessions' | 'moments' | 'profile';
   active: boolean;
 }) {
   switch (name) {
@@ -318,6 +318,31 @@ export function NavIcon({
         >
           <path d="M21 12a9 9 0 1 1-3.2-6.9" />
           <path d="M12 7v5l3 2" />
+        </svg>
+      );
+    case 'moments':
+      return (
+        <svg
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <rect
+            x="4"
+            y="5"
+            width="16"
+            height="15"
+            rx="2"
+            fill={active ? 'currentColor' : 'none'}
+            fillOpacity={active ? 0.12 : 0}
+          />
+          <path d="M8 3v4M16 3v4M4 10h16" />
+          <path d="M9 15l2 2 4-4" />
         </svg>
       );
     case 'profile':

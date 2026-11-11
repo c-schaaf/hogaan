@@ -887,3 +887,63 @@
     display: none !important;
   }
 }
+
+/* ---- Form fields on the profile-family pages (Profile, What Hogaan knows,
+   Moments, Sponsor). These inputs previously fell back to browser defaults. */
+.pr-page input:not([type='checkbox']):not([type='radio']),
+.pr-page textarea,
+.pr-page select {
+  box-sizing: border-box;
+  min-width: 0;
+  font-family: var(--font-b);
+  font-size: 14.5px;
+  color: var(--ink-1);
+  background: var(--surface-field, var(--paper-sunken));
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 9px 12px;
+}
+.pr-page input:not([type='checkbox']):not([type='radio']):focus,
+.pr-page textarea:focus,
+.pr-page select:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: var(--shadow-focus);
+}
+.pr-card-action {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ---- Moments rows: let the title wrap instead of truncating. */
+.mo-row {
+  align-items: flex-start;
+}
+.mo-row .pr-field-value {
+  flex-wrap: wrap;
+}
+.mo-row .pr-field-value > span {
+  white-space: normal;
+  overflow: visible;
+  flex: 1 1 180px;
+}
+@media (max-width: 699px) {
+  .mo-row {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .mo-row .pr-field-label {
+    width: auto;
+  }
+  .mo-row .pr-field-value {
+    width: 100%;
+  }
+  .ctx-line-edit {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ctx-line-edit .pr-name-input {
+    flex: none;
+    width: 100%;
+  }
+}

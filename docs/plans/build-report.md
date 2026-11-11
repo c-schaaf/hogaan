@@ -566,3 +566,33 @@ In order. Each step is something a person does; nothing here is automated.
    repo owner how this work moves to `muhsinwarfa/hogaan`, then the repo's
    normal ship and verify gates (G5–G8): pull request, CI, merge, deploy,
    10 minutes of quiet Sentry, p99 ≤ 3 s. Switch Stripe to live keys last.
+
+---
+
+## 8. Changes made after the build, by the reviewing session
+
+A second session re-ran every check on the final commit (typecheck, lint,
+484 backend, 89 route and 128 web tests, production build: all passed, matching
+section 2), then started `pnpm demo` and clicked through every page on a phone
+and a desktop screen. It found no errors, but did find layout and polish
+problems, and fixed them:
+
+- **Phone layout.** The demo banner wrapped to two lines and covered the page
+  header; it is now one line. Moments rows were truncated and cramped; they now
+  wrap and stack on a phone.
+- **Form fields.** Inputs on Profile, What Hogaan knows, Moments and Sponsor
+  fell back to plain browser styling (the class they used had no style rule).
+  They now match the app.
+- **Navigation (new).** Moments was only reachable through Profile or a card on
+  Home, and its page highlighted the Home tab. It now has its own tab, shown
+  only when the moments feature is on. Test:
+  `web/src/__tests__/nav/moments-tab.test.tsx` (2).
+- **Wording.** "1 messages" is now "1 message". The scripted demo coach no
+  longer repeats the "Open loop:" label.
+- **Demo data.** The sample leader now has a complete work context, and the
+  sample funder has an obviously made-up name.
+- **Browser-code typecheck.** Added `pnpm typecheck:web`, fixed the two old
+  errors, and added it to CI (item 9 in section 5).
+
+After these changes: typecheck and web typecheck pass, lint passes, backend 484
+passed, web 130 passed, and the demo was clicked through again with no errors.

@@ -46,7 +46,7 @@ export function Reflect({
     <PageFrame
       title="How did it go?"
       subtitle="Two minutes. Hogaan will remember what you learned for next time."
-      active="home"
+      active="moments"
       onNav={onNav}
       onBack={onDone}
       backLabel="Moments"

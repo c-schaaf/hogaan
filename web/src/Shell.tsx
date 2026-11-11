@@ -506,8 +506,7 @@ export function Shell() {
     <div className="stage" data-bg="tinted">
       {isDemoMode && (
         <div className="demo-banner" role="note">
-          Demo mode: you are the sample leader &ldquo;Amina&rdquo;. Nothing is saved after the demo
-          stops.
+          Demo: sample leader &ldquo;Amina&rdquo;. Nothing is saved.
         </div>
       )}
       <div className="device">

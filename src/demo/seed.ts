@@ -13,6 +13,7 @@ import { subscriptions } from '../shared/db/schema/billing.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import { DEMO_SUPABASE_USER_ID } from '../web-api/supabase-session.js';
 import { KNOWLEDGE_DIGEST_PLACEHOLDER } from '../libraries/knowledge-digest.js';
+import { getBrief, saveBrief } from '../leader-context/store.js';
 import { runBriefUpdate } from '../leader-context/updater.js';
 import { createMoment, recordExtractedMoments, recordOutcome } from '../moments/store.js';
 import { createCohort, createInvite, createOrg, joinByCode, verifyOrg } from '../orgs/store.js';
@@ -146,6 +147,27 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
         await recordExtractedMoments(config, db, userId, sessionId, res.moments ?? []);
       }
     }
+    // The scripted extraction only fills a couple of fields. Complete the
+    // sample leader's work context so the demo shows a realistic profile.
+    const brief = await getBrief(config, db, userId);
+    await saveBrief(
+      config,
+      db,
+      userId,
+      {
+        ...brief,
+        profileFields: {
+          ...brief.profileFields,
+          title: 'Program manager',
+          industry: 'Affordable housing',
+          orgType: 'Nonprofit',
+          orgSize: 'About 40 people',
+          teamShape: 'A team of six; two joined this quarter',
+          coachingPreference: 'Direct questions, short answers',
+        },
+      },
+      { updatedBy: 'demo-seed' },
+    );
   }
   // P4 — Amina starts on Personal (demo ids, no Stripe) so every feature is
   // visible; "Cancel plan (demo)" on Profile shows the Free limits.
@@ -198,7 +220,7 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
 }
 
 async function seedOrgs(config: AppConfig, db: Database, aminaId: string): Promise<void> {
-  const org = await createOrg(db, aminaId, { name: 'Twin Cities Leadership Fund', kind: 'funder' });
+  const org = await createOrg(db, aminaId, { name: 'Example Leadership Fund', kind: 'funder' });
   const fellows = await createCohort(db, org.id, { name: 'Fall 2026 Fellows', seatLimit: 50 });
   const pilot = await createCohort(db, org.id, { name: 'Spring pilot', seatLimit: 10 });
   const fellowsCode = await createInvite(db, fellows.id);

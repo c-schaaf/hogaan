@@ -52,7 +52,7 @@ function SessionRow({
         </div>
         <div className="ses-row-side">
           <div className="ses-row-meta">
-            {s.when} · {s.msgs} messages
+            {s.when} · {s.msgs} {s.msgs === 1 ? 'message' : 'messages'}
           </div>
           <span className="ses-row-arrow">
             <SesIconArrow />

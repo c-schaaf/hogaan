@@ -29,6 +29,7 @@
     "lint": "eslint . --ext .ts,.tsx && prettier --check .",
     "lint:fix": "eslint . --ext .ts,.tsx --fix && prettier --write .",
     "typecheck": "tsc --noEmit",
+    "typecheck:web": "tsc -p web/tsconfig.json --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",

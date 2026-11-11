@@ -43,6 +43,10 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # The server typecheck does not cover web/. Check the browser code too.
+      - name: Typecheck (web)
+        run: pnpm typecheck:web
+
       # F10 (beta pre-flight): every test job the launch-readiness handout
       # cites as proof must be enforced on every PR. Pre-fix CI only ran
       # `pnpm test` — `test:routes` and `test:web` existed but were not
