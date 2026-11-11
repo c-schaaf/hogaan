@@ -67,6 +67,10 @@ export interface CoachingContext {
     mappedPractices?: PracticeTag[];
   };
   sessionTurns: { userMessage: string; responseText: string | null }[];
+  /** P1.1 — rendered leader-brief block ('' when off / empty / failed). */
+  leaderContextText?: string;
+  /** D2 — the leader's own surnames, stripped from every model call. */
+  knownSurnames?: string[];
   /** True when one or more branches failed-soft and returned empty. */
   partialFailure: boolean;
 }

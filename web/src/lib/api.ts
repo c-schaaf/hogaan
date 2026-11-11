@@ -196,6 +196,32 @@ function parseSseBlock(block: string): TurnStreamEvent | null {
   }
 }
 
+// ---- P1 leader brief ("What Hogaan knows about you") -------------------
+export type BriefDoc = 'profile' | 'goals' | 'notes';
+export interface BriefLine {
+  id: string;
+  text: string;
+  source: 'conversation' | 'leader' | 'reflection' | 'assistant';
+  updatedAt: string;
+}
+export interface ProfileFields {
+  title?: string;
+  industry?: string;
+  orgType?: string;
+  orgSize?: string;
+  teamShape?: string;
+  coachingPreference?: string;
+}
+export interface LeaderBrief {
+  profileFields: ProfileFields;
+  profile: BriefLine[];
+  goals: BriefLine[];
+  notes: BriefLine[];
+  version: number;
+  updatedAt: string | null;
+  updatedBy: string;
+}
+
 export const api = {
   // SCRUM — `api.turn` (non-streaming) and its /api/chat/turn route were
   // removed in SCRUM-43. The wrapper lingered in the client SDK and was
@@ -223,6 +249,24 @@ export const api = {
     get: (id: string) => call<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
     del: (id: string) =>
       call<{ ok: true }>(`/api/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  },
+  brief: {
+    get: () => call<LeaderBrief>('/api/brief'),
+    setFields: (fields: Partial<Record<keyof ProfileFields, string>>) =>
+      call<LeaderBrief>('/api/brief/fields', { method: 'PATCH', body: fields }),
+    addLine: (doc: BriefDoc, text: string) =>
+      call<LeaderBrief>('/api/brief/lines', { method: 'POST', body: { doc, text } }),
+    editLine: (id: string, text: string) =>
+      call<LeaderBrief>(`/api/brief/lines/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: { text },
+      }),
+    deleteLine: (id: string) =>
+      call<LeaderBrief>(`/api/brief/lines/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    deleteAll: () => call<{ ok: true }>('/api/brief', { method: 'DELETE' }),
+  },
+  demo: {
+    runJobs: () => call<{ ran: number }>('/api/demo/run-jobs', { method: 'POST' }),
   },
   profile: {
     get: () => call<MeResponse>('/api/profile'),

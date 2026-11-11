@@ -17,6 +17,7 @@ import { devLog } from './lib/log';
 import { isDemoMode } from './lib/demo';
 import { supabase } from './lib/supabase';
 import { Chat } from './phases/Chat';
+import { Context } from './phases/Context';
 import { EmailVerify } from './phases/EmailVerify';
 import { Forgot } from './phases/Forgot';
 import { Home } from './phases/Home';
@@ -39,19 +40,22 @@ type Phase =
   | 'home'
   | 'chat'
   | 'sessions'
-  | 'profile';
+  | 'profile'
+  | 'context';
 
-const AUTHED_PHASES = new Set<Phase>(['home', 'chat', 'sessions', 'profile']);
+const AUTHED_PHASES = new Set<Phase>(['home', 'chat', 'sessions', 'profile', 'context']);
 
 const URL_PATH_TO_PHASE: Partial<Record<string, Phase>> = {
   '/sessions': 'sessions',
   '/profile': 'profile',
+  '/about-you': 'context',
 };
 
 // Phases that own their own URL path. Home/chat live at '/'.
 const PHASE_TO_URL_PATH: Partial<Record<Phase, string>> = {
   sessions: '/sessions',
   profile: '/profile',
+  context: '/about-you',
   home: '/',
   chat: '/',
 };
@@ -401,8 +405,12 @@ export function Shell() {
           practices={me?.mappedPractices ?? []}
           onSignOut={() => void handleSignOut()}
           onNav={onNav}
+          onOpenContext={() => setPhase('context')}
         />
       );
+      break;
+    case 'context':
+      body = <Context onNav={onNav} onBack={() => setPhase('profile')} />;
       break;
     case 'chat':
       body = (

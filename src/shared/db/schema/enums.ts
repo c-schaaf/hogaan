@@ -26,6 +26,7 @@ export const libraryName = pgEnum('library_name', [
   'crisis_resources',
   'scenarios',
   'daily_prompts',
+  'knowledge_digest',
 ]);
 
 /**

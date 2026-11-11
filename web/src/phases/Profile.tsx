@@ -3,6 +3,7 @@ import { HogaanWordmark } from '../components/HogaanWordmark';
 import { PrIconEdit } from '../components/Icons';
 import { BottomNav, DesktopSidebar, type Tab } from '../components/Nav';
 import { api } from '../lib/api';
+import { useFeatures } from '../lib/features';
 import { TWELVE_PRACTICES } from './onboarding/data';
 
 interface CardProps {
@@ -103,9 +104,12 @@ interface Props {
   practices?: string[];
   onSignOut: () => void;
   onNav: (t: Tab) => void;
+  /** P1.3 — open "What Hogaan knows about you". */
+  onOpenContext?: () => void;
 }
 
-export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
+export function Profile({ user, practices = [], onSignOut, onNav, onOpenContext }: Props) {
+  const features = useFeatures();
   const [fullName, setFullName] = useState(user.name || '');
   const [email, setEmail] = useState(user.email || '');
   const [editingName, setEditingName] = useState(false);
@@ -336,6 +340,22 @@ export function Profile({ user, practices = [], onSignOut, onNav }: Props) {
                     </div>
                   )}
                 </ProfileCard>
+
+                {features.leaderBrief && onOpenContext !== undefined && (
+                  <ProfileCard
+                    title="What Hogaan knows about you"
+                    action={
+                      <button type="button" className="pr-card-action" onClick={onOpenContext}>
+                        View and edit
+                      </button>
+                    }
+                  >
+                    <p className="pr-card-note">
+                      Your role, team, goals and notes from past conversations. Only used to coach
+                      you. You can change or delete any of it.
+                    </p>
+                  </ProfileCard>
+                )}
 
                 <ProfileCard title="Support">
                   <div className="pr-sup">

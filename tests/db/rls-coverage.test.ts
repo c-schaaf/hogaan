@@ -24,6 +24,9 @@ const schemaDir = path.join(repoRoot, 'src', 'shared', 'db', 'schema');
  * here and add the corresponding ALTER TABLE ... ENABLE ROW LEVEL SECURITY
  * to a new migration.
  */
+const BASELINE_RLS_TABLES = ['memories', 'sessions', 'turns', 'users'];
+const CONTEXT_BUILD_RLS_TABLES = ['background_jobs', 'leader_briefs'];
+
 const DOCUMENTED_RLS_EXCLUSIONS = new Set<string>(['audit_log', 'prompt_logs']);
 
 async function readSqlFiles(): Promise<string[]> {
@@ -140,6 +143,10 @@ describe('drizzle RLS migration coverage', () => {
   it('RLS-enabled table set matches the baseline migration (regression pin)', async () => {
     const sqlSources = await readSqlFiles();
     const rlsEnabled = collectRlsEnabledTables(sqlSources);
-    expect([...rlsEnabled].sort()).toEqual(['memories', 'sessions', 'turns', 'users']);
+    // Context-and-connections build: each phase that adds a table adds it
+    // here deliberately (0018 = leader_briefs + background_jobs, …).
+    expect([...rlsEnabled].sort()).toEqual(
+      [...BASELINE_RLS_TABLES, ...CONTEXT_BUILD_RLS_TABLES].sort(),
+    );
   });
 });

@@ -29,6 +29,13 @@ safety framing.
 - Past sessions list + continue past session + delete
 - Profile management
 
+**Built behind feature flags on the fork (all OFF by default; see
+`.env.example` and `docs/plans/build-report.md`):** leader brief + "What
+Hogaan knows about you", knowledge-digest mechanism, moments + follow-up
+email + reflections, response ratings, weekly nudge, Hogaan MCP server,
+billing + free tier, organizations/cohorts/funder report, meeting-notes
+reflection. `pnpm demo` runs everything with no accounts.
+
 **On the roadmap (NOT in code yet — do not assume these exist):**
 
 - Voice coaching
@@ -163,8 +170,16 @@ Procedures · Audit Questions · Audit Evidence · Control Recommendations.
    `src/libraries/seed/` content without his sign-off. Every change is a new
    library version, logged per-prompt for traceability.
 3. **PII discipline.** Email and identifiers hashed for IDs; plaintext stored
-   encrypted at column level. No PII beyond first name reaches LLM providers.
-   Audit-log writes in `src/identity/` are fail-closed.
+   encrypted at column level. Audit-log writes in `src/identity/` are
+   fail-closed. **What may reach an LLM provider (decision D2, pending
+   Hamse + repo-owner confirmation):** work context (job title, industry,
+   team roles), first names, and what the leader writes — but **never email
+   addresses, phone numbers, or surnames**. These are stripped by
+   `src/shared/pii/filter.ts`, applied inside `src/shared/llm/chat.ts` to
+   every message and every non-library system block, so no caller can skip
+   it. Library content (Hamse's prompt and approved digest) is marked
+   trusted and passes through unchanged. Proven by
+   `tests/leader-context/second-session.test.ts`.
 4. **No therapy / no crisis routing.** Leadership coaching only. The AI
    disclaimer covers safety framing. Do not add diagnostic, therapeutic, or
    crisis-detection features in code.

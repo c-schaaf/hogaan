@@ -26,8 +26,13 @@ orchestrator (triage / tagger / quality-check) were removed in SCRUM-43.
 [Resolve session via session-lifecycle/] ─────────── (BPMN 05)
         │
         ▼
+[Context fetch (parallel, each fail-soft)]
+        │   - profile + recent turns (+ leader brief if FEATURE_LEADER_BRIEF — BPMN 06)
+        ▼
 [Assemble prompt via prompt-assembly/]
         │   - load active library versions (prompt_templates)
+        │   - approved knowledge digest if FEATURE_KNOWLEDGE_DIGEST (BPMN 06)
+        │   - leader-brief block (BPMN 06)
         │   - build memory block (BPMN 04)
         │   - build session-context block (last 3–5 turns)
         │   - build user-profile block (experience, role)
@@ -53,7 +58,10 @@ orchestrator (triage / tagger / quality-check) were removed in SCRUM-43.
 [Persist turn + update session]
         │   - insert turn row
         │   - bump session.last_turn_at, turn_count
-        │   - if first turn of session: kick off async title generation via Haiku
+        │   - pin library_versions + determinism_hash on the turn row (P2.4)
+        │   - on the 3rd turn: kick off async title generation
+        │   - if FEATURE_LEADER_BRIEF and not private: enqueue debounced
+        │     brief.update job (BPMN 06). Fail-open; adds no latency.
         ▼
 [emit `event: end { turnId, sessionId, latencyMs }`]
         │

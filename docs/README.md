@@ -13,6 +13,14 @@ Welcome. If you are new to this repo, **read in this order:**
    - `03-identity-audit.md` — JWT validation + fail-closed audit log
    - `04-memory-recall-store.md` — pgvector recall + store
    - `05-session-lifecycle.md` — when a message starts a new session vs continues
+   - `06-leader-brief-and-background-jobs.md` — leader brief + job runner (flagged)
+   - `07-moments-and-follow-up.md` — moments, follow-up email, reflections (flagged)
+   - `08-mcp-server.md` — Hogaan MCP server (flagged)
+   - `09-billing-and-entitlements.md` — subscriptions + free tier (flagged)
+   - `10-orgs-and-impact-reporting.md` — cohorts + funder report (flagged)
+
+   The context-and-connections build plan and its report live in `plans/`.
+   Try everything without accounts: `pnpm demo`.
 
    **Rule:** if you change a process, update its BPMN in the same PR. A PR that
    modifies a process without its BPMN diff fails gate G5.

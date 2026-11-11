@@ -11,6 +11,10 @@ import { turns } from '../shared/db/schema/turns.js';
 import { users } from '../shared/db/schema/users.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import { DEMO_SUPABASE_USER_ID } from '../web-api/supabase-session.js';
+import { KNOWLEDGE_DIGEST_PLACEHOLDER } from '../libraries/knowledge-digest.js';
+import { runBriefUpdate } from '../leader-context/updater.js';
+import { recordExtractedMoments } from '../moments/store.js';
+import { isEnabled } from '../shared/flags/index.js';
 
 /**
  * Seed data for DEMO MODE. One fictional sample leader ("Amina"), a few past
@@ -71,7 +75,7 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
       title: 'Giving hard feedback to a senior analyst',
       exchange: [
         [
-          'One of my senior analysts keeps missing deadlines and I have been avoiding the conversation. I manage a team of six at a housing nonprofit.',
+          "I'm a program manager at a housing nonprofit. I manage a team of six. One of my senior analysts keeps missing deadlines and I have been avoiding the conversation.",
           'It sounds like you care about this person and also about the team carrying the load. What have you noticed about when the deadlines slip?',
         ],
         [
@@ -92,6 +96,7 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
     },
   ];
 
+  const seededSessionIds: string[] = [];
   for (const p of past) {
     const at = new Date(Date.now() - p.daysAgo * DAY);
     const s = await db
@@ -105,6 +110,7 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
       })
       .returning({ id: sessions.id });
     const sessionId = s[0]!.id;
+    seededSessionIds.push(sessionId);
     let i = 0;
     for (const [u, a] of p.exchange) {
       await db.insert(turns).values({
@@ -116,6 +122,25 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
         latencyMs: 0,
         createdAt: new Date(at.getTime() + i++ * 60_000),
       });
+    }
+  }
+  await publishLibraryVersion(db, {
+    libraryName: 'knowledge_digest',
+    version: 'placeholder-v0',
+    payload: KNOWLEDGE_DIGEST_PLACEHOLDER,
+    publishedBy: 'system:demo-seed',
+    notes: 'mechanism only; awaiting founder-approved content (Hard Rule 2)',
+    makeActive: true,
+  });
+
+  // P1.1 — build Amina's brief from her past sessions (scripted extraction
+  // in demo mode), so her next session opens with context.
+  if (isEnabled(config, 'leaderBrief')) {
+    for (const sessionId of seededSessionIds) {
+      const res = await runBriefUpdate(config, db, { userId, sessionId });
+      if (isEnabled(config, 'moments')) {
+        await recordExtractedMoments(config, db, userId, sessionId, res.moments ?? []);
+      }
     }
   }
   return { userId };

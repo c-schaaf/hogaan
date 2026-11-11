@@ -7,6 +7,8 @@ import { type AppConfig, loadConfig } from '../shared/secrets/config.js';
 import { wireWebApiRoutes } from '../web-api/setup.js';
 import { wireWebStatic } from '../web-static/setup.js';
 import { seedDemo } from './seed.js';
+import { buildJobHandlers } from '../jobs/handlers.js';
+import { startJobRunner } from '../jobs/runner.js';
 
 /**
  * DEMO MODE server. Runs the real Fastify app and real routes against:
@@ -93,6 +95,7 @@ export async function startDemoServer(
     rateLimiters: createPassThroughRateLimiters(),
   });
   await wireWebStatic(app, config, opts.webDistDir);
+  const runner = startJobRunner(config, embedded.db, buildJobHandlers(config, embedded.db));
   if (opts.listen !== false) {
     await app.listen({ host: '0.0.0.0', port: config.port });
   } else {
@@ -103,6 +106,7 @@ export async function startDemoServer(
     config,
     embedded,
     close: async () => {
+      runner.stop();
       await app.close();
       await embedded.close();
     },

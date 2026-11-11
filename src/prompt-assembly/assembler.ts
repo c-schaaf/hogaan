@@ -15,6 +15,8 @@ import {
   buildUserProfileBlock,
 } from './blocks.js';
 import { computeDeterminismHash } from './determinism-hash.js';
+import { getApprovedDigest } from '../libraries/knowledge-digest.js';
+import { isEnabled } from '../shared/flags/index.js';
 import { writePromptLog } from './log.js';
 import { selectSystemTemplate } from './template.js';
 import {
@@ -71,6 +73,16 @@ export async function assemblePrompt(
     );
   }
 
+  // P1.4 — founder-approved knowledge digest (flag-gated; never the placeholder).
+  let knowledgeDigestText = validated.knowledgeDigestText;
+  if (knowledgeDigestText === undefined && isEnabled(config, 'knowledgeDigest')) {
+    try {
+      knowledgeDigestText = (await getApprovedDigest(db))?.text;
+    } catch {
+      knowledgeDigestText = undefined; // fail-open: coach without the digest
+    }
+  }
+
   // Step 3: system template selection (throws E8)
   const template = selectSystemTemplate(libs.promptTemplates.payload, validated.responseMode);
 
@@ -87,8 +99,8 @@ export async function assemblePrompt(
 
   const finalPrompt: PromptUnderConstruction = {
     systemTemplateText: template.systemText,
-    ...(validated.knowledgeDigestText !== undefined && validated.knowledgeDigestText.length > 0
-      ? { knowledgeDigestText: validated.knowledgeDigestText }
+    ...(knowledgeDigestText !== undefined && knowledgeDigestText.length > 0
+      ? { knowledgeDigestText }
       : {}),
     ...(validated.leaderContextText !== undefined && validated.leaderContextText.length > 0
       ? { leaderContextText: validated.leaderContextText }

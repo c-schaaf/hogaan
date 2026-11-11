@@ -6,3 +6,5 @@ export * from './memories.js';
 export * from './audit-log.js';
 export * from './library-versions.js';
 export * from './prompt-logs.js';
+export * from './leader-briefs.js';
+export * from './background-jobs.js';

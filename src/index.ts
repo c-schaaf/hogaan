@@ -4,6 +4,8 @@ import { loadConfig } from './shared/secrets/config.js';
 import { initSentry, shutdownSentry, startHeartbeat } from './shared/observability/index.js';
 import { wireWebApiRoutes } from './web-api/setup.js';
 import { wireWebStatic } from './web-static/setup.js';
+import { buildJobHandlers, jobRunnerNeeded } from './jobs/handlers.js';
+import { startJobRunner } from './jobs/runner.js';
 
 // DEBUG INSTRUMENTATION — startup probes. Bypass pino entirely (writes
 // to stderr via console.warn) so we localize WHERE on Render startup
@@ -38,6 +40,11 @@ async function main(): Promise<void> {
   // backend just validates the `Authorization: Bearer <supabase-token>`
   // header on /api/* via web-api/supabase-session.ts middleware.
   const webApiWired = await wireWebApiRoutes(app, config);
+  // P2.5 — background jobs run in-process. Started only when a feature that
+  // needs them is on, so merging this code with every flag off changes nothing.
+  const jobRunner = jobRunnerNeeded(config)
+    ? startJobRunner(config, webApiWired.deps.db, buildJobHandlers(config, webApiWired.deps.db))
+    : null;
   // SCRUM (PR 6, launch-readiness D-3) — wireWebApiRoutes now crashes on
   // missing required env, so it always returns { registered: true }.
   app.log.info({ webApiRoutes: webApiWired.registered }, 'web api routes');
@@ -53,6 +60,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string): Promise<void> => {
     app.log.info({ signal }, 'shutdown signal received');
     heartbeat.stop();
+    jobRunner?.stop();
     try {
       await app.close();
       await shutdownSentry();

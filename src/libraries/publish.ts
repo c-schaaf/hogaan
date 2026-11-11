@@ -10,7 +10,8 @@ export type LibraryName =
   | 'cultural_framing'
   | 'crisis_resources'
   | 'scenarios'
-  | 'daily_prompts';
+  | 'daily_prompts'
+  | 'knowledge_digest';
 
 export interface PublishOptions {
   libraryName: LibraryName;

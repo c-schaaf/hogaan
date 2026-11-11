@@ -9,8 +9,10 @@
 > `src/memory/write.ts` is never invoked. The diagrams describe the designed
 > process, not what runs today. Model is `voyage-3` (1024-dim), not
 > `voyage-3-lite`. The table is `memories`, not `memory_embeddings`. See the
-> leader-brief process in BPMN 02 (Phase 1 of the context build plan) for the
-> replacement primary memory mechanism.
+> leader-brief process in BPMN 06 (Phase 1 of the context build plan): the
+> brief is now the primary memory mechanism, read with one primary-key
+> lookup instead of a ~300 ms embedding call. pgvector memory stays as a
+> possible secondary way to pull up one specific past conversation.
 
 ## Purpose
 

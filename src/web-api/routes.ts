@@ -21,7 +21,9 @@ import {
   noDegradation,
 } from '../shared/types/index.js';
 import { createHash } from 'node:crypto';
-import { featureSnapshot } from '../shared/flags/index.js';
+import { featureSnapshot, isEnabled } from '../shared/flags/index.js';
+import { enqueueJobSafe } from '../jobs/runner.js';
+import { registerContextRoutes } from './context-routes.js';
 import { generateSessionTitle } from './session-title.js';
 import { requireSupabaseSession } from './supabase-session.js';
 
@@ -73,6 +75,9 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
   // a flag that defaults off). Public: flags are not secret, and the SPA
   // needs `demoMode` before any sign-in happens.
   app.get('/api/features', (_req, reply) => reply.send(featureSnapshot(opts.config)));
+
+  // Context-and-connections routes (each flag-gated inside).
+  registerContextRoutes(app, opts);
 
   // POST /api/chat/turn/stream ----------------------------------------
   // Streaming variant of /api/chat/turn. Returns Server-Sent Events:
@@ -234,6 +239,8 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
           // (writer + retrieval) in a post-launch follow-up PR.
           memoryTopN: 0,
           recentTurnsLimit: 3,
+          // P1.1 — leader brief read (one primary-key lookup + decrypt).
+          includeBrief: isEnabled(opts.config, 'leaderBrief'),
         },
       );
       // SCRUM — surface partial context-fetch failures on the request log so
@@ -283,7 +290,12 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         sessionTurns: ctx.sessionTurns,
         retrievedMemories: ctx.memories,
         historyInMessages: priorMessages.length > 0,
+        ...(ctx.leaderContextText !== undefined && ctx.leaderContextText.length > 0
+          ? { leaderContextText: ctx.leaderContextText }
+          : {}),
       });
+      // D2 — strip the leader's own surname from every model call.
+      const pii = { knownSurnames: ctx.knownSurnames ?? [] };
       traceLibraryVersions = promptBundle.libraryVersions;
 
       sendEvent('start', { sessionId });
@@ -294,6 +306,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         ...(promptBundle.systemBlocks !== undefined
           ? { systemBlocks: promptBundle.systemBlocks }
           : {}),
+        pii,
         messages: chatMessages,
         maxTokens: 600,
         temperature: 0.7,
@@ -356,6 +369,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
             ...(promptBundle.systemBlocks !== undefined
               ? { systemBlocks: promptBundle.systemBlocks }
               : {}),
+            pii,
             messages: chatMessages,
             maxTokens: 600,
             temperature: 0.7,
@@ -404,6 +418,10 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
                 responseText: accumulated,
                 modelUsed: final?.modelUsed ?? 'claude-haiku-4-5',
                 latencyMs,
+                // P2.4 — pin the library versions so ratings can be compared
+                // across prompt versions.
+                libraryVersions: promptBundle.libraryVersions,
+                determinismHash: promptBundle.determinismHash,
               })
               .returning({ id: turns.id });
             await tx
@@ -497,6 +515,18 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       // contract). Persist failures also skip titling.
       if (!isPrivate && !persistFailed && resolved.turnCount === 2) {
         void generateSessionTitle(opts.config, opts.db, sessionId, message);
+      }
+      // P1.1 — debounced background brief update. Re-armed on every turn so
+      // it runs once the leader goes quiet. Private sessions never enqueue
+      // (P1.3). Fail-open: enqueue errors are reported, never thrown.
+      if (!isPrivate && !persistFailed && isEnabled(opts.config, 'leaderBrief')) {
+        enqueueJobSafe(opts.db, {
+          kind: 'brief.update',
+          dedupeKey: `brief:${sessionId}`,
+          payload: { userId, sessionId },
+          runAfter: new Date(Date.now() + (opts.config.briefUpdateDelayMs ?? 600_000)),
+          mode: 'replace',
+        });
       }
       return reply;
     } catch (err) {
