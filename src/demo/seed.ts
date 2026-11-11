@@ -14,7 +14,8 @@ import type { AppConfig } from '../shared/secrets/config.js';
 import { DEMO_SUPABASE_USER_ID } from '../web-api/supabase-session.js';
 import { KNOWLEDGE_DIGEST_PLACEHOLDER } from '../libraries/knowledge-digest.js';
 import { runBriefUpdate } from '../leader-context/updater.js';
-import { createMoment, recordExtractedMoments } from '../moments/store.js';
+import { createMoment, recordExtractedMoments, recordOutcome } from '../moments/store.js';
+import { createCohort, createInvite, createOrg, joinByCode } from '../orgs/store.js';
 import { setPrefs } from '../shared/email/proactive.js';
 import { scheduleWeeklyNudge } from '../jobs/phase2-handlers.js';
 import { isEnabled } from '../shared/flags/index.js';
@@ -189,5 +190,50 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
       source: 'leader',
     });
   }
+  // P5 — a funder with two cohorts. In the demo Amina is both a member of
+  // the Fellows cohort and an admin of the funder, so both sides are visible.
+  if (isEnabled(config, 'orgs')) await seedOrgs(config, db, userId);
   return { userId };
+}
+
+async function seedOrgs(config: AppConfig, db: Database, aminaId: string): Promise<void> {
+  const org = await createOrg(db, aminaId, { name: 'Twin Cities Leadership Fund', kind: 'funder' });
+  const fellows = await createCohort(db, org.id, { name: 'Fall 2026 Fellows', seatLimit: 50 });
+  const pilot = await createCohort(db, org.id, { name: 'Spring pilot', seatLimit: 10 });
+  const fellowsCode = await createInvite(db, fellows.id);
+  const pilotCode = await createInvite(db, pilot.id);
+  await joinByCode(db, aminaId, fellowsCode);
+  const practices = ['Integrity', 'Empathy', 'Inclusion', 'Purpose', 'Accountability', 'Peace'];
+  const outcomes = ['well', 'mixed', 'hard', 'well'] as const;
+  for (let i = 0; i < 17; i++) {
+    const inFellows = i < 11;
+    const u = await db
+      .insert(users)
+      .values({
+        email: `sample${i}@example.com`,
+        fullNameEncrypted: encryptPlaintext(config, `Sample Leader${i}`),
+        status: 'onboarded',
+        mappedPractices: [practices[i % practices.length]!, practices[(i + 2) % practices.length]!],
+      })
+      .returning({ id: users.id });
+    const id = u[0]!.id;
+    await joinByCode(db, id, inFellows ? fellowsCode : pilotCode);
+    for (let k = 0; k < 1 + (i % 3); k++) {
+      await db.insert(sessions).values({ userId: id, turnCount: 3, title: 'sample session' });
+    }
+    if (inFellows && i % 2 === 0) {
+      const m = await createMoment(config, db, id, {
+        what: `Sample conversation ${i}`,
+        source: 'leader',
+        happensAt: new Date(Date.now() - 2 * DAY),
+      });
+      if (m !== null) {
+        await recordOutcome(config, db, id, m.id, {
+          howItWent: outcomes[i % outcomes.length]!,
+          confidenceBefore: 2 + (i % 2),
+          confidenceAfter: 4,
+        });
+      }
+    }
+  }
 }

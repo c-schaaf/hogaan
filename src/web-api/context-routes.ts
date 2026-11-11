@@ -19,6 +19,7 @@ import type { WebApiRoutesOpts } from './routes.js';
 import { registerPhase2Routes } from './phase2-routes.js';
 import { registerMcpRoutes } from '../mcp/routes.js';
 import { registerBillingRoutes } from '../billing/routes.js';
+import { registerOrgRoutes } from '../orgs/routes.js';
 
 /** 404 when a feature flag is off, so a merged-but-off feature is invisible. */
 export function featureOff(
@@ -170,4 +171,5 @@ export function registerContextRoutes(app: FastifyInstance, opts: WebApiRoutesOp
   registerPhase2Routes(app, opts);
   registerMcpRoutes(app, opts);
   registerBillingRoutes(app, opts);
+  registerOrgRoutes(app, opts);
 }

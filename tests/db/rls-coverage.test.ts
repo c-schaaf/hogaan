@@ -39,6 +39,12 @@ const CONTEXT_BUILD_RLS_TABLES = [
   // 0021
   'billing_events',
   'subscriptions',
+  // 0022
+  'cohort_invites',
+  'cohort_members',
+  'cohorts',
+  'org_admins',
+  'organizations',
 ];
 
 const DOCUMENTED_RLS_EXCLUSIONS = new Set<string>(['audit_log', 'prompt_logs']);

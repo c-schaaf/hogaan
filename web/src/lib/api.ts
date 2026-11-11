@@ -276,6 +276,48 @@ export interface Billing {
   priceLabel: string;
 }
 
+export interface SponsorStatement {
+  canSee: string[];
+  cannotSee: string[];
+}
+export interface Sponsorship {
+  memberships: {
+    cohortId: string;
+    cohortName: string;
+    orgName: string;
+    joinedAt: string;
+    endsAt: string | null;
+  }[];
+  statement: SponsorStatement;
+  minGroupSize: number;
+}
+export interface AdminOrg {
+  id: string;
+  name: string;
+  kind: string;
+  cohorts: {
+    id: string;
+    name: string;
+    seatLimit: number;
+    endsAt: string | null;
+    enrolled: number;
+  }[];
+}
+export interface CohortReport {
+  enrolled: number;
+  seatLimit: number;
+  activeLast4Weeks: number;
+  coachingSessions: number;
+  momentsPrepared: number;
+  loopsClosed: number;
+  outcomes: { well: number; mixed: number; hard: number };
+  avgConfidenceChange: number | null;
+  practiceCoverage: Record<string, number>;
+}
+export type ReportResponse =
+  | { cohortName: string; suppressed: true; reason: string }
+  | { cohortName: string; suppressed: false; report: CohortReport };
+
 export const api = {
   // SCRUM — `api.turn` (non-streaming) and its /api/chat/turn route were
   // removed in SCRUM-43. The wrapper lingered in the client SDK and was
@@ -358,6 +400,32 @@ export const api = {
     portal: () => call<{ url?: string; demo?: boolean }>('/api/billing/portal', { method: 'POST' }),
     demo: (action: 'subscribe' | 'cancel') =>
       call<Billing>('/api/demo/billing', { method: 'POST', body: { action } }),
+  },
+  orgs: {
+    sponsorship: () => call<Sponsorship>('/api/sponsorship'),
+    join: (code: string) =>
+      call<{ ok: true; cohortName: string; orgName: string }>('/api/cohorts/join', {
+        method: 'POST',
+        body: { code, acknowledged: true },
+      }),
+    leave: (cohortId: string) =>
+      call<{ ok: true }>(`/api/cohorts/${encodeURIComponent(cohortId)}/membership`, {
+        method: 'DELETE',
+      }),
+    admin: () => call<{ orgs: AdminOrg[] }>('/api/orgs'),
+    createOrg: (name: string) =>
+      call<{ id: string }>('/api/orgs', { method: 'POST', body: { name } }),
+    createCohort: (orgId: string, name: string, seatLimit: number) =>
+      call<{ id: string }>(`/api/orgs/${encodeURIComponent(orgId)}/cohorts`, {
+        method: 'POST',
+        body: { name, seatLimit },
+      }),
+    invite: (cohortId: string) =>
+      call<{ code: string }>(`/api/cohorts/${encodeURIComponent(cohortId)}/invites`, {
+        method: 'POST',
+      }),
+    report: (cohortId: string) =>
+      call<ReportResponse>(`/api/cohorts/${encodeURIComponent(cohortId)}/report`),
   },
   rateTurn: (turnId: string, rating: 'helpful' | 'not_helpful', note?: string) =>
     call<{ ok: true }>(`/api/turns/${encodeURIComponent(turnId)}/rating`, {

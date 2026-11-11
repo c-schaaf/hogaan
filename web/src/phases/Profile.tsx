@@ -4,6 +4,7 @@ import { PrIconEdit } from '../components/Icons';
 import { BottomNav, DesktopSidebar, type Tab } from '../components/Nav';
 import { api, type Billing, type Prefs } from '../lib/api';
 import { BillingCard } from '../components/BillingCard';
+import { SponsorshipCard } from '../components/SponsorshipCard';
 import { useFeatures } from '../lib/features';
 import { AssistantConnect } from '../components/AssistantConnect';
 import { TWELVE_PRACTICES } from './onboarding/data';
@@ -175,6 +176,8 @@ interface Props {
   onOpenContext?: () => void;
   /** P2.1 — open Moments. */
   onOpenMoments?: () => void;
+  /** P5.3 — open sponsor reports. */
+  onOpenSponsor?: () => void;
 }
 
 export function Profile({
@@ -184,6 +187,7 @@ export function Profile({
   onNav,
   onOpenContext,
   onOpenMoments,
+  onOpenSponsor,
 }: Props) {
   const features = useFeatures();
   const [billing, setBilling] = useState<Billing | null>(null);
@@ -458,6 +462,10 @@ export function Profile({
                 )}
 
                 {features.billing && <BillingCard onChange={setBilling} />}
+
+                {features.orgs && onOpenSponsor !== undefined && (
+                  <SponsorshipCard onOpenSponsor={onOpenSponsor} />
+                )}
 
                 {features.mcp && <AssistantConnect key={billing?.plan ?? 'none'} />}
 

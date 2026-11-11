@@ -878,3 +878,12 @@
   border-radius: 6px;
   overflow-wrap: anywhere;
 }
+@media print {
+  .sp-noprint,
+  .hm-side,
+  .hm-nav,
+  .demo-banner,
+  .pr-topbar {
+    display: none !important;
+  }
+}

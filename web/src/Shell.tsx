@@ -20,6 +20,7 @@ import { Chat } from './phases/Chat';
 import { Context } from './phases/Context';
 import { Moments } from './phases/Moments';
 import { Reflect } from './phases/Reflect';
+import { Sponsor } from './phases/Sponsor';
 import { EmailVerify } from './phases/EmailVerify';
 import { Forgot } from './phases/Forgot';
 import { Home } from './phases/Home';
@@ -45,7 +46,8 @@ type Phase =
   | 'profile'
   | 'context'
   | 'moments'
-  | 'reflect';
+  | 'reflect'
+  | 'sponsor';
 
 const AUTHED_PHASES = new Set<Phase>([
   'home',
@@ -55,6 +57,7 @@ const AUTHED_PHASES = new Set<Phase>([
   'context',
   'moments',
   'reflect',
+  'sponsor',
 ]);
 
 const URL_PATH_TO_PHASE: Partial<Record<string, Phase>> = {
@@ -62,6 +65,7 @@ const URL_PATH_TO_PHASE: Partial<Record<string, Phase>> = {
   '/profile': 'profile',
   '/about-you': 'context',
   '/moments': 'moments',
+  '/sponsor': 'sponsor',
 };
 
 // Phases that own their own URL path. Home/chat live at '/'.
@@ -70,6 +74,7 @@ const PHASE_TO_URL_PATH: Partial<Record<Phase, string>> = {
   profile: '/profile',
   context: '/about-you',
   moments: '/moments',
+  sponsor: '/sponsor',
   home: '/',
   chat: '/',
 };
@@ -433,8 +438,12 @@ export function Shell() {
           onNav={onNav}
           onOpenContext={() => setPhase('context')}
           onOpenMoments={() => setPhase('moments')}
+          onOpenSponsor={() => setPhase('sponsor')}
         />
       );
+      break;
+    case 'sponsor':
+      body = <Sponsor onNav={onNav} onBack={() => setPhase('profile')} />;
       break;
     case 'context':
       body = <Context onNav={onNav} onBack={() => setPhase('profile')} />;
