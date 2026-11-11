@@ -34,6 +34,21 @@ export interface EnqueueOptions {
 }
 
 const MAX_ATTEMPTS = 3;
+
+/**
+ * Thrown by a handler that wants to run again later for a normal reason
+ * (weekly cap reached, quiet hours, recurring job). Not a failure: attempts
+ * are reset and no incident is raised.
+ */
+export class RescheduleJob extends Error {
+  constructor(
+    readonly at: Date,
+    readonly reason: string,
+  ) {
+    super(`reschedule: ${reason}`);
+    this.name = 'RescheduleJob';
+  }
+}
 const STALE_RUNNING_MS = 10 * 60_000;
 
 export async function enqueueJob(db: Database, opts: EnqueueOptions): Promise<void> {
@@ -154,6 +169,20 @@ export async function runDueJobs(
         .where(and(eq(backgroundJobs.id, job.id), eq(backgroundJobs.status, 'running')));
       if (opts.quiet !== true) trace(job, 'done', Date.now() - t0);
     } catch (err) {
+      if (err instanceof RescheduleJob) {
+        await db
+          .update(backgroundJobs)
+          .set({
+            status: 'pending',
+            runAfter: err.at,
+            attempts: 0,
+            lastError: err.reason,
+            updatedAt: new Date(),
+          })
+          .where(eq(backgroundJobs.id, job.id));
+        if (opts.quiet !== true) trace(job, `rescheduled:${err.reason}`, Date.now() - t0);
+        continue;
+      }
       const message = (err instanceof Error ? err.message : String(err)).slice(0, 500);
       const final = job.attempts >= MAX_ATTEMPTS;
       const backoffMs = 60_000 * 2 ** (job.attempts - 1);

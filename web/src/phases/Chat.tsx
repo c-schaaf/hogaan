@@ -9,6 +9,43 @@ import {
   ChatIconSend,
 } from '../components/Icons';
 import { api, ApiError, type SessionSummary } from '../lib/api';
+import { useFeatures } from '../lib/features';
+
+// P2.4 — helpful / not helpful on a coach reply.
+function RateReply({
+  turnId,
+  rating,
+  onRated,
+}: {
+  turnId: string;
+  rating: 'helpful' | 'not_helpful' | undefined;
+  onRated: (r: 'helpful' | 'not_helpful') => void;
+}) {
+  const rate = (r: 'helpful' | 'not_helpful') => {
+    onRated(r);
+    void api.rateTurn(turnId, r).catch(() => undefined);
+  };
+  return (
+    <div className="chat-rate" aria-label="Was this reply helpful?">
+      <button
+        type="button"
+        className={`chat-rate-btn ${rating === 'helpful' ? 'is-on' : ''}`}
+        aria-pressed={rating === 'helpful'}
+        onClick={() => rate('helpful')}
+      >
+        Helpful
+      </button>
+      <button
+        type="button"
+        className={`chat-rate-btn ${rating === 'not_helpful' ? 'is-on' : ''}`}
+        aria-pressed={rating === 'not_helpful'}
+        onClick={() => rate('not_helpful')}
+      >
+        Not helpful
+      </button>
+    </div>
+  );
+}
 
 interface BotParagraph {
   paras: ReactNode[];
@@ -94,6 +131,9 @@ interface ChatItem {
   // original prompt so the user can resend with one click.
   unsent?: boolean;
   retryText?: string;
+  /** P2.4 — persisted turn id for the bot reply (enables rating). */
+  turnId?: string;
+  rating?: 'helpful' | 'not_helpful';
 }
 
 let nextItemId = 0;
@@ -215,6 +255,7 @@ export function Chat({
   openSessionId,
   onOpenSession,
 }: Props) {
+  const features = useFeatures();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [items, setItems] = useState<ChatItem[]>(() => [
     { id: newItemId(), kind: 'divider', label: dividerLabel() },
@@ -286,6 +327,8 @@ export function Chat({
               kind: 'bot',
               paras: r.paras,
               chips: r.chips,
+              turnId: t.id,
+              ...(t.rating !== undefined ? { rating: t.rating } : {}),
             });
           }
         }
@@ -358,6 +401,17 @@ export function Chat({
         } else if (ev.type === 'error') {
           throw new Error(ev.message);
         } else if (ev.type === 'end') {
+          const endTurnId = ev.turnId;
+          if (endTurnId !== null) {
+            // Attach the persisted turn id to the reply just streamed.
+            setItems((prev) => {
+              const lastIdx = prev.length - 1;
+              if (lastIdx < 0 || prev[lastIdx].kind !== 'bot') return prev;
+              const next = [...prev];
+              next[lastIdx] = { ...next[lastIdx], turnId: endTurnId };
+              return next;
+            });
+          }
           void reloadPast();
         }
       }
@@ -523,6 +577,17 @@ export function Chat({
                         ))}
                       </div>
                     </div>
+                    {features.ratings && it.turnId !== undefined && (
+                      <RateReply
+                        turnId={it.turnId}
+                        rating={it.rating}
+                        onRated={(rating) =>
+                          setItems((prev) =>
+                            prev.map((x) => (x.id === it.id ? { ...x, rating } : x)),
+                          )
+                        }
+                      />
+                    )}
                     {it.chips && (
                       <div className="chat-quick-wrap">
                         <div className="chat-quick">

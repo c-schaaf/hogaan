@@ -7,6 +7,7 @@ import { users } from '../shared/db/schema/users.js';
 import { decryptPlaintext } from '../shared/db/encryption.js';
 import { getBrief } from '../leader-context/store.js';
 import { renderBriefBlock } from '../leader-context/render.js';
+import { listMoments, renderMomentsBlock } from '../moments/store.js';
 import { surnamesFromFullName } from '../shared/pii/filter.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import type { PracticeTag, SessionId, UserId } from '../shared/types/index.js';
@@ -46,6 +47,8 @@ export interface ContextFetchOptions {
   recentTurnsLimit?: number;
   /** P1.1 — read the leader brief (flag-gated by the caller). */
   includeBrief?: boolean;
+  /** P2.1 — read upcoming moments (flag-gated by the caller). */
+  includeMoments?: boolean;
 }
 
 export async function fetchCoachingContext(
@@ -70,9 +73,14 @@ export async function fetchCoachingContext(
       'session-turns',
     ),
     withTimeout(
-      opts.includeBrief === true
-        ? getBrief(deps.config, deps.db, opts.userId).then(renderBriefBlock)
-        : Promise.resolve(''),
+      Promise.all([
+        opts.includeBrief === true
+          ? getBrief(deps.config, deps.db, opts.userId).then(renderBriefBlock)
+          : Promise.resolve(''),
+        opts.includeMoments === true
+          ? listMoments(deps.config, deps.db, opts.userId).then((m) => renderMomentsBlock(m))
+          : Promise.resolve(''),
+      ]).then((parts) => parts.filter((p) => p.length > 0).join('\n\n')),
       FETCH_TIMEOUT_MS,
       'leader-brief',
     ),

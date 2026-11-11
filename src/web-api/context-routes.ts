@@ -152,17 +152,15 @@ export function registerContextRoutes(app: FastifyInstance, opts: WebApiRoutesOp
       .update(backgroundJobs)
       .set({ runAfter: new Date(0) })
       .where(eq(backgroundJobs.status, 'pending'));
+    // Fast-forward once, then let chained work (brief -> moment -> follow-up)
+    // that became due run too. Recurring jobs are not fast-forwarded again.
     let ran = 0;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       const n = await runDueJobs(opts.db, buildJobHandlers(opts.config, opts.db), {
         quiet: true,
       });
       ran += n;
       if (n === 0) break;
-      await opts.db
-        .update(backgroundJobs)
-        .set({ runAfter: new Date(0) })
-        .where(eq(backgroundJobs.status, 'pending'));
     }
     return reply.send({ ran });
   });

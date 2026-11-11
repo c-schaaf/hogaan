@@ -19,6 +19,10 @@ export interface SendOptions {
   text: string;
   /** Source tag for incident reports. Helps ops triage failed sends by feature. */
   source: string;
+  /** Sent as the Idempotency-Key HTTP header so a retried send is not delivered twice. */
+  idempotencyKey?: string;
+  /** Extra email headers, e.g. List-Unsubscribe. */
+  headers?: Record<string, string>;
 }
 
 export interface SendResult {
@@ -49,6 +53,7 @@ export async function sendEmail(config: AppConfig, opts: SendOptions): Promise<S
     subject: opts.subject,
     html: opts.html,
     text: opts.text,
+    ...(opts.headers !== undefined ? { headers: opts.headers } : {}),
   };
 
   let resp: Response;
@@ -58,6 +63,7 @@ export async function sendEmail(config: AppConfig, opts: SendOptions): Promise<S
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
+        ...(opts.idempotencyKey !== undefined ? { 'Idempotency-Key': opts.idempotencyKey } : {}),
       },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(5000),

@@ -18,6 +18,8 @@ import { isDemoMode } from './lib/demo';
 import { supabase } from './lib/supabase';
 import { Chat } from './phases/Chat';
 import { Context } from './phases/Context';
+import { Moments } from './phases/Moments';
+import { Reflect } from './phases/Reflect';
 import { EmailVerify } from './phases/EmailVerify';
 import { Forgot } from './phases/Forgot';
 import { Home } from './phases/Home';
@@ -41,14 +43,25 @@ type Phase =
   | 'chat'
   | 'sessions'
   | 'profile'
-  | 'context';
+  | 'context'
+  | 'moments'
+  | 'reflect';
 
-const AUTHED_PHASES = new Set<Phase>(['home', 'chat', 'sessions', 'profile', 'context']);
+const AUTHED_PHASES = new Set<Phase>([
+  'home',
+  'chat',
+  'sessions',
+  'profile',
+  'context',
+  'moments',
+  'reflect',
+]);
 
 const URL_PATH_TO_PHASE: Partial<Record<string, Phase>> = {
   '/sessions': 'sessions',
   '/profile': 'profile',
   '/about-you': 'context',
+  '/moments': 'moments',
 };
 
 // Phases that own their own URL path. Home/chat live at '/'.
@@ -56,12 +69,20 @@ const PHASE_TO_URL_PATH: Partial<Record<Phase, string>> = {
   sessions: '/sessions',
   profile: '/profile',
   context: '/about-you',
+  moments: '/moments',
   home: '/',
   chat: '/',
 };
 
+/** P2.3 — /reflect/<momentId> deep link from the follow-up email. */
+function readReflectIdFromUrl(): string | null {
+  const m = /^\/reflect\/([0-9a-f-]{36})$/i.exec(window.location.pathname);
+  return m?.[1] ?? null;
+}
+
 function readPhaseFromUrl(): Phase | null {
   const path = window.location.pathname;
+  if (readReflectIdFromUrl() !== null) return 'reflect';
   const mapped = URL_PATH_TO_PHASE[path];
   return mapped ?? null;
 }
@@ -89,12 +110,16 @@ export function Shell() {
   const phaseRef = useRef<Phase>('boot');
   const routeAuthedInFlight = useRef(false);
   const [chatOrigin, setChatOrigin] = useState<Phase>('home');
+  const [reflectId, setReflectId] = useState<string | null>(() => readReflectIdFromUrl());
 
   useEffect(() => {
     phaseRef.current = phase;
     if (AUTHED_PHASES.has(phase)) {
       sessionStorage.setItem('shell-phase', phase);
-      const desiredPath = PHASE_TO_URL_PATH[phase];
+      const desiredPath =
+        phase === 'reflect' && reflectId !== null
+          ? `/reflect/${reflectId}`
+          : PHASE_TO_URL_PATH[phase];
       if (desiredPath !== undefined && window.location.pathname !== desiredPath) {
         window.history.replaceState(
           {},
@@ -103,7 +128,7 @@ export function Shell() {
         );
       }
     }
-  }, [phase]);
+  }, [phase, reflectId]);
 
   const routeAuthed = useCallback(async () => {
     if (routeAuthedInFlight.current) return;
@@ -381,6 +406,7 @@ export function Shell() {
             setPhase('chat');
           }}
           onNav={onNav}
+          onOpenMoments={() => setPhase('moments')}
         />
       );
       break;
@@ -406,11 +432,41 @@ export function Shell() {
           onSignOut={() => void handleSignOut()}
           onNav={onNav}
           onOpenContext={() => setPhase('context')}
+          onOpenMoments={() => setPhase('moments')}
         />
       );
       break;
     case 'context':
       body = <Context onNav={onNav} onBack={() => setPhase('profile')} />;
+      break;
+    case 'moments':
+      body = (
+        <Moments
+          onNav={onNav}
+          onReflect={(id) => {
+            setReflectId(id);
+            setPhase('reflect');
+          }}
+        />
+      );
+      break;
+    case 'reflect':
+      body =
+        reflectId === null ? (
+          <div>Missing moment</div>
+        ) : (
+          <Reflect
+            momentId={reflectId}
+            onNav={onNav}
+            onDone={() => setPhase('moments')}
+            onTalk={(seed) => {
+              setChatSeed(seed);
+              setOpenSessionId(null);
+              setChatOrigin('moments');
+              setPhase('chat');
+            }}
+          />
+        );
       break;
     case 'chat':
       body = (

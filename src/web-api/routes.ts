@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, ilike, isNotNull, lt, sql as drizzleSql } from 'drizzle-orm';
+import { and, desc, eq, gt, ilike, inArray, isNotNull, lt, sql as drizzleSql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { fetchCoachingContext } from '../coaching/context-fetch.js';
 import { reportP2 } from '../incident-handling/index.js';
@@ -8,6 +8,7 @@ import type { Database } from '../shared/db/client.js';
 import { decryptPlaintext, encryptPlaintext } from '../shared/db/encryption.js';
 import { sessions } from '../shared/db/schema/sessions.js';
 import { turns } from '../shared/db/schema/turns.js';
+import { turnRatings } from '../shared/db/schema/moments.js';
 import { users } from '../shared/db/schema/users.js';
 import { chat, chatStream, type ModelUsed } from '../shared/llm/chat.js';
 import type { RedisBundle } from '../shared/redis/client.js';
@@ -241,6 +242,8 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
           recentTurnsLimit: 3,
           // P1.1 — leader brief read (one primary-key lookup + decrypt).
           includeBrief: isEnabled(opts.config, 'leaderBrief'),
+          // P2.1 — upcoming moments (one indexed query, same parallel fetch).
+          includeMoments: isEnabled(opts.config, 'moments'),
         },
       );
       // SCRUM — surface partial context-fetch failures on the request log so
@@ -862,6 +865,24 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
     const hasMore = turnRows.length > SESSION_TURN_LIMIT;
     const pageTurns = hasMore ? turnRows.slice(0, SESSION_TURN_LIMIT) : turnRows;
 
+    // P2.4 — include the leader's own ratings when the feature is on.
+    const ratingByTurn = new Map<string, string>();
+    if (isEnabled(opts.config, 'ratings') && pageTurns.length > 0) {
+      const rated = await opts.db
+        .select({ turnId: turnRatings.turnId, rating: turnRatings.rating })
+        .from(turnRatings)
+        .where(
+          and(
+            eq(turnRatings.userId, session.userId),
+            inArray(
+              turnRatings.turnId,
+              pageTurns.map((t) => t.id),
+            ),
+          ),
+        );
+      for (const r of rated) ratingByTurn.set(r.turnId, r.rating);
+    }
+
     return reply.send({
       session: { id: s.id, title: s.title, isPrivate: s.isPrivate },
       turns: pageTurns.map((t) => ({
@@ -869,6 +890,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         userMessage: t.userMessage,
         responseText: t.responseText,
         createdAt: t.createdAt.toISOString(),
+        ...(ratingByTurn.has(t.id) ? { rating: ratingByTurn.get(t.id) } : {}),
       })),
       hasMore,
     });

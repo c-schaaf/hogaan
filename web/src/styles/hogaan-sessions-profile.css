@@ -823,3 +823,58 @@
   background: var(--tint, #e8f1fd);
   color: var(--ink-2, #33415c);
 }
+.chat-rate {
+  display: flex;
+  gap: 6px;
+  margin: 4px 0 8px 44px;
+}
+.chat-rate-btn {
+  font: inherit;
+  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line, #d7dee8);
+  background: transparent;
+  color: var(--ink-3, #6b778c);
+  cursor: pointer;
+}
+.chat-rate-btn.is-on {
+  background: var(--tint, #e8f1fd);
+  color: var(--ink-1, #10223d);
+  border-color: var(--ink-3, #9fb0c8);
+}
+.mo-when {
+  font-size: 12px;
+  color: var(--ink-3, #6b778c);
+}
+.mo-how {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+.mo-how button.is-on {
+  outline: 2px solid var(--ink-1, #10223d);
+}
+.mo-textarea {
+  width: 100%;
+  min-height: 80px;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line, #d7dee8);
+}
+.demo-panel {
+  border: 1px dashed #d1b55a;
+  background: #fffaf0;
+}
+.demo-mail {
+  white-space: pre-wrap;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #eee;
+  padding: 8px;
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}

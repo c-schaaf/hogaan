@@ -1,4 +1,35 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { api, type Moment } from '../lib/api';
+import { useFeatures } from '../lib/features';
+
+// P2.1 — "Ready to reflect" / "Coming up" strip, only when moments are on.
+function MomentsNudge({ onOpen }: { onOpen: () => void }) {
+  const features = useFeatures();
+  const [list, setList] = useState<Moment[]>([]);
+  useEffect(() => {
+    if (!features.moments) return;
+    api.moments
+      .list()
+      .then((r) => setList(r.moments.filter((m) => m.status === 'upcoming')))
+      .catch(() => undefined);
+  }, [features.moments]);
+  if (!features.moments || list.length === 0) return null;
+  const now = Date.now();
+  const due = list.filter((m) => m.happensAt !== null && Date.parse(m.happensAt) < now);
+  const label =
+    due.length > 0
+      ? `${due.length} conversation${due.length === 1 ? '' : 's'} ready to reflect on`
+      : `${list.length} moment${list.length === 1 ? '' : 's'} coming up`;
+  return (
+    <button type="button" className="hm-chip" onClick={onOpen} style={{ marginBottom: 16 }}>
+      <span className="hm-chip-body">
+        <span className="hm-chip-label">{label}</span>
+        <span className="hm-chip-tied">Moments</span>
+      </span>
+      <span className="hm-chip-arrow">→</span>
+    </button>
+  );
+}
 import { HogaanWordmark } from '../components/HogaanWordmark';
 import { HomeIconMic, HomeIconSpark } from '../components/Icons';
 import { BottomNav, DesktopSidebar, type Tab } from '../components/Nav';
@@ -67,9 +98,18 @@ interface Props {
   showPracticeCaption?: boolean;
   onCompose: (seed: string | null) => void;
   onNav: (t: Tab) => void;
+  /** P2.1 — open Moments (shown only when the feature is on). */
+  onOpenMoments?: () => void;
 }
 
-export function Home({ user, practices, showPracticeCaption = false, onCompose, onNav }: Props) {
+export function Home({
+  user,
+  practices,
+  showPracticeCaption = false,
+  onCompose,
+  onNav,
+  onOpenMoments,
+}: Props) {
   const name = user.name || 'friend';
   const hour = new Date().getHours();
   const greeting = useMemo(() => greetingFor(name, hour), [name, hour]);
@@ -126,6 +166,8 @@ export function Home({ user, practices, showPracticeCaption = false, onCompose, 
                 →
               </button>
             </div>
+
+            {onOpenMoments !== undefined && <MomentsNudge onOpen={onOpenMoments} />}
 
             <div className="hm-section-h">You might want to explore</div>
             <div className="hm-chips">

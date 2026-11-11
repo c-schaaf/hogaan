@@ -13,7 +13,9 @@ import type { AppConfig } from '../shared/secrets/config.js';
 import { DEMO_SUPABASE_USER_ID } from '../web-api/supabase-session.js';
 import { KNOWLEDGE_DIGEST_PLACEHOLDER } from '../libraries/knowledge-digest.js';
 import { runBriefUpdate } from '../leader-context/updater.js';
-import { recordExtractedMoments } from '../moments/store.js';
+import { createMoment, recordExtractedMoments } from '../moments/store.js';
+import { setPrefs } from '../shared/email/proactive.js';
+import { scheduleWeeklyNudge } from '../jobs/phase2-handlers.js';
 import { isEnabled } from '../shared/flags/index.js';
 
 /**
@@ -142,6 +144,33 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
         await recordExtractedMoments(config, db, userId, sessionId, res.moments ?? []);
       }
     }
+  }
+  // P2 — Amina opted in to check-ins; one moment is ready for a follow-up
+  // and reflection, one is coming up.
+  if (isEnabled(config, 'followUpEmail') || isEnabled(config, 'weeklyNudge')) {
+    await setPrefs(db, userId, {
+      followupEmailOptIn: isEnabled(config, 'followUpEmail'),
+      weeklyNudgeOptIn: isEnabled(config, 'weeklyNudge'),
+    });
+    if (isEnabled(config, 'weeklyNudge')) await scheduleWeeklyNudge(db, userId);
+  }
+  if (isEnabled(config, 'moments')) {
+    const yesterday = new Date(Date.now() - DAY);
+    yesterday.setHours(14, 0, 0, 0);
+    await createMoment(config, db, userId, {
+      what: 'Headcount conversation',
+      withWhom: 'my director',
+      happensAt: yesterday,
+      source: 'leader',
+    });
+    const soon = new Date(Date.now() + 2 * DAY);
+    soon.setHours(10, 0, 0, 0);
+    await createMoment(config, db, userId, {
+      what: 'Deadline check-in with senior analyst',
+      withWhom: 'a senior analyst on my team',
+      happensAt: soon,
+      source: 'leader',
+    });
   }
   return { userId };
 }

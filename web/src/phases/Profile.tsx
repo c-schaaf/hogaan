@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { HogaanWordmark } from '../components/HogaanWordmark';
 import { PrIconEdit } from '../components/Icons';
 import { BottomNav, DesktopSidebar, type Tab } from '../components/Nav';
-import { api } from '../lib/api';
+import { api, type Prefs } from '../lib/api';
 import { useFeatures } from '../lib/features';
 import { TWELVE_PRACTICES } from './onboarding/data';
 
@@ -99,6 +99,57 @@ function PracticesView({
   );
 }
 
+// P2.2 / P2.6 — explicit opt-in for proactive email (D4).
+function EmailCheckIns({ followUp, nudge }: { followUp: boolean; nudge: boolean }) {
+  const [prefs, setPrefs] = useState<Prefs | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    api.preferences
+      .get()
+      .then(setPrefs)
+      .catch(() => setError("We couldn't load your email settings."));
+  }, []);
+  const toggle = (key: 'followupEmailOptIn' | 'weeklyNudgeOptIn', value: boolean) => {
+    api.preferences
+      .patch({ [key]: value })
+      .then(setPrefs)
+      .catch(() => setError("That didn't save. Please try again."));
+  };
+  return (
+    <ProfileCard title="Email check-ins">
+      <p className="pr-card-note">
+        Off unless you turn them on. At most two emails a week, never at night in your timezone, and
+        every email has a one-click unsubscribe.
+      </p>
+      {prefs !== null && followUp && (
+        <label className="pr-field" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="checkbox"
+            checked={prefs.followupEmailOptIn}
+            onChange={(e) => toggle('followupEmailOptIn', e.target.checked)}
+          />
+          <span>After a conversation you prepared for, ask me how it went</span>
+        </label>
+      )}
+      {prefs !== null && nudge && (
+        <label className="pr-field" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="checkbox"
+            checked={prefs.weeklyNudgeOptIn}
+            onChange={(e) => toggle('weeklyNudgeOptIn', e.target.checked)}
+          />
+          <span>Send me one reflection question each week</span>
+        </label>
+      )}
+      {error !== null && (
+        <div role="alert" style={{ marginTop: 6, fontSize: 12, color: '#c0392b' }}>
+          {error}
+        </div>
+      )}
+    </ProfileCard>
+  );
+}
+
 interface Props {
   user: { name: string; email: string };
   practices?: string[];
@@ -106,9 +157,18 @@ interface Props {
   onNav: (t: Tab) => void;
   /** P1.3 — open "What Hogaan knows about you". */
   onOpenContext?: () => void;
+  /** P2.1 — open Moments. */
+  onOpenMoments?: () => void;
 }
 
-export function Profile({ user, practices = [], onSignOut, onNav, onOpenContext }: Props) {
+export function Profile({
+  user,
+  practices = [],
+  onSignOut,
+  onNav,
+  onOpenContext,
+  onOpenMoments,
+}: Props) {
   const features = useFeatures();
   const [fullName, setFullName] = useState(user.name || '');
   const [email, setEmail] = useState(user.email || '');
@@ -355,6 +415,25 @@ export function Profile({ user, practices = [], onSignOut, onNav, onOpenContext 
                       you. You can change or delete any of it.
                     </p>
                   </ProfileCard>
+                )}
+
+                {features.moments && onOpenMoments !== undefined && (
+                  <ProfileCard
+                    title="Moments"
+                    action={
+                      <button type="button" className="pr-card-action" onClick={onOpenMoments}>
+                        Open
+                      </button>
+                    }
+                  >
+                    <p className="pr-card-note">
+                      Conversations you are preparing for, and your reflections afterwards.
+                    </p>
+                  </ProfileCard>
+                )}
+
+                {(features.followUpEmail || features.weeklyNudge) && (
+                  <EmailCheckIns followUp={features.followUpEmail} nudge={features.weeklyNudge} />
                 )}
 
                 <ProfileCard title="Support">

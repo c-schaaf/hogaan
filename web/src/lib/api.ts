@@ -40,6 +40,7 @@ export interface SessionDetail {
     userMessage: string;
     responseText: string | null;
     createdAt: string;
+    rating?: 'helpful' | 'not_helpful';
   }[];
 }
 
@@ -222,6 +223,34 @@ export interface LeaderBrief {
   updatedBy: string;
 }
 
+// ---- P2 moments, reflections, ratings, email preferences ----------------
+export type HowItWent = 'well' | 'mixed' | 'hard';
+export interface Moment {
+  id: string;
+  what: string;
+  withWhom: string | null;
+  happensAt: string | null;
+  status: 'upcoming' | 'reflected' | 'dismissed';
+  source: 'conversation' | 'leader' | 'assistant';
+  followupSentAt: string | null;
+  createdAt: string;
+  outcome: { howItWent: HowItWent; differently: string | null; createdAt: string } | null;
+}
+export interface Prefs {
+  followupEmailOptIn: boolean;
+  weeklyNudgeOptIn: boolean;
+  unsubscribedAll: boolean;
+  quietStartHour: number;
+  quietEndHour: number;
+}
+export interface DemoEmail {
+  to: string;
+  subject: string;
+  text: string;
+  kind: string;
+  at: string;
+}
+
 export const api = {
   // SCRUM — `api.turn` (non-streaming) and its /api/chat/turn route were
   // removed in SCRUM-43. The wrapper lingered in the client SDK and was
@@ -267,6 +296,35 @@ export const api = {
   },
   demo: {
     runJobs: () => call<{ ran: number }>('/api/demo/run-jobs', { method: 'POST' }),
+    outbox: () => call<{ emails: DemoEmail[] }>('/api/demo/outbox'),
+  },
+  moments: {
+    list: () => call<{ moments: Moment[] }>('/api/moments'),
+    create: (body: { what: string; withWhom?: string; happensAt?: string | null }) =>
+      call<Moment>('/api/moments', { method: 'POST', body }),
+    update: (id: string, body: { happensAt?: string | null; status?: 'upcoming' | 'dismissed' }) =>
+      call<Moment>(`/api/moments/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+    del: (id: string) =>
+      call<{ ok: true }>(`/api/moments/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    reflect: (
+      id: string,
+      body: {
+        howItWent: HowItWent;
+        differently?: string;
+        confidenceBefore?: number;
+        confidenceAfter?: number;
+      },
+    ) => call<Moment>(`/api/moments/${encodeURIComponent(id)}/outcome`, { method: 'POST', body }),
+  },
+  rateTurn: (turnId: string, rating: 'helpful' | 'not_helpful', note?: string) =>
+    call<{ ok: true }>(`/api/turns/${encodeURIComponent(turnId)}/rating`, {
+      method: 'POST',
+      body: { rating, ...(note !== undefined ? { note } : {}) },
+    }),
+  preferences: {
+    get: () => call<Prefs>('/api/preferences'),
+    patch: (body: Partial<Pick<Prefs, 'followupEmailOptIn' | 'weeklyNudgeOptIn'>>) =>
+      call<Prefs>('/api/preferences', { method: 'PATCH', body }),
   },
   profile: {
     get: () => call<MeResponse>('/api/profile'),

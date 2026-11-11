@@ -25,7 +25,16 @@ const schemaDir = path.join(repoRoot, 'src', 'shared', 'db', 'schema');
  * to a new migration.
  */
 const BASELINE_RLS_TABLES = ['memories', 'sessions', 'turns', 'users'];
-const CONTEXT_BUILD_RLS_TABLES = ['background_jobs', 'leader_briefs'];
+const CONTEXT_BUILD_RLS_TABLES = [
+  'background_jobs',
+  'leader_briefs',
+  // 0019
+  'email_sends',
+  'moment_outcomes',
+  'moments',
+  'notification_prefs',
+  'turn_ratings',
+];
 
 const DOCUMENTED_RLS_EXCLUSIONS = new Set<string>(['audit_log', 'prompt_logs']);
 
