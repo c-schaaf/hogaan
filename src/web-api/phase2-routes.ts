@@ -23,6 +23,8 @@ import {
 import { isEnabled } from '../shared/flags/index.js';
 import { stripPii } from '../shared/pii/filter.js';
 import { featureOff } from './context-routes.js';
+import { hasCapability } from '../entitlements/index.js';
+import { extractMeetingInsights, MAX_NOTES_CHARS } from '../meeting-notes/extract.js';
 import type { WebApiRoutesOpts } from './routes.js';
 import { requireSupabaseSession } from './supabase-session.js';
 
@@ -256,6 +258,30 @@ export function registerPhase2Routes(app: FastifyInstance, opts: WebApiRoutesOpt
     async (req, reply) => {
       const ok = await unsubscribe(req.query.u, req.query.t);
       return reply.code(ok ? 200 : 400).send({ ok });
+    },
+  );
+
+  // P6.2 — paste meeting notes, get suggested insights. Nothing is stored:
+  // the body is not logged (see the route config) and never persisted.
+  app.post<{ Body: { notes?: unknown } }>(
+    '/api/meeting-notes/insights',
+    { logLevel: 'warn' },
+    async (req, reply) => {
+      if (featureOff(reply, opts, 'meetingNotes')) return;
+      const s = await requireSupabaseSession(req, reply, opts, 'E1_MeetingNotes');
+      if (s === null) return;
+      if (!(await hasCapability(opts.config, opts.db, s.userId, 'connections'))) {
+        return reply.code(402).send({ error: 'upgrade_required', capability: 'connections' });
+      }
+      const notes = typeof req.body?.notes === 'string' ? req.body.notes : '';
+      if (notes.trim().length < 20) return reply.code(400).send({ error: 'notes_too_short' });
+      if (notes.length > MAX_NOTES_CHARS) return reply.code(400).send({ error: 'notes_too_long' });
+      try {
+        const insights = await extractMeetingInsights(opts.config, notes);
+        return reply.send({ insights, stored: false });
+      } catch {
+        return reply.code(503).send({ error: 'unavailable' });
+      }
     },
   );
 

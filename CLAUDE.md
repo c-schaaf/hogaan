@@ -76,7 +76,18 @@ src/
 ├── identity/          # Supabase JWT validation + audit log (fail-CLOSED)
 ├── memory/            # pgvector read/write
 ├── libraries/         # Voice rules + framework content (Hamse-owned)
-└── shared/            # LLM wrappers, DB, Redis, observability, types, trace
+├── shared/            # LLM wrappers, DB, Redis, observability, types, trace,
+│                      #   pii/ (D2 filter), flags/, email/proactive.ts, db/embedded.ts
+├── leader-context/    # P1 leader brief: store (encrypted), render, background updater
+├── moments/           # P2 moments + outcomes (reflections)
+├── jobs/              # P2.5 Postgres-backed background job runner + handlers
+├── mcp/               # P3 Hogaan MCP server (tokens, tools, prompts)
+├── entitlements/      # P4 the one place plans/capabilities are decided
+├── billing/           # P4 Stripe checkout, portal, webhooks
+├── orgs/              # P5 organizations, cohorts, invites, funder report
+├── meeting-notes/     # P6.2 notes -> insights (notes never stored)
+├── eval/              # P0.4 coaching eval set + rubric (pnpm eval:coaching)
+└── demo/              # pnpm demo: embedded DB + seeded sample leader (never prod)
 
 web/src/               # React SPA — auth, onboarding, chat, profile, sessions
 ```
@@ -220,6 +231,9 @@ pnpm lint             # ESLint + Prettier
 pnpm typecheck        # tsc --noEmit
 pnpm db:migrate       # Supabase / Drizzle migrations
 pnpm build            # production build
+pnpm demo             # run the whole app with no accounts (embedded DB, sample leader)
+pnpm eval:coaching    # coaching-quality eval (needs ANTHROPIC_API_KEY; --scripted to test harness)
+npx tsc -p web/tsconfig.json --noEmit   # NOTE: `pnpm typecheck` does not cover web/
 ```
 
 ## Ask before doing

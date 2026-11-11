@@ -74,3 +74,23 @@ when the leader opts out or unsubscribes. Counts toward the 2-a-week cap.
 - `src/shared/email/proactive.ts`, `src/shared/email/resend.ts`
 - `src/web-api/phase2-routes.ts`
 - `drizzle/0019_moments_and_feedback.sql`
+
+## Meeting notes into a reflection (P6.2)
+
+**Flag:** `FEATURE_MEETING_NOTES` (default off). Requires the `connections`
+capability when billing is on.
+
+```
+[leader pastes notes on /moments or after a reflection]
+        │ POST /api/meeting-notes/insights {notes ≤ 20,000 chars}
+        ▼
+[extractMeetingInsights] PII filter → background model (structured JSON)
+        │ ≤ 5 insights about the leader, own words, others by role
+        │ PII filter again on the way out
+        ▼
+[response {insights, stored: false}]  — the notes are never persisted or logged
+        ▼
+[leader ticks which to keep] → POST /api/brief/lines (normal, filtered path)
+```
+
+Key file: `src/meeting-notes/extract.ts`.

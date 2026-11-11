@@ -427,6 +427,11 @@ export const api = {
     report: (cohortId: string) =>
       call<ReportResponse>(`/api/cohorts/${encodeURIComponent(cohortId)}/report`),
   },
+  meetingInsights: (notes: string) =>
+    call<{ insights: string[]; stored: false }>('/api/meeting-notes/insights', {
+      method: 'POST',
+      body: { notes },
+    }),
   rateTurn: (turnId: string, rating: 'helpful' | 'not_helpful', note?: string) =>
     call<{ ok: true }>(`/api/turns/${encodeURIComponent(turnId)}/rating`, {
       method: 'POST',

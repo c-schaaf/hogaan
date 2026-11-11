@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { Card, ErrorLine, PageFrame } from '../components/PageFrame';
 import type { Tab } from '../components/Nav';
 import { api, type HowItWent, type Moment } from '../lib/api';
+import { useFeatures } from '../lib/features';
+import { MeetingNotesPanel } from '../components/MeetingNotesPanel';
 
 const OPTIONS: [HowItWent, string][] = [
   ['well', 'It went well'],
@@ -26,6 +28,7 @@ export function Reflect({
   const [differently, setDifferently] = useState('');
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const features = useFeatures();
 
   useEffect(() => {
     api.moments
@@ -118,6 +121,7 @@ export function Reflect({
           )}
         </Card>
       )}
+      {saved && features.meetingNotes && <MeetingNotesPanel />}
     </PageFrame>
   );
 }

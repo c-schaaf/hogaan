@@ -4,6 +4,7 @@ import { Card, ErrorLine, PageFrame } from '../components/PageFrame';
 import type { Tab } from '../components/Nav';
 import { api, type DemoEmail, type Moment } from '../lib/api';
 import { useFeatures } from '../lib/features';
+import { MeetingNotesPanel } from '../components/MeetingNotesPanel';
 
 function fmt(iso: string | null): string {
   if (iso === null) return 'Date not set';
@@ -205,6 +206,7 @@ export function Moments({
           ))}
         </Card>
       )}
+      {features.meetingNotes && <MeetingNotesPanel />}
       {features.demoMode && (
         <section className="pr-card demo-panel" style={{ marginBottom: 16 }}>
           <header className="pr-card-head">
