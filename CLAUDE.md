@@ -54,7 +54,7 @@ process. A code change to a process without its BPMN diff fails gate G5.
 Node 22 LTS · TypeScript strict · Fastify · React 18 + Vite · Render (host) ·
 Supabase Postgres + pgvector · Supabase Auth · Upstash Redis · Anthropic Claude
 Haiku 4.5 (coaching) · Llama 3.3 70B on Groq (fallback) · Voyage
-`voyage-3-lite` (embeddings, 1024-dim) · Resend (transactional email) · Sentry
+`voyage-3` (embeddings, 1024-dim; originally specced as voyage-3-lite, which cannot emit 1024 dims) · Resend (transactional email) · Sentry
 · Axiom · BetterStack.
 
 ## Module layout

@@ -1,7 +1,16 @@
 # 04 — Memory Recall + Store
 
 **Status:** living contract — update in the same PR that changes this process.
-**Last reviewed:** 2026-05-19 (path fixups for memory/{read,write}.ts).
+**Last reviewed:** 2026-11-11 (P0.3 — recorded that this process is switched off).
+
+> **Current state: OFF.** Recall is disabled on the live chat path
+> (`src/web-api/routes.ts` passes `memoryTopN: 0`, so no Voyage call and no
+> pgvector search happens) and the store path below has **no caller** —
+> `src/memory/write.ts` is never invoked. The diagrams describe the designed
+> process, not what runs today. Model is `voyage-3` (1024-dim), not
+> `voyage-3-lite`. The table is `memories`, not `memory_embeddings`. See the
+> leader-brief process in BPMN 02 (Phase 1 of the context build plan) for the
+> replacement primary memory mechanism.
 
 ## Purpose
 
@@ -17,7 +26,7 @@ user asks something new.
 [user message arrives in the coaching turn]
         │
         ▼
-[Voyage embed the user message] (voyage-3-lite, 1024-dim)
+[Voyage embed the user message] (voyage-3, 1024-dim)
         │
         ▼
 [pgvector cosine-similarity search on memory_embeddings table]
@@ -71,7 +80,7 @@ user asks something new.
 - `src/memory/write.ts` — embed + insert
 - `src/prompt-assembly/blocks.ts` — `buildMemoryBlock`
 - `src/shared/llm/voyage.ts` — Voyage embeddings wrapper
-- `src/shared/db/schema/memory.ts`
+- `src/shared/db/schema/memories.ts`
 
 ## Known issues
 
