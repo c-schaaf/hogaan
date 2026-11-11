@@ -44,6 +44,7 @@ export async function wireWebStatic(
     const url = req.url.split('?')[0] ?? '/';
     if (
       url.startsWith('/api/') ||
+      url === '/mcp' ||
       url.startsWith('/webhooks/') ||
       url.startsWith('/portal/') ||
       url.startsWith('/auth/') ||

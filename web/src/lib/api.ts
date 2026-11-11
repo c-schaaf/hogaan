@@ -251,6 +251,13 @@ export interface DemoEmail {
   at: string;
 }
 
+export interface McpToken {
+  id: string;
+  label: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
 export const api = {
   // SCRUM — `api.turn` (non-streaming) and its /api/chat/turn route were
   // removed in SCRUM-43. The wrapper lingered in the client SDK and was
@@ -315,6 +322,16 @@ export const api = {
         confidenceAfter?: number;
       },
     ) => call<Moment>(`/api/moments/${encodeURIComponent(id)}/outcome`, { method: 'POST', body }),
+  },
+  mcp: {
+    list: () => call<{ allowed: boolean; tokens: McpToken[] }>('/api/mcp/tokens'),
+    create: (label: string) =>
+      call<{ id: string; token: string; serverUrl: string }>('/api/mcp/tokens', {
+        method: 'POST',
+        body: { label },
+      }),
+    revoke: (id: string) =>
+      call<{ ok: true }>(`/api/mcp/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   },
   rateTurn: (turnId: string, rating: 'helpful' | 'not_helpful', note?: string) =>
     call<{ ok: true }>(`/api/turns/${encodeURIComponent(turnId)}/rating`, {

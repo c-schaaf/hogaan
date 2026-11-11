@@ -4,6 +4,7 @@ import { PrIconEdit } from '../components/Icons';
 import { BottomNav, DesktopSidebar, type Tab } from '../components/Nav';
 import { api, type Prefs } from '../lib/api';
 import { useFeatures } from '../lib/features';
+import { AssistantConnect } from '../components/AssistantConnect';
 import { TWELVE_PRACTICES } from './onboarding/data';
 
 interface CardProps {
@@ -435,6 +436,8 @@ export function Profile({
                 {(features.followUpEmail || features.weeklyNudge) && (
                   <EmailCheckIns followUp={features.followUpEmail} nudge={features.weeklyNudge} />
                 )}
+
+                {features.mcp && <AssistantConnect />}
 
                 <ProfileCard title="Support">
                   <div className="pr-sup">

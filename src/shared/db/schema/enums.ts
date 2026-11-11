@@ -34,4 +34,4 @@ export const libraryName = pgEnum('library_name', [
  * Postgres enum for append-only audit history compliance (CLAUDE.md hard
  * rule #3), but new writers may only use the values declared here.
  */
-export const triggerSource = pgEnum('trigger_source', ['web_session', 'web_signup']);
+export const triggerSource = pgEnum('trigger_source', ['web_session', 'web_signup', 'mcp']);

@@ -36,8 +36,10 @@ export function installModelStub(): ModelStub {
             },
           });
         }
+        const wantsJson =
+          (params['output_config'] as { format?: unknown } | undefined)?.format !== undefined;
         return Promise.resolve({
-          content: [{ type: 'text', text: JSON.stringify(json) }],
+          content: [{ type: 'text', text: wantsJson ? JSON.stringify(json) : reply }],
           usage: { input_tokens: 10, output_tokens: 5 },
           stop_reason: 'end_turn',
         });

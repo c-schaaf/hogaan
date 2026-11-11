@@ -34,6 +34,8 @@ const CONTEXT_BUILD_RLS_TABLES = [
   'moments',
   'notification_prefs',
   'turn_ratings',
+  // 0020
+  'mcp_tokens',
 ];
 
 const DOCUMENTED_RLS_EXCLUSIONS = new Set<string>(['audit_log', 'prompt_logs']);
