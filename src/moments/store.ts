@@ -43,16 +43,21 @@ export interface MomentView {
 const MAX_WHAT = 160;
 const MAX_WHO = 60;
 
-function dedupeHash(what: string): string {
-  return createHash('sha256')
-    .update(
-      what
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, ' ')
-        .trim(),
-    )
-    .digest('hex')
-    .slice(0, 32);
+/** Same "what" on a different day is a different moment (e.g. a recurring 1:1). */
+function dedupeHash(what: string, happensAt: Date | null | undefined): string {
+  const day =
+    happensAt !== null && happensAt !== undefined
+      ? happensAt.toISOString().slice(0, 10)
+      : 'undated';
+  const norm = what
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  return createHash('sha256').update(`${norm}|${day}`).digest('hex').slice(0, 32);
+}
+
+export function cleanMomentText(text: string): string {
+  return clean(text, MAX_WHAT);
 }
 
 function clean(text: string, max: number): string {
@@ -83,7 +88,7 @@ export async function createMoment(
       withWhomEncrypted: who.length > 0 ? encryptPlaintext(config, who) : null,
       happensAt: input.happensAt ?? null,
       source: input.source,
-      dedupeHash: dedupeHash(what),
+      dedupeHash: dedupeHash(what, input.happensAt),
     })
     .onConflictDoNothing()
     .returning({ id: moments.id });

@@ -5,6 +5,7 @@ import { getApprovedDigest } from '../libraries/knowledge-digest.js';
 import { renderBriefBlock } from '../leader-context/render.js';
 import { appendLine, getBrief } from '../leader-context/store.js';
 import {
+  cleanMomentText,
   createMoment,
   getMoment,
   listMoments,
@@ -227,9 +228,10 @@ export function buildMcpServer(deps: McpDeps): McpServer {
           const m = await createMoment(config, db, userId, { what, source: 'assistant' });
           id = m?.id ?? null;
           if (id === null) {
-            const existing = (await listMoments(config, db, userId)).find(
-              (x) => x.what.toLowerCase() === what.toLowerCase(),
-            );
+            const wanted = cleanMomentText(what).toLowerCase();
+            const existing = (await listMoments(config, db, userId))
+              .filter((x) => x.status === 'upcoming' && x.outcome === null)
+              .find((x) => x.what.toLowerCase() === wanted);
             id = existing?.id ?? null;
           }
         }

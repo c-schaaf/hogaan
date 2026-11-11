@@ -143,9 +143,10 @@ export function loadConfig(): AppConfig {
 
   const demoRaw = readOptional('DEMO_MODE');
   const demoMode = demoRaw === 'true' || demoRaw === '1';
-  if (demoMode && nodeEnvRaw === 'production') {
-    // Hard stop: demo mode bypasses sign-in. It must never run in production.
-    throw new ConfigError('DEMO_MODE cannot be enabled when NODE_ENV=production');
+  if (demoMode && nodeEnvRaw !== 'development' && nodeEnvRaw !== 'test') {
+    // Hard stop: demo mode bypasses sign-in. It must never run in production
+    // (or on a shared staging server, where its fixed demo key is public).
+    throw new ConfigError(`DEMO_MODE cannot be enabled when NODE_ENV=${nodeEnvRaw}`);
   }
 
   const chatModelRaw = readOptional('LLM_CHAT_MODEL') ?? 'claude-haiku-4-5';

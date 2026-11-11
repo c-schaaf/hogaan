@@ -163,7 +163,7 @@ export function registerOrgRoutes(app: FastifyInstance, opts: WebApiRoutesOpts):
       return reply.send({
         cohortName: r.name,
         suppressed: true,
-        reason: `Reports are only shown for cohorts of at least ${MIN_REPORT_GROUP} leaders, to protect privacy.`,
+        reason: `Reports are only shown for verified programs, and only once at least ${MIN_REPORT_GROUP} leaders in the cohort have used Hogaan, to protect privacy.`,
       });
     }
     return reply.send({ cohortName: r.name, suppressed: false, report: r.report });

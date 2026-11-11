@@ -107,63 +107,114 @@ function periodEnd(sub: Stripe.Subscription): Date | null {
   return typeof ts === 'number' ? new Date(ts * 1000) : null;
 }
 
-export type HandleResult = 'handled' | 'duplicate' | 'ignored';
+export type HandleResult = 'handled' | 'duplicate' | 'ignored' | 'stale';
 
-export async function handleStripeEvent(db: Database, event: Stripe.Event): Promise<HandleResult> {
-  const fresh = await db
-    .insert(billingEvents)
-    .values({ eventId: event.id, type: event.type })
-    .onConflictDoNothing()
-    .returning({ id: billingEvents.eventId });
-  if (fresh[0] === undefined) return 'duplicate';
+/**
+ * Applies one verified Stripe event. Safety rules (from the build's
+ * security review):
+ *   - The ledger row and the subscription change commit together in ONE
+ *     transaction, so a failed update is retried by Stripe instead of being
+ *     recorded as done.
+ *   - Stripe does not guarantee order: an event older than the newest one
+ *     already applied for that leader is ignored ('stale').
+ *   - checkout.session.completed grants nothing unless payment_status is
+ *     'paid'; subscription events grant Personal only for the configured
+ *     Personal price (when STRIPE_PRICE_PERSONAL is set).
+ */
+export async function handleStripeEvent(
+  db: Database,
+  event: Stripe.Event,
+  opts: { personalPriceId?: string | undefined } = {},
+): Promise<HandleResult> {
+  const at = new Date(event.created * 1000);
+  return db.transaction(async (tx) => {
+    const fresh = await tx
+      .insert(billingEvents)
+      .values({ eventId: event.id, type: event.type })
+      .onConflictDoNothing()
+      .returning({ id: billingEvents.eventId });
+    if (fresh[0] === undefined) return 'duplicate';
 
-  switch (event.type) {
-    case 'checkout.session.completed': {
-      const s = event.data.object;
-      if (s.mode !== 'subscription' || s.client_reference_id === null) return 'ignored';
-      const values = {
-        userId: s.client_reference_id,
-        plan: 'personal',
-        status: 'active',
-        stripeCustomerId: idOf(s.customer),
-        stripeSubscriptionId: idOf(s.subscription),
-        cancelAtPeriodEnd: false,
-        updatedAt: new Date(),
-      };
-      await db
-        .insert(subscriptions)
-        .values(values)
-        .onConflictDoUpdate({ target: subscriptions.userId, set: values });
-      return 'handled';
+    const current = async (where: ReturnType<typeof eq>) =>
+      (
+        await tx
+          .select({ userId: subscriptions.userId, lastEventAt: subscriptions.lastEventAt })
+          .from(subscriptions)
+          .where(where)
+          .limit(1)
+      )[0];
+    const isStale = (last: Date | null | undefined) =>
+      last !== null && last !== undefined && last.getTime() > at.getTime();
+
+    switch (event.type) {
+      case 'checkout.session.completed': {
+        const s = event.data.object;
+        if (s.mode !== 'subscription' || s.client_reference_id === null) return 'ignored';
+        const row = await current(eq(subscriptions.userId, s.client_reference_id));
+        if (isStale(row?.lastEventAt)) return 'stale';
+        const paid = s.payment_status === 'paid';
+        const values = {
+          userId: s.client_reference_id,
+          plan: 'personal',
+          status: paid ? 'active' : 'incomplete',
+          stripeCustomerId: idOf(s.customer),
+          stripeSubscriptionId: idOf(s.subscription),
+          cancelAtPeriodEnd: false,
+          lastEventAt: at,
+          updatedAt: new Date(),
+        };
+        await tx
+          .insert(subscriptions)
+          .values(values)
+          .onConflictDoUpdate({ target: subscriptions.userId, set: values });
+        return 'handled';
+      }
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object;
+        const priceId = (sub.items?.data?.[0] as { price?: { id?: string } } | undefined)?.price
+          ?.id;
+        const wrongPrice =
+          opts.personalPriceId !== undefined &&
+          priceId !== undefined &&
+          priceId !== opts.personalPriceId;
+        const status =
+          event.type === 'customer.subscription.deleted'
+            ? 'canceled'
+            : wrongPrice
+              ? 'other_product'
+              : sub.status;
+        const set = {
+          status,
+          cancelAtPeriodEnd: sub.cancel_at_period_end,
+          currentPeriodEnd: periodEnd(sub),
+          stripeCustomerId: idOf(sub.customer),
+          lastEventAt: at,
+          updatedAt: new Date(),
+        };
+        const bySub = await current(eq(subscriptions.stripeSubscriptionId, sub.id));
+        if (bySub !== undefined) {
+          if (isStale(bySub.lastEventAt)) return 'stale';
+          await tx
+            .update(subscriptions)
+            .set(set)
+            .where(eq(subscriptions.stripeSubscriptionId, sub.id));
+          return 'handled';
+        }
+        const userId = sub.metadata?.['hogaanUserId'];
+        if (typeof userId !== 'string' || userId === '') return 'ignored';
+        const byUser = await current(eq(subscriptions.userId, userId));
+        if (isStale(byUser?.lastEventAt)) return 'stale';
+        const values = { userId, plan: 'personal', stripeSubscriptionId: sub.id, ...set };
+        await tx
+          .insert(subscriptions)
+          .values(values)
+          .onConflictDoUpdate({ target: subscriptions.userId, set: values });
+        return 'handled';
+      }
+      default:
+        return 'ignored';
     }
-    case 'customer.subscription.created':
-    case 'customer.subscription.updated':
-    case 'customer.subscription.deleted': {
-      const sub = event.data.object;
-      const status = event.type === 'customer.subscription.deleted' ? 'canceled' : sub.status;
-      const set = {
-        status,
-        cancelAtPeriodEnd: sub.cancel_at_period_end,
-        currentPeriodEnd: periodEnd(sub),
-        stripeCustomerId: idOf(sub.customer),
-        updatedAt: new Date(),
-      };
-      const updated = await db
-        .update(subscriptions)
-        .set(set)
-        .where(eq(subscriptions.stripeSubscriptionId, sub.id))
-        .returning({ userId: subscriptions.userId });
-      if (updated[0] !== undefined) return 'handled';
-      const userId = sub.metadata?.['hogaanUserId'];
-      if (typeof userId !== 'string' || userId === '') return 'ignored';
-      const values = { userId, plan: 'personal', stripeSubscriptionId: sub.id, ...set };
-      await db
-        .insert(subscriptions)
-        .values(values)
-        .onConflictDoUpdate({ target: subscriptions.userId, set: values });
-      return 'handled';
-    }
-    default:
-      return 'ignored';
-  }
+  });
 }

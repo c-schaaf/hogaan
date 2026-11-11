@@ -186,7 +186,7 @@ export function resolveDayWord(word: string, now = new Date()): string {
 }
 
 export interface BriefUpdateResult {
-  skipped?: 'private' | 'missing' | 'empty';
+  skipped?: 'private' | 'missing' | 'empty' | 'conflict';
   brief?: LeaderBrief;
   moments?: BriefModelOutput['moments'];
   model?: string;
@@ -252,9 +252,12 @@ export async function runBriefUpdate(
     scripted: () => scriptedBriefExtraction(rows, session.title),
   });
   const merged = mergeBrief(brief, value, surnames);
-  await saveBrief(config, db, input.userId, merged, {
+  const written = await saveBrief(config, db, input.userId, merged, {
     updatedBy: model === 'scripted-demo' ? 'scripted-demo' : `model:${model}`,
     lastSessionId: session.id,
+    // The leader may have edited or deleted lines while the model ran.
+    expectedVersion: brief.version,
   });
+  if (!written) return { skipped: 'conflict', moments: value.moments ?? [], model };
   return { brief: merged, moments: value.moments ?? [], model };
 }

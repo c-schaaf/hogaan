@@ -51,8 +51,9 @@ export class DemoRefusedError extends Error {
 
 /** Throws when demo mode must not run. Exported for the refusal test. */
 export function assertDemoAllowed(env: Record<string, string | undefined>): void {
-  if ((env['NODE_ENV'] ?? '').trim().toLowerCase() === 'production') {
-    throw new DemoRefusedError('Refusing to start demo mode: NODE_ENV is "production".');
+  const nodeEnv = (env['NODE_ENV'] ?? '').trim().toLowerCase();
+  if (nodeEnv === 'production' || nodeEnv === 'staging') {
+    throw new DemoRefusedError(`Refusing to start demo mode: NODE_ENV is "${nodeEnv}".`);
   }
 }
 

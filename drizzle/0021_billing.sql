@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS "subscriptions" (
   "stripe_subscription_id" text,
   "current_period_end" timestamp with time zone,
   "cancel_at_period_end" boolean DEFAULT false NOT NULL,
+  "last_event_at" timestamp with time zone,
   "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "subscriptions_plan_chk" CHECK ("plan" IN ('free', 'personal'))
 );

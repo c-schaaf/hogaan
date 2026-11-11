@@ -41,6 +41,14 @@ describe('D2 PII filter', () => {
     expect(stripPii(t)).toBe(t);
   });
 
+  it('review fix: surnames with inner capitals or apostrophes, and non-English letters', () => {
+    expect(stripPii("Sarah O'Brien and Sarah McDonald met the CEO at NASA.")).toBe(
+      'Sarah and Sarah met the CEO at NASA.',
+    );
+    expect(stripPii('Ali Ödegaard spoke', { knownSurnames: ['Ödegaard'] })).toBe('Ali spoke');
+    expect(stripPii('ödegaard alone', { knownSurnames: ['Ödegaard'] }).trim()).toBe('alone');
+  });
+
   it('derives surnames from a full name', () => {
     expect(surnamesFromFullName('Amina Farah')).toEqual(['Farah']);
     expect(surnamesFromFullName('Amina')).toEqual([]);

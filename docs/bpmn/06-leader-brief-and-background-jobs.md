@@ -43,7 +43,10 @@ lookup) at the start of each turn.
         │  (LLM_BACKGROUND_MODEL = claude-opus-5-5, structured JSON output)
         │  merge: leader lines + reflection lines untouched; fields only filled
         │  when empty; PII filter on every stored string
-        │  save (AES-256-GCM per document)
+        │  save (AES-256-GCM per document) ONLY IF the brief's version is still the
+        │  one read before the model call; otherwise skip (the leader edited meanwhile)
+        │  "delete everything" keeps an empty versioned record for the same reason
+        │  if the session got new turns while this ran → job re-armed (RescheduleJob)
         ▼
 [moments extracted from the same call → BPMN 07]
 ```

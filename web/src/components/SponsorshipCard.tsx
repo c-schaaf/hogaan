@@ -7,6 +7,7 @@ const JOIN_ERRORS: Record<string, string> = {
   invalid_code: 'That code did not work. Check it with your program.',
   cohort_full: 'That cohort is full.',
   cohort_ended: 'That cohort has ended.',
+  sponsor_cannot_join: "Sponsors can't join their own cohorts.",
 };
 
 export function SponsorshipCard({ onOpenSponsor }: { onOpenSponsor: () => void }) {

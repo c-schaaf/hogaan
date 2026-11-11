@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Database } from '../shared/db/client.js';
 import { decryptPlaintext, encryptPlaintext } from '../shared/db/encryption.js';
 import { leaderBriefs } from '../shared/db/schema/leader-briefs.js';
@@ -70,13 +70,19 @@ export function newLine(text: string, source: LineSource): BriefLine {
   return { id: randomUUID(), text, source, updatedAt: new Date().toISOString() };
 }
 
+/**
+ * Saves the brief. With `expectedVersion`, the write only happens if the
+ * stored version is still the one that was read (optimistic concurrency),
+ * so a slow background update can never overwrite an edit or a "delete
+ * everything" the leader made meanwhile. Returns false when it did not write.
+ */
 export async function saveBrief(
   config: AppConfig,
   db: Database,
   userId: string,
   brief: LeaderBrief,
-  meta: { updatedBy: string; lastSessionId?: string | null },
-): Promise<void> {
+  meta: { updatedBy: string; lastSessionId?: string | null; expectedVersion?: number },
+): Promise<boolean> {
   const capped: LeaderBrief = {
     ...brief,
     profile: brief.profile.slice(-MAX_LINES.profile),
@@ -94,14 +100,38 @@ export async function saveBrief(
     updatedAt: new Date(),
     ...(meta.lastSessionId !== undefined ? { lastSessionId: meta.lastSessionId } : {}),
   };
-  await db
-    .insert(leaderBriefs)
-    .values(values)
-    .onConflictDoUpdate({ target: leaderBriefs.userId, set: values });
+  if (meta.expectedVersion === undefined) {
+    await db
+      .insert(leaderBriefs)
+      .values(values)
+      .onConflictDoUpdate({ target: leaderBriefs.userId, set: values });
+    return true;
+  }
+  if (meta.expectedVersion === 0) {
+    const ins = await db
+      .insert(leaderBriefs)
+      .values(values)
+      .onConflictDoNothing()
+      .returning({ v: leaderBriefs.version });
+    return ins[0] !== undefined;
+  }
+  const upd = await db
+    .update(leaderBriefs)
+    .set(values)
+    .where(and(eq(leaderBriefs.userId, userId), eq(leaderBriefs.version, meta.expectedVersion)))
+    .returning({ v: leaderBriefs.version });
+  return upd[0] !== undefined;
 }
 
-export async function deleteBrief(db: Database, userId: string): Promise<void> {
-  await db.delete(leaderBriefs).where(eq(leaderBriefs.userId, userId));
+/**
+ * "Delete everything": wipes every line and field but keeps a versioned,
+ * empty record, so an in-flight background update cannot write old lines back.
+ */
+export async function deleteBrief(config: AppConfig, db: Database, userId: string): Promise<void> {
+  const current = await getBrief(config, db, userId);
+  const empty = emptyBrief();
+  empty.version = current.version;
+  await saveBrief(config, db, userId, empty, { updatedBy: 'leader' });
 }
 
 /** Find which document holds a line id. */

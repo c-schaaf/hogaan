@@ -62,7 +62,7 @@ export function scriptedCoachReply(
   const parts: string[] = [SCRIPTED_MARKER];
   if (messages.filter((m) => m.role === 'user').length === 1 && (openLoop ?? role) !== undefined) {
     parts.push(
-      `Good to see you again. Last time we left this open: ${openLoop ?? role}. Let's keep that in view.`,
+      `Good to see you again. Last time we left this open: ${(openLoop ?? role ?? '').replace(/^open loop:\s*/i, '')}. Let's keep that in view.`,
     );
   }
   parts.push(`What I'm hearing: "${paraphrase(last)}"`);

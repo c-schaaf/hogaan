@@ -15,7 +15,7 @@ import { DEMO_SUPABASE_USER_ID } from '../web-api/supabase-session.js';
 import { KNOWLEDGE_DIGEST_PLACEHOLDER } from '../libraries/knowledge-digest.js';
 import { runBriefUpdate } from '../leader-context/updater.js';
 import { createMoment, recordExtractedMoments, recordOutcome } from '../moments/store.js';
-import { createCohort, createInvite, createOrg, joinByCode } from '../orgs/store.js';
+import { createCohort, createInvite, createOrg, joinByCode, verifyOrg } from '../orgs/store.js';
 import { setPrefs } from '../shared/email/proactive.js';
 import { scheduleWeeklyNudge } from '../jobs/phase2-handlers.js';
 import { isEnabled } from '../shared/flags/index.js';
@@ -190,8 +190,9 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
       source: 'leader',
     });
   }
-  // P5 — a funder with two cohorts. In the demo Amina is both a member of
-  // the Fellows cohort and an admin of the funder, so both sides are visible.
+  // P5 — a verified funder with two cohorts. In the demo Amina is the
+  // funder's admin (sponsors may not join their own cohorts); the leader side
+  // is visible on her Profile ("Sponsored programs").
   if (isEnabled(config, 'orgs')) await seedOrgs(config, db, userId);
   return { userId };
 }
@@ -202,7 +203,7 @@ async function seedOrgs(config: AppConfig, db: Database, aminaId: string): Promi
   const pilot = await createCohort(db, org.id, { name: 'Spring pilot', seatLimit: 10 });
   const fellowsCode = await createInvite(db, fellows.id);
   const pilotCode = await createInvite(db, pilot.id);
-  await joinByCode(db, aminaId, fellowsCode);
+  await verifyOrg(db, org.id);
   const practices = ['Integrity', 'Empathy', 'Inclusion', 'Purpose', 'Accountability', 'Peace'];
   const outcomes = ['well', 'mixed', 'hard', 'well'] as const;
   for (let i = 0; i < 17; i++) {

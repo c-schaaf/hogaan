@@ -59,6 +59,9 @@ prompt from the existing `daily_prompts` library (read-only use), chosen
 by the leader's practices and the ISO week; re-arms itself weekly; stops
 when the leader opts out or unsubscribes. Counts toward the 2-a-week cap.
 
+Known limit: the weekly cap is checked then claimed, not atomically; two server
+instances sending to the same leader at the same instant could exceed it.
+
 ## Failure modes
 
 | Step | Failure | Behaviour |
@@ -67,6 +70,7 @@ when the leader opts out or unsubscribes. Counts toward the 2-a-week cap.
 | Send | Resend error | email_sends `failed`; job retried (backoff) then `failed` + P2 |
 | Send | cap / quiet hours | job rescheduled, not a failure |
 | Unsubscribe link | bad signature | 400 page, nothing changes |
+| Unsubscribe link | opened by a link scanner (GET) | shows a confirmation page only; the POST (button or the mail provider's one-click, form-encoded) unsubscribes |
 
 ## Key files
 

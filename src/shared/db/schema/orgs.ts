@@ -7,6 +7,8 @@ export const organizations = pgTable('organizations', {
   name: text('name').notNull(),
   /** funder | employer | program */
   kind: text('kind').notNull().default('funder'),
+  /** Set by Hogaan staff after vetting. Unverified orgs grant no seats and get no report. */
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

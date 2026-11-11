@@ -138,7 +138,7 @@ export function registerContextRoutes(app: FastifyInstance, opts: WebApiRoutesOp
     if (featureOff(reply, opts, 'leaderBrief')) return;
     const session = await requireSupabaseSession(req, reply, opts, 'E1_BriefDelete');
     if (session === null) return;
-    await deleteBrief(opts.db, session.userId);
+    await deleteBrief(opts.config, opts.db, session.userId);
     return reply.send({ ok: true });
   });
 

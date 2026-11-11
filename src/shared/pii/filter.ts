@@ -65,8 +65,11 @@ const NOT_A_SURNAME = new Set(
   ),
 );
 
-// A run of 2+ capitalized words separated by single spaces.
-const CAP_RUN_RE = /\p{Lu}[\p{Ll}'’-]+(?:\s+\p{Lu}[\p{Ll}'’-]+)+/gu;
+// A run of 2+ capitalized words separated by single spaces. A word may
+// contain more capitals and apostrophes (O'Brien, McDonald, DeShawn) but must
+// contain a lowercase letter, so acronyms (CEO, NASA) are not words here.
+const CAP_WORD = "\\p{Lu}(?=[\\p{L}'’-]*\\p{Ll})[\\p{L}'’-]+";
+const CAP_RUN_RE = new RegExp(`${CAP_WORD}(?:\\s+${CAP_WORD})+`, 'gu');
 
 function escapeRe(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -111,7 +114,11 @@ export function stripPii(text: string, opts: PiiFilterOptions = {}): string {
   for (const surname of opts.knownSurnames ?? []) {
     const s = surname.trim();
     if (s.length < 2) continue;
-    out = out.replace(new RegExp(`\\s*\\b${escapeRe(s)}\\b`, 'giu'), '');
+    // Unicode-aware word edges (\b is ASCII-only in JS, so "Ödegaard" needs this).
+    out = out.replace(
+      new RegExp(`\\s*(?<![\\p{L}\\p{N}])${escapeRe(s)}(?![\\p{L}\\p{N}])`, 'giu'),
+      '',
+    );
   }
   out = stripNameRuns(out);
   return out;

@@ -83,7 +83,9 @@ export function registerBillingRoutes(app: FastifyInstance, opts: WebApiRoutesOp
       } catch {
         return reply.code(400).send({ error: 'invalid_signature' });
       }
-      const result = await handleStripeEvent(opts.db, event);
+      const result = await handleStripeEvent(opts.db, event, {
+        personalPriceId: opts.config.stripePricePersonal,
+      });
       return reply.send({ received: true, result });
     });
     done();
@@ -119,6 +121,7 @@ export function registerBillingRoutes(app: FastifyInstance, opts: WebApiRoutesOp
                   client_reference_id: s.userId,
                   customer: 'cus_demo',
                   subscription: subId,
+                  payment_status: 'paid',
                 },
               },
             },
@@ -139,7 +142,11 @@ export function registerBillingRoutes(app: FastifyInstance, opts: WebApiRoutesOp
           : null;
     if (events === null) return reply.code(400).send({ error: 'invalid_action' });
     for (const e of events) {
-      const payload = JSON.stringify({ object: 'event', ...e });
+      const payload = JSON.stringify({
+        object: 'event',
+        created: Math.floor(Date.now() / 1000),
+        ...e,
+      });
       const event = verifyWebhook(
         opts.config,
         payload,

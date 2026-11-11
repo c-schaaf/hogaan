@@ -295,6 +295,7 @@ export interface AdminOrg {
   id: string;
   name: string;
   kind: string;
+  verified: boolean;
   cohorts: {
     id: string;
     name: string;

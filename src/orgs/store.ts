@@ -29,7 +29,7 @@ export const SPONSOR_STATEMENT = {
     'Anything you say to Hogaan, or any summary of it',
     'Your name, email, or anything that identifies you in the report',
     'Your notes, goals, moments or reflections',
-    'Any report at all for a cohort with fewer than 10 leaders',
+    'Any report at all for a cohort with fewer than 10 active leaders',
   ],
 };
 
@@ -87,6 +87,16 @@ export async function createOrg(
   return o;
 }
 
+/** Ops action (scripts/verify-org.ts): mark an organization as vetted. */
+export async function verifyOrg(db: Database, orgId: string): Promise<boolean> {
+  const r = await db
+    .update(organizations)
+    .set({ verifiedAt: new Date() })
+    .where(eq(organizations.id, orgId))
+    .returning({ id: organizations.id });
+  return r[0] !== undefined;
+}
+
 export async function createCohort(
   db: Database,
   orgId: string,
@@ -125,7 +135,7 @@ async function activeCount(db: Database, cohortId: string): Promise<number> {
 
 export type JoinResult =
   | { ok: true; cohortId: string; cohortName: string; orgName: string }
-  | { ok: false; reason: 'invalid_code' | 'cohort_full' | 'cohort_ended' };
+  | { ok: false; reason: 'invalid_code' | 'cohort_full' | 'cohort_ended' | 'sponsor_cannot_join' };
 
 export async function joinByCode(db: Database, userId: string, code: string): Promise<JoinResult> {
   const now = new Date();
@@ -151,6 +161,7 @@ export async function joinByCode(db: Database, userId: string, code: string): Pr
         seatLimit: cohorts.seatLimit,
         endsAt: cohorts.endsAt,
         orgName: organizations.name,
+        orgId: cohorts.orgId,
       })
       .from(cohorts)
       .innerJoin(organizations, eq(organizations.id, cohorts.orgId))
@@ -158,6 +169,8 @@ export async function joinByCode(db: Database, userId: string, code: string): Pr
       .limit(1)
   )[0]!;
   if (c.endsAt !== null && c.endsAt < now) return { ok: false, reason: 'cohort_ended' };
+  // A sponsor's own admins can never be counted as leaders in its cohorts.
+  if (await isOrgAdmin(db, userId, c.orgId)) return { ok: false, reason: 'sponsor_cannot_join' };
   const existing = (
     await db
       .select({ leftAt: cohortMembers.leftAt })
@@ -216,7 +229,12 @@ export async function myMemberships(db: Database, userId: string) {
 /** Organizations this user administers, with their cohorts and seat use. */
 export async function adminView(db: Database, userId: string) {
   const orgs = await db
-    .select({ id: organizations.id, name: organizations.name, kind: organizations.kind })
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      kind: organizations.kind,
+      verified: sql<boolean>`${organizations.verifiedAt} IS NOT NULL`,
+    })
     .from(organizations)
     .innerJoin(orgAdmins, eq(orgAdmins.orgId, organizations.id))
     .where(eq(orgAdmins.userId, userId));

@@ -22,12 +22,18 @@ to every leader of what their sponsor can and cannot see (P5.4).
           ticks "I have read…", enters code
           POST /api/cohorts/join {code, acknowledged: true}
             invalid / expired / full / ended → refused
-          active member of a cohort that has not ended = Sponsored plan (BPMN 09)
+          the sponsor's own admins cannot join their own cohorts
+          active member of a cohort that has not ended, in a VERIFIED org
+          (Hogaan staff run scripts/verify-org.ts after vetting) = Sponsored plan (BPMN 09)
           Leave any time → seat freed
         ▼
 [sponsor] GET /api/cohorts/:id/report (org admins only; others get 404)
           SELECT FROM analytics.cohort_report  ← D5 floor inside the view:
-            no row unless >= 10 leaders enrolled → API says "suppressed"
+            no row unless: org verified AND >= 10 enrolled (admins excluded)
+            AND >= 10 of them have had a coaching session since joining
+            → otherwise API says "suppressed"
+            Residual risk: a verified sponsor with 9+ real, active fake accounts
+            could isolate one leader; sponsor vetting is the control.
           GET …/report.csv  (same numbers); "Print or save as PDF" in the browser
 ```
 

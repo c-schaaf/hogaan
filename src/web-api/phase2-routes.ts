@@ -224,42 +224,65 @@ export function registerPhase2Routes(app: FastifyInstance, opts: WebApiRoutesOpt
     },
   );
 
-  // One-click unsubscribe from every proactive email. Signed link; works
-  // without signing in (RFC 8058 POST and a plain GET page).
-  const unsubscribe = async (u: unknown, t: unknown): Promise<boolean> => {
+  // Unsubscribe from every proactive email (signed link, no sign-in needed).
+  //   GET  shows a confirmation page with a button. It changes nothing, so
+  //        corporate link scanners that open every link cannot unsubscribe
+  //        people (security review finding).
+  //   POST does the unsubscribe. Mail providers' one-click unsubscribe
+  //        (RFC 8058) sends a form-encoded body, so this route accepts any
+  //        body type and ignores it.
+  const validLink = (u: unknown, t: unknown): u is string => {
     if (typeof u !== 'string' || typeof t !== 'string' || !UUID_RE.test(u)) return false;
-    let ok = false;
     try {
-      ok = verifyLink(opts.config, 'unsub', u, t);
+      return verifyLink(opts.config, 'unsub', u, t);
     } catch {
-      ok = false;
+      return false;
     }
-    if (!ok) return false;
-    await unsubscribeAll(opts.db, u);
-    await cancelJob(opts.db, `nudge:${u}`);
-    return true;
   };
-  app.get<{ Querystring: { u?: string; t?: string } }>(
-    '/api/email/unsubscribe',
-    async (req, reply) => {
-      const ok = await unsubscribe(req.query.u, req.query.t);
-      void reply.type('text/html; charset=utf-8');
+  const page = (body: string) =>
+    `<!doctype html><meta name="viewport" content="width=device-width"><title>Hogaan email check-ins</title><div style="font-family:system-ui;max-width:480px;margin:48px auto;padding:0 16px">${body}</div>`;
+  app.get<{ Querystring: { u?: string; t?: string } }>('/api/email/unsubscribe', (req, reply) => {
+    const { u, t } = req.query;
+    void reply.type('text/html; charset=utf-8');
+    if (!validLink(u, t)) {
       return reply
-        .code(ok ? 200 : 400)
+        .code(400)
         .send(
-          ok
-            ? '<!doctype html><meta name="viewport" content="width=device-width"><title>Unsubscribed</title><p style="font-family:system-ui;max-width:480px;margin:48px auto;padding:0 16px">You will not get any more check-in emails from Hogaan. You can turn them back on any time in your Profile.</p>'
-            : '<!doctype html><title>Link not valid</title><p style="font-family:system-ui;max-width:480px;margin:48px auto;padding:0 16px">This unsubscribe link is not valid. You can turn check-ins off in your Profile.</p>',
+          page(
+            '<p>This unsubscribe link is not valid. You can turn check-ins off in your Profile.</p>',
+          ),
         );
-    },
-  );
-  app.post<{ Querystring: { u?: string; t?: string } }>(
-    '/api/email/unsubscribe',
-    async (req, reply) => {
-      const ok = await unsubscribe(req.query.u, req.query.t);
-      return reply.code(ok ? 200 : 400).send({ ok });
-    },
-  );
+    }
+    const action = `/api/email/unsubscribe?u=${encodeURIComponent(u)}&t=${encodeURIComponent(String(t))}`;
+    return reply.send(
+      page(
+        `<p>Stop all check-in emails from Hogaan?</p><form method="post" action="${action}"><button type="submit" style="font:inherit;padding:8px 16px">Unsubscribe</button></form>`,
+      ),
+    );
+  });
+  void app.register((child, _o, done) => {
+    child.removeAllContentTypeParsers();
+    child.addContentTypeParser('*', { parseAs: 'buffer' }, (_req, _body, next) => next(null, {}));
+    child.post<{ Querystring: { u?: string; t?: string } }>(
+      '/api/email/unsubscribe',
+      async (req, reply) => {
+        const { u, t } = req.query;
+        if (!validLink(u, t)) return reply.code(400).send({ ok: false });
+        await unsubscribeAll(opts.db, u);
+        await cancelJob(opts.db, `nudge:${u}`);
+        if ((req.headers.accept ?? '').includes('text/html')) {
+          void reply.type('text/html; charset=utf-8');
+          return reply.send(
+            page(
+              '<p>Done. You will not get any more check-in emails from Hogaan. You can turn them back on any time in your Profile.</p>',
+            ),
+          );
+        }
+        return reply.send({ ok: true });
+      },
+    );
+    done();
+  });
 
   // P6.2 — paste meeting notes, get suggested insights. Nothing is stored:
   // the body is not logged (see the route config) and never persisted.

@@ -21,6 +21,12 @@ describe('demo mode can never run in production', () => {
     expect(() => loadConfig()).toThrow(/DEMO_MODE cannot be enabled/);
   });
 
+  it('review fix: demo mode is refused on staging too (its demo key is public)', () => {
+    process.env = { NODE_ENV: 'staging', PORT: '3000', LOG_LEVEL: 'info', DEMO_MODE: 'true' };
+    expect(() => loadConfig()).toThrow(ConfigError);
+    expect(() => assertDemoAllowed({ NODE_ENV: 'staging' })).toThrow(DemoRefusedError);
+  });
+
   it('loadConfig accepts DEMO_MODE outside production', () => {
     process.env = { NODE_ENV: 'development', PORT: '3000', LOG_LEVEL: 'info', DEMO_MODE: 'true' };
     expect(loadConfig().demoMode).toBe(true);

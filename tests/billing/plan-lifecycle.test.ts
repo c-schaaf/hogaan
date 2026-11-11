@@ -55,8 +55,10 @@ const chat = (sessionId?: string) =>
   });
 const sessionIdOf = (body: string) => (/"sessionId":"([0-9a-f-]{36})"/.exec(body) ?? [])[1]!;
 
+let clock = 1_790_000_000;
 async function webhook(event: Record<string, unknown>, secret = SECRET) {
-  const payload = JSON.stringify({ object: 'event', ...event });
+  clock += 60;
+  const payload = JSON.stringify({ object: 'event', created: clock, ...event });
   return app.inject({
     method: 'POST',
     url: '/api/billing/webhook',
@@ -126,6 +128,7 @@ describe('P4 Free -> Personal -> cancelled', () => {
               client_reference_id: current,
               customer: 'cus_123',
               subscription: 'sub_123',
+              payment_status: 'paid',
             },
           },
         })
@@ -170,6 +173,85 @@ describe('P4 Free -> Personal -> cancelled', () => {
     expect(b).toMatchObject({ plan: 'free', status: 'canceled' });
     expect((await chat()).statusCode).toBe(402);
     expect(await hasCapability(config, edb.db, current, 'mcp')).toBe(false);
+  });
+
+  it('out-of-order delivery: an older event arriving late cannot revive a cancelled plan', async () => {
+    const payload = JSON.stringify({
+      object: 'event',
+      id: 'evt_late',
+      created: 1_790_000_001, // older than everything applied so far
+      type: 'customer.subscription.updated',
+      data: { object: sub('active') },
+    });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/billing/webhook',
+      headers: {
+        'content-type': 'application/json',
+        'stripe-signature': signTestPayload(payload, SECRET),
+      },
+      payload,
+    });
+    expect(res.json()).toMatchObject({ result: 'stale' });
+    expect((await app.inject({ url: '/api/billing' })).json()).toMatchObject({ plan: 'free' });
+  });
+
+  it('an unpaid checkout grants nothing', async () => {
+    const other = await insertLeader(config, edb.db);
+    await webhook({
+      id: 'evt_unpaid',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          object: 'checkout.session',
+          mode: 'subscription',
+          client_reference_id: other,
+          customer: 'cus_x',
+          subscription: 'sub_x',
+          payment_status: 'unpaid',
+        },
+      },
+    });
+    const { planFor } = await import('../../src/entitlements/index.js');
+    expect(await planFor(config, edb.db, other)).toBe('free');
+  });
+
+  it('a subscription to a different price does not grant Personal', async () => {
+    const priced = demoTestConfig({
+      stripeWebhookSecret: SECRET,
+      stripePricePersonal: 'price_personal',
+    });
+    const pricedApp = await buildRealApp(priced, edb.db);
+    const other = await insertLeader(config, edb.db);
+    clock += 60;
+    const payload = JSON.stringify({
+      object: 'event',
+      id: 'evt_price',
+      created: clock,
+      type: 'customer.subscription.updated',
+      data: {
+        object: {
+          ...sub('active'),
+          id: 'sub_other',
+          metadata: { hogaanUserId: other },
+          items: {
+            object: 'list',
+            data: [{ current_period_end: 1795000000, price: { id: 'price_cheap' } }],
+          },
+        },
+      },
+    });
+    await pricedApp.inject({
+      method: 'POST',
+      url: '/api/billing/webhook',
+      headers: {
+        'content-type': 'application/json',
+        'stripe-signature': signTestPayload(payload, SECRET),
+      },
+      payload,
+    });
+    const { planFor } = await import('../../src/entitlements/index.js');
+    expect(await planFor(priced, edb.db, other)).toBe('free');
   });
 
   it('a new calendar month resets the free allowance', async () => {

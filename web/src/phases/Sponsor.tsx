@@ -98,6 +98,12 @@ export function Sponsor({ onNav, onBack }: { onNav: (t: Tab) => void; onBack: ()
       <ErrorLine message={error} />
       {orgs?.map((o) => (
         <Card key={o.id} title={o.name}>
+          {!o.verified && (
+            <p className="pr-card-note">
+              Waiting for Hogaan to verify this program. Until then its cohorts do not give leaders
+              a sponsored seat and no report is shown.
+            </p>
+          )}
           {o.cohorts.map((c) => (
             <div key={c.id} style={{ marginBottom: 12 }}>
               <div className="pr-field">

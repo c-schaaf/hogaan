@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { planFor } from '../../src/entitlements/index.js';
+import { verifyOrg } from '../../src/orgs/store.js';
 import { createMoment, recordOutcome } from '../../src/moments/store.js';
 import type { EmbeddedDb } from '../../src/shared/db/embedded.js';
 import { resetEncryptionCache } from '../../src/shared/db/encryption.js';
@@ -64,6 +65,26 @@ describe('P5 cohorts and the funder report', () => {
       code: string;
     }>().code;
     expect(code).toMatch(/^HGN-[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+  });
+
+  it('review fix: a sponsor cannot join its own cohort, and an unverified org grants no seat', async () => {
+    as(sponsor);
+    const self = await app.inject({
+      method: 'POST',
+      url: '/api/cohorts/join',
+      payload: { code, acknowledged: true },
+    });
+    expect(self.json()).toMatchObject({ error: 'sponsor_cannot_join' });
+    const l = await insertLeader(config, edb.db);
+    as(l);
+    await app.inject({
+      method: 'POST',
+      url: '/api/cohorts/join',
+      payload: { code, acknowledged: true },
+    });
+    expect(await planFor(config, edb.db, l)).toBe('free'); // org not verified yet
+    await app.inject({ method: 'DELETE', url: `/api/cohorts/${bigCohort}/membership` });
+    await verifyOrg(edb.db, orgId); // Hogaan staff vet the sponsor
   });
 
   it('joining requires acknowledging the plain statement of what the sponsor can see (P5.4)', async () => {
@@ -134,6 +155,34 @@ describe('P5 cohorts and the funder report', () => {
     expect(wire).not.toMatch(
       /Leader Number|secret topic|Private moment|private reflection|@example\.com/,
     );
+  });
+
+  it('review fix: 10 enrolled but only 9 have used Hogaan -> still no report (placeholder accounts do not count)', async () => {
+    as(sponsor);
+    const mid = (
+      await app.inject({
+        method: 'POST',
+        url: `/api/orgs/${orgId}/cohorts`,
+        payload: { name: 'Mid', seatLimit: 10 },
+      })
+    ).json<{ id: string }>().id;
+    const midCode = (
+      await app.inject({ method: 'POST', url: `/api/cohorts/${mid}/invites` })
+    ).json<{ code: string }>().code;
+    for (let i = 0; i < 10; i++) {
+      const l = await insertLeader(config, edb.db);
+      as(l);
+      await app.inject({
+        method: 'POST',
+        url: '/api/cohorts/join',
+        payload: { code: midCode, acknowledged: true },
+      });
+      if (i < 9) await edb.db.insert(sessions).values({ userId: l, turnCount: 1 });
+    }
+    as(sponsor);
+    expect((await app.inject({ url: `/api/cohorts/${mid}/report` })).json()).toMatchObject({
+      suppressed: true,
+    });
   });
 
   it('D5: a 9-person cohort returns nothing — through the API and in the database view', async () => {

@@ -49,7 +49,9 @@ export class RescheduleJob extends Error {
     this.name = 'RescheduleJob';
   }
 }
-const STALE_RUNNING_MS = 10 * 60_000;
+// Each job's heartbeat (updated_at) is refreshed when it starts, and a batch
+// is small, so a healthy job is never mistaken for a crashed one.
+const STALE_RUNNING_MS = 30 * 60_000;
 
 export async function enqueueJob(db: Database, opts: EnqueueOptions): Promise<void> {
   const values = {
@@ -138,7 +140,7 @@ export async function runDueJobs(
     .from(backgroundJobs)
     .where(and(eq(backgroundJobs.status, 'pending'), lte(backgroundJobs.runAfter, now)))
     .orderBy(backgroundJobs.runAfter)
-    .limit(opts.limit ?? 10);
+    .limit(opts.limit ?? 5);
   if (due.length === 0) return 0;
   const claimed = await db
     .update(backgroundJobs)
@@ -159,6 +161,10 @@ export async function runDueJobs(
     .returning();
   for (const job of claimed) {
     const t0 = Date.now();
+    await db
+      .update(backgroundJobs)
+      .set({ updatedAt: new Date() })
+      .where(eq(backgroundJobs.id, job.id));
     const handler = handlers[job.kind];
     try {
       if (handler === undefined) throw new Error(`no handler for job kind ${job.kind}`);

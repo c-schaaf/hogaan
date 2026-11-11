@@ -104,7 +104,18 @@ describe('D4 proactive email guards', () => {
     expect(forged.statusCode).toBe(400);
     expect((await getPrefs(edb.db, id)).followupEmailOptIn).toBe(true);
     const url = new URL(unsubscribeUrl(demo, id));
-    const ok = await app.inject({ url: url.pathname + url.search });
+    // A link scanner opening the link (GET) must NOT unsubscribe.
+    const view = await app.inject({ url: url.pathname + url.search });
+    expect(view.statusCode).toBe(200);
+    expect(view.body).toContain('<form method="post"');
+    expect((await getPrefs(edb.db, id)).followupEmailOptIn).toBe(true);
+    // Gmail/Yahoo one-click (RFC 8058): form-encoded POST.
+    const ok = await app.inject({
+      method: 'POST',
+      url: url.pathname + url.search,
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      payload: 'List-Unsubscribe=One-Click',
+    });
     expect(ok.statusCode).toBe(200);
     const p = await getPrefs(edb.db, id);
     expect(p).toMatchObject({

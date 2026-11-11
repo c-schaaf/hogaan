@@ -20,8 +20,12 @@
 --   analytics.metric_rating_by_prompt_version  helpful share per prompt version + model (P2.4)
 --
 -- D5 privacy floor, enforced IN THE DATABASE: analytics.cohort_report only
--- returns a row for a cohort with at least 10 enrolled leaders, and holds
--- counts only — never ids, names, or message content.
+-- returns a row for a cohort of a VERIFIED organization with at least 10
+-- enrolled leaders (not counting the sponsor's own admins) of whom at least
+-- 10 have used Hogaan since joining. Counts only — never ids, names, or
+-- message content. Residual risk (build report): a verified sponsor who
+-- creates 9+ real, active fake accounts could still isolate one leader;
+-- vetting sponsors is the control for that.
 --
 -- Rollback (destructive): DROP VIEW analytics.cohort_report, analytics.metric_*;
 --   DROP TABLE cohort_members, cohort_invites, cohorts, org_admins, organizations;
@@ -30,6 +34,10 @@ CREATE TABLE IF NOT EXISTS "organizations" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "name" text NOT NULL,
   "kind" text DEFAULT 'funder' NOT NULL,
+  -- Set by Hogaan staff after vetting the sponsor (and, in production, its
+  -- payment). Until then the org's cohorts grant no sponsored seats and
+  -- produce no report.
+  "verified_at" timestamp with time zone,
   "created_at" timestamp with time zone DEFAULT now() NOT NULL,
   CONSTRAINT "organizations_kind_chk" CHECK ("kind" IN ('funder', 'employer', 'program'))
 );
@@ -133,12 +141,25 @@ GROUP BY r."prompt_version", r."model_used";
 -- date. Every column is an aggregate. Cohorts under 10 enrolled: no row.
 CREATE OR REPLACE VIEW "analytics"."cohort_report" AS
 WITH members AS (
+  -- Active members, never the cohort's own sponsor admins.
   SELECT cm."cohort_id", cm."user_id", cm."joined_at"
   FROM "public"."cohort_members" cm
+  JOIN "public"."cohorts" c2 ON c2."id" = cm."cohort_id"
   WHERE cm."left_at" IS NULL
+    AND NOT EXISTS (SELECT 1 FROM "public"."org_admins" oa
+                    WHERE oa."org_id" = c2."org_id" AND oa."user_id" = cm."user_id")
 ),
 enrolled AS (
   SELECT "cohort_id", count(*) AS "n" FROM members GROUP BY "cohort_id"
+),
+-- The floor counts leaders who have actually used Hogaan since joining, so
+-- empty placeholder accounts cannot make a small group look big.
+engaged AS (
+  SELECT m."cohort_id", count(DISTINCT m."user_id") AS "n"
+  FROM members m
+  JOIN "analytics"."metric_coaching_sessions" cs
+    ON cs."user_id" = m."user_id" AND cs."started_at" >= m."joined_at"
+  GROUP BY m."cohort_id"
 )
 SELECT
   c."id" AS "cohort_id",
@@ -147,7 +168,8 @@ SELECT
   c."seat_limit",
   (SELECT count(DISTINCT al."user_id") FROM members m
      JOIN "analytics"."metric_active_leaders" al ON al."user_id" = m."user_id"
-     WHERE m."cohort_id" = c."id" AND al."week_start" >= date_trunc('week', now()) - interval '4 weeks') AS "active_last_4_weeks",
+     WHERE m."cohort_id" = c."id" AND al."week_start" >= date_trunc('week', now()) - interval '4 weeks'
+       AND al."week_start" >= date_trunc('week', m."joined_at")) AS "active_last_4_weeks",
   (SELECT count(*) FROM members m
      JOIN "analytics"."metric_coaching_sessions" cs ON cs."user_id" = m."user_id" AND cs."started_at" >= m."joined_at"
      WHERE m."cohort_id" = c."id") AS "coaching_sessions",
@@ -174,5 +196,7 @@ SELECT
      JOIN "analytics"."metric_practice_coverage" pc ON pc."user_id" = m."user_id"
      WHERE m."cohort_id" = c."id" GROUP BY pc."practice") x) AS "practice_coverage"
 FROM "public"."cohorts" c
+JOIN "public"."organizations" o ON o."id" = c."org_id"
 JOIN enrolled e ON e."cohort_id" = c."id"
-WHERE e."n" >= 10;
+JOIN engaged g ON g."cohort_id" = c."id"
+WHERE o."verified_at" IS NOT NULL AND e."n" >= 10 AND g."n" >= 10;

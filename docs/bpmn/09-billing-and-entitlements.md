@@ -27,6 +27,10 @@ Same coach, model and memory on every plan (P4.3). One module decides:
         customer.subscription.updated   → status, period end, cancel_at_period_end
         customer.subscription.deleted   → status canceled  → back to Free
    each event id recorded in billing_events → retries are no-ops
+   ledger row + subscription change commit in ONE transaction (a failure is retried by Stripe)
+   events older than the newest applied (Stripe `created`) are ignored ('stale')
+   checkout only grants when payment_status = 'paid'; subscription events only
+   grant Personal for STRIPE_PRICE_PERSONAL (when set)
 [Manage or cancel] POST /api/billing/portal → Stripe customer portal
 ```
 
