@@ -31,7 +31,11 @@ vi.mock('../../src/web-api/supabase-session.js', () => ({
 }));
 
 // Demo-mode email capture, but a (stubbed) real model.
-const config = demoTestConfig({ anthropicApiKey: 'sk-test-stub' });
+// Billing (Phase 4) is tested separately; here every leader is entitled.
+const config = demoTestConfig({
+  anthropicApiKey: 'sk-test-stub',
+  features: { ...demoTestConfig().features, billing: false },
+});
 let edb: EmbeddedDb;
 let stub: ModelStub;
 

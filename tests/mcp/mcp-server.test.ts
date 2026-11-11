@@ -32,7 +32,12 @@ vi.mock('../../src/web-api/supabase-session.js', () => ({
   requireSupabaseSession: vi.fn(() => Promise.resolve({ userId: current })),
 }));
 
-const config = demoTestConfig({ demoMode: false, anthropicApiKey: 'sk-test-stub' });
+// Billing (Phase 4) is tested separately; here every leader is entitled.
+const config = demoTestConfig({
+  demoMode: false,
+  anthropicApiKey: 'sk-test-stub',
+  features: { ...demoTestConfig().features, billing: false },
+});
 let edb: EmbeddedDb;
 let app: FastifyInstance;
 let base = '';

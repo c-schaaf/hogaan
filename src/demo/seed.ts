@@ -9,6 +9,7 @@ import { encryptPlaintext } from '../shared/db/encryption.js';
 import { sessions } from '../shared/db/schema/sessions.js';
 import { turns } from '../shared/db/schema/turns.js';
 import { users } from '../shared/db/schema/users.js';
+import { subscriptions } from '../shared/db/schema/billing.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import { DEMO_SUPABASE_USER_ID } from '../web-api/supabase-session.js';
 import { KNOWLEDGE_DIGEST_PLACEHOLDER } from '../libraries/knowledge-digest.js';
@@ -145,6 +146,22 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
       }
     }
   }
+  // P4 — Amina starts on Personal (demo ids, no Stripe) so every feature is
+  // visible; "Cancel plan (demo)" on Profile shows the Free limits.
+  if (isEnabled(config, 'billing')) {
+    await db
+      .insert(subscriptions)
+      .values({
+        userId,
+        plan: 'personal',
+        status: 'active',
+        stripeCustomerId: 'cus_demo',
+        stripeSubscriptionId: `sub_demo_${userId.slice(0, 8)}`,
+        currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+      })
+      .onConflictDoNothing();
+  }
+
   // P2 — Amina opted in to check-ins; one moment is ready for a follow-up
   // and reflection, one is coming up.
   if (isEnabled(config, 'followUpEmail') || isEnabled(config, 'weeklyNudge')) {

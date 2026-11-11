@@ -25,6 +25,7 @@ import { createHash } from 'node:crypto';
 import { featureSnapshot, isEnabled } from '../shared/flags/index.js';
 import { enqueueJobSafe } from '../jobs/runner.js';
 import { registerContextRoutes } from './context-routes.js';
+import { newSessionAllowance } from '../entitlements/index.js';
 import { generateSessionTitle } from './session-title.js';
 import { requireSupabaseSession } from './supabase-session.js';
 
@@ -183,6 +184,32 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
         retryAfterMs: rateDecision.retryAfterMs,
         message: 'The coach is busy right now. Try again in a moment.',
       });
+    }
+
+    // P4.3 — free tier: 3 new sessions a calendar month (FEATURE_BILLING
+    // only). Continuing a session the leader owns is never blocked.
+    if (isEnabled(opts.config, 'billing')) {
+      let startsNewSession = clientSessionId === undefined;
+      if (!startsNewSession) {
+        const owned = await opts.db
+          .select({ id: sessions.id })
+          .from(sessions)
+          .where(and(eq(sessions.id, clientSessionId!), eq(sessions.userId, userId)))
+          .limit(1);
+        startsNewSession = owned[0] === undefined;
+      }
+      if (startsNewSession) {
+        const allowance = await newSessionAllowance(opts.config, opts.db, userId);
+        if (!allowance.allowed) {
+          return reply.code(402).send({
+            error: 'session_limit',
+            used: allowance.used,
+            limit: allowance.limit,
+            message:
+              "You've used this month's free sessions. You can keep going in a past session, or upgrade to Personal in your Profile for unlimited sessions.",
+          });
+        }
+      }
     }
 
     // Tell Fastify to stop managing this response — we're going raw for SSE.

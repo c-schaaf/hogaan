@@ -2,7 +2,8 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { HogaanWordmark } from '../components/HogaanWordmark';
 import { PrIconEdit } from '../components/Icons';
 import { BottomNav, DesktopSidebar, type Tab } from '../components/Nav';
-import { api, type Prefs } from '../lib/api';
+import { api, type Billing, type Prefs } from '../lib/api';
+import { BillingCard } from '../components/BillingCard';
 import { useFeatures } from '../lib/features';
 import { AssistantConnect } from '../components/AssistantConnect';
 import { TWELVE_PRACTICES } from './onboarding/data';
@@ -101,7 +102,15 @@ function PracticesView({
 }
 
 // P2.2 / P2.6 — explicit opt-in for proactive email (D4).
-function EmailCheckIns({ followUp, nudge }: { followUp: boolean; nudge: boolean }) {
+function EmailCheckIns({
+  followUp,
+  nudge,
+  followUpsIncluded,
+}: {
+  followUp: boolean;
+  nudge: boolean;
+  followUpsIncluded: boolean;
+}) {
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
@@ -131,6 +140,12 @@ function EmailCheckIns({ followUp, nudge }: { followUp: boolean; nudge: boolean 
           />
           <span>After a conversation you prepared for, ask me how it went</span>
         </label>
+      )}
+      {prefs !== null && followUp && !followUpsIncluded && (
+        <p className="pr-card-note">
+          Follow-up check-ins are part of the Personal plan. You can turn this on now; emails start
+          when you upgrade (see Plan).
+        </p>
       )}
       {prefs !== null && nudge && (
         <label className="pr-field" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -171,6 +186,7 @@ export function Profile({
   onOpenMoments,
 }: Props) {
   const features = useFeatures();
+  const [billing, setBilling] = useState<Billing | null>(null);
   const [fullName, setFullName] = useState(user.name || '');
   const [email, setEmail] = useState(user.email || '');
   const [editingName, setEditingName] = useState(false);
@@ -434,10 +450,16 @@ export function Profile({
                 )}
 
                 {(features.followUpEmail || features.weeklyNudge) && (
-                  <EmailCheckIns followUp={features.followUpEmail} nudge={features.weeklyNudge} />
+                  <EmailCheckIns
+                    followUp={features.followUpEmail}
+                    nudge={features.weeklyNudge}
+                    followUpsIncluded={billing === null || billing.capabilities.followUps}
+                  />
                 )}
 
-                {features.mcp && <AssistantConnect />}
+                {features.billing && <BillingCard onChange={setBilling} />}
+
+                {features.mcp && <AssistantConnect key={billing?.plan ?? 'none'} />}
 
                 <ProfileCard title="Support">
                   <div className="pr-sup">

@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { getActiveDailyPrompts } from '../libraries/index.js';
 import { getMoment } from '../moments/store.js';
+import { hasCapability } from '../entitlements/index.js';
 import type { Database } from '../shared/db/client.js';
 import { decryptPlaintext } from '../shared/db/encryption.js';
 import { moments } from '../shared/db/schema/moments.js';
@@ -85,6 +86,8 @@ export function phase2JobHandlers(config: AppConfig, db: Database): JobHandlers 
       const momentId = String(payload['momentId']);
       const m = await getMoment(config, db, userId, momentId);
       if (m === null || m.status !== 'upcoming' || m.followupSentAt !== null) return;
+      // P4.3 — follow-ups are not part of the free plan.
+      if (!(await hasCapability(config, db, userId, 'followUps'))) return;
       const name = await firstNameOf(config, db, userId);
       const decision = await sendProactiveEmail(config, db, {
         userId,

@@ -36,6 +36,9 @@ const CONTEXT_BUILD_RLS_TABLES = [
   'turn_ratings',
   // 0020
   'mcp_tokens',
+  // 0021
+  'billing_events',
+  'subscriptions',
 ];
 
 const DOCUMENTED_RLS_EXCLUSIONS = new Set<string>(['audit_log', 'prompt_logs']);

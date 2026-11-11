@@ -258,6 +258,24 @@ export interface McpToken {
   lastUsedAt: string | null;
 }
 
+export interface Billing {
+  billing: boolean;
+  plan: 'free' | 'personal' | 'sponsored';
+  capabilities: {
+    mcp: boolean;
+    followUps: boolean;
+    connections: boolean;
+    unlimitedSessions: boolean;
+  };
+  sessionsUsedThisMonth: number;
+  sessionLimit: number | null;
+  status: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
+  demo: boolean;
+  priceLabel: string;
+}
+
 export const api = {
   // SCRUM — `api.turn` (non-streaming) and its /api/chat/turn route were
   // removed in SCRUM-43. The wrapper lingered in the client SDK and was
@@ -332,6 +350,14 @@ export const api = {
       }),
     revoke: (id: string) =>
       call<{ ok: true }>(`/api/mcp/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  },
+  billing: {
+    get: () => call<Billing>('/api/billing'),
+    checkout: () =>
+      call<{ url?: string; demo?: boolean }>('/api/billing/checkout', { method: 'POST' }),
+    portal: () => call<{ url?: string; demo?: boolean }>('/api/billing/portal', { method: 'POST' }),
+    demo: (action: 'subscribe' | 'cancel') =>
+      call<Billing>('/api/demo/billing', { method: 'POST', body: { action } }),
   },
   rateTurn: (turnId: string, rating: 'helpful' | 'not_helpful', note?: string) =>
     call<{ ok: true }>(`/api/turns/${encodeURIComponent(turnId)}/rating`, {
