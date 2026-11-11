@@ -18,7 +18,13 @@ export interface TurnTrace {
   turnId: string;
   /** Step where the turn finished — process number + step number for grep-ability. */
   terminalEvent: string;
-  modelUsed: 'claude-haiku-4-5' | 'llama-3.3-70b' | 'safe-template' | 'none';
+  modelUsed:
+    | 'claude-haiku-4-5'
+    | 'claude-haiku-5-5'
+    | 'llama-3.3-70b'
+    | 'safe-template'
+    | 'scripted-demo'
+    | 'none';
   fallbackPath: 'none' | 'fast-model' | 'safe-template' | 'service-unavailable';
   latencyMs: number;
   qaOutcome:

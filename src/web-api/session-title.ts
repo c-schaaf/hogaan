@@ -96,6 +96,8 @@ export async function generateSessionTitle(
         maxTokens: 24,
         temperature: 0.2,
         primaryTimeoutMs: 5000,
+        // Demo mode only: a plain first-words title instead of a model call.
+        scripted: () => titleInput.replace(/\s+/g, ' ').trim().split(' ').slice(0, 6).join(' '),
       },
       FALLBACK,
     );

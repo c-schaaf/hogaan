@@ -9,7 +9,7 @@ import { decryptPlaintext, encryptPlaintext } from '../shared/db/encryption.js';
 import { sessions } from '../shared/db/schema/sessions.js';
 import { turns } from '../shared/db/schema/turns.js';
 import { users } from '../shared/db/schema/users.js';
-import { chat, chatStream } from '../shared/llm/chat.js';
+import { chat, chatStream, type ModelUsed } from '../shared/llm/chat.js';
 import type { RedisBundle } from '../shared/redis/client.js';
 import { checkRateLimit, type RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
@@ -21,6 +21,7 @@ import {
   noDegradation,
 } from '../shared/types/index.js';
 import { createHash } from 'node:crypto';
+import { featureSnapshot } from '../shared/flags/index.js';
 import { generateSessionTitle } from './session-title.js';
 import { requireSupabaseSession } from './supabase-session.js';
 
@@ -67,6 +68,12 @@ export interface WebApiRoutesOpts {
  *   DELETE /api/profile                                          -> hard delete account + all data
  */
 export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpts): void {
+  // GET /api/features ---------------------------------------------------
+  // Which feature flags are on (build plan: every new capability is behind
+  // a flag that defaults off). Public: flags are not secret, and the SPA
+  // needs `demoMode` before any sign-in happens.
+  app.get('/api/features', (_req, reply) => reply.send(featureSnapshot(opts.config)));
+
   // POST /api/chat/turn/stream ----------------------------------------
   // Streaming variant of /api/chat/turn. Returns Server-Sent Events:
   //   event: start   data: { sessionId }
@@ -284,6 +291,9 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
       const chatMessages = [...priorMessages, { role: 'user' as const, content: message }];
       const stream = chatStream(opts.config, {
         systemPrompt: promptBundle.assembledPrompt,
+        ...(promptBundle.systemBlocks !== undefined
+          ? { systemBlocks: promptBundle.systemBlocks }
+          : {}),
         messages: chatMessages,
         maxTokens: 600,
         temperature: 0.7,
@@ -291,7 +301,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
 
       let accumulated = '';
       let receivedDeltas = false;
-      let final: { modelUsed: 'claude-haiku-4-5' | 'llama-3.3-70b' | 'safe-template' | 'none' } & {
+      let final: { modelUsed: ModelUsed | 'none' } & {
         fallbackPath?: 'none' | 'fast-model' | 'safe-template' | 'service-unavailable';
       } = { modelUsed: 'claude-haiku-4-5' };
 
@@ -343,6 +353,9 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
           opts.config,
           {
             systemPrompt: promptBundle.assembledPrompt,
+            ...(promptBundle.systemBlocks !== undefined
+              ? { systemBlocks: promptBundle.systemBlocks }
+              : {}),
             messages: chatMessages,
             maxTokens: 600,
             temperature: 0.7,

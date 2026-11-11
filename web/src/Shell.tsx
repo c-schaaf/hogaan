@@ -14,6 +14,7 @@ import type { Tab } from './components/Nav';
 import { ApiError, api, type MeResponse } from './lib/api';
 import { readAuthErrorFromUrl } from './lib/auth-errors';
 import { devLog } from './lib/log';
+import { isDemoMode } from './lib/demo';
 import { supabase } from './lib/supabase';
 import { Chat } from './phases/Chat';
 import { EmailVerify } from './phases/EmailVerify';
@@ -430,6 +431,12 @@ export function Shell() {
 
   return (
     <div className="stage" data-bg="tinted">
+      {isDemoMode && (
+        <div className="demo-banner" role="note">
+          Demo mode: you are the sample leader &ldquo;Amina&rdquo;. Nothing is saved after the demo
+          stops.
+        </div>
+      )}
       <div className="device">
         <div className="phase-stage" key={phase}>
           {body}

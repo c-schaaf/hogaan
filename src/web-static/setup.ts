@@ -21,8 +21,10 @@ import type { AppConfig } from '../shared/secrets/config.js';
 export async function wireWebStatic(
   app: FastifyInstance,
   _config: AppConfig,
+  rootOverride?: string,
 ): Promise<{ registered: boolean; reason?: string }> {
-  const root = locateWebDist();
+  const root =
+    rootOverride !== undefined && existsSync(rootOverride) ? rootOverride : locateWebDist();
   if (root === null) {
     return { registered: false, reason: 'dist/web not present (run pnpm build:web)' };
   }

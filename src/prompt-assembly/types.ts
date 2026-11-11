@@ -32,6 +32,18 @@ export interface InputPayload {
   secondaryLevelTag?: LevelTag | null;
   taggerConfidence?: number | null;
   userMessage: string;
+  /**
+   * P1.1 — rendered leader-brief block ("## What you know about this
+   * leader"). Per-leader, so it sits AFTER the cache breakpoint. Absent when
+   * the leaderBrief flag is off or the leader has no brief yet.
+   */
+  leaderContextText?: string;
+  /**
+   * P1.4 — knowledge digest (founder-approved framework excerpts). Static
+   * across leaders, so it sits BEFORE the cache breakpoint, after the
+   * system template. Absent when the flag is off or no approved digest exists.
+   */
+  knowledgeDigestText?: string;
   /** From the user record. Not all fields required; missing ones get omitted. */
   userProfile: {
     firstName?: string;
@@ -70,6 +82,8 @@ export interface InputPayload {
  */
 export interface PromptUnderConstruction {
   systemTemplateText: string;
+  knowledgeDigestText?: string;
+  leaderContextText?: string;
   memoryBlockText: string;
   sessionContextText: string;
   userProfileBlockText: string;
@@ -81,6 +95,12 @@ export interface OutputBundle {
   responseMode: ResponseMode;
   /** Final assembled prompt text in canonical block order. */
   assembledPrompt: string;
+  /**
+   * The same prompt split for the provider: static library text first
+   * (trusted, prompt-cached), per-leader blocks after. Joining the block
+   * texts with blank lines yields `assembledPrompt`.
+   */
+  systemBlocks?: { text: string; cache?: boolean; trusted?: boolean }[];
   /** SHA-256 over structural elements only. Identical structural inputs → identical hash. */
   determinismHash: string;
   /**

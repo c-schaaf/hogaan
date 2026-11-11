@@ -87,6 +87,12 @@ export async function assemblePrompt(
 
   const finalPrompt: PromptUnderConstruction = {
     systemTemplateText: template.systemText,
+    ...(validated.knowledgeDigestText !== undefined && validated.knowledgeDigestText.length > 0
+      ? { knowledgeDigestText: validated.knowledgeDigestText }
+      : {}),
+    ...(validated.leaderContextText !== undefined && validated.leaderContextText.length > 0
+      ? { leaderContextText: validated.leaderContextText }
+      : {}),
     memoryBlockText,
     sessionContextText,
     userProfileBlockText,
@@ -106,6 +112,7 @@ export async function assemblePrompt(
 
   // Assemble final text in canonical block order.
   const assembledPrompt = canonicalAssemble(finalPrompt);
+  const systemBlocks = splitForProvider(finalPrompt);
   const terminal = pickTerminalMode(validated.responseMode);
 
   // tokenCount stays on the bundle for observability. Computed post-assembly
@@ -116,6 +123,7 @@ export async function assemblePrompt(
     endEvent: terminal,
     responseMode: validated.responseMode,
     assembledPrompt,
+    systemBlocks,
     determinismHash,
     tokenCount,
     degradationFlags: noDegradation(),
@@ -166,6 +174,8 @@ function pickTerminalMode(mode: ResponseMode): OutputBundle['endEvent'] {
 function canonicalAssemble(p: PromptUnderConstruction): string {
   return [
     p.systemTemplateText,
+    p.knowledgeDigestText ?? '',
+    p.leaderContextText ?? '',
     p.memoryBlockText,
     p.sessionContextText,
     p.userProfileBlockText,
@@ -173,4 +183,32 @@ function canonicalAssemble(p: PromptUnderConstruction): string {
   ]
     .filter((b) => b.length > 0)
     .join('\n\n');
+}
+
+/**
+ * P1.4 — provider-facing split of the canonical order. Library text (the
+ * founder's template and the approved knowledge digest) is identical for
+ * every leader, so it goes first and carries the prompt-cache breakpoint;
+ * it is marked `trusted` so the D2 PII filter leaves the founder's own
+ * name etc. intact. Everything per-leader follows the breakpoint.
+ */
+function splitForProvider(
+  p: PromptUnderConstruction,
+): { text: string; cache?: boolean; trusted?: boolean }[] {
+  const staticParts = [p.systemTemplateText, p.knowledgeDigestText ?? ''].filter(
+    (b) => b.length > 0,
+  );
+  const dynamic = [
+    p.leaderContextText ?? '',
+    p.memoryBlockText,
+    p.sessionContextText,
+    p.userProfileBlockText,
+    p.userMessageText,
+  ]
+    .filter((b) => b.length > 0)
+    .join('\n\n');
+  return [
+    { text: staticParts.join('\n\n'), cache: true, trusted: true },
+    ...(dynamic.length > 0 ? [{ text: dynamic }] : []),
+  ];
 }

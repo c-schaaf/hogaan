@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string;
   readonly VITE_SUPABASE_ANON_KEY: string;
+  /** 'true' only in the `pnpm demo` build. */
+  readonly VITE_DEMO_MODE?: string;
 }
 
 interface ImportMeta {

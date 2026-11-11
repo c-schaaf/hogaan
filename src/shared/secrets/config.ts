@@ -1,3 +1,5 @@
+import { type FeatureFlag, readFeatureFlags } from '../flags/index.js';
+
 type RequiredKey = 'NODE_ENV' | 'PORT' | 'LOG_LEVEL';
 
 type OptionalKey =
@@ -21,7 +23,17 @@ type OptionalKey =
   | 'RESEND_FROM_EMAIL'
   | 'SUPABASE_URL'
   | 'SUPABASE_ANON_KEY'
-  | 'SUPABASE_JWT_SECRET';
+  | 'SUPABASE_JWT_SECRET'
+  | 'DEMO_MODE'
+  | 'LLM_CHAT_MODEL'
+  | 'LLM_CHAT_EFFORT'
+  | 'LLM_BACKGROUND_MODEL'
+  | 'STRIPE_SECRET_KEY'
+  | 'STRIPE_WEBHOOK_SECRET'
+  | 'STRIPE_PRICE_PERSONAL'
+  | 'BRIEF_UPDATE_DELAY_MS'
+  | 'JOB_POLL_INTERVAL_MS'
+  | 'EMAIL_LINK_SECRET';
 
 export interface AppConfig {
   nodeEnv: 'development' | 'test' | 'staging' | 'production';
@@ -53,7 +65,36 @@ export interface AppConfig {
    * `/api/*` call. Missing value falls back to remote `getUser`.
    */
   supabaseJwtSecret: string | undefined;
+  /**
+   * Demo mode (build plan, owner request). Embedded database, sign-in
+   * bypassed for one sample leader, scripted coach when no model key.
+   * `loadConfig` refuses to return a config with demoMode=true when
+   * NODE_ENV=production. Optional so existing test fakes stay valid.
+   */
+  demoMode?: boolean;
+  /** Feature flags — see src/shared/flags/index.ts. Missing = off. */
+  features?: Partial<Record<FeatureFlag, boolean>>;
+  /** Live-chat model id. Default 'claude-haiku-4-5' (today's model). */
+  llmChatModel?: ChatModelId;
+  /** Effort for the live-chat model when it supports effort (Haiku 5.5). */
+  llmChatEffort?: 'low' | 'medium' | 'high';
+  /** Background-work model id (brief updater, reflections). */
+  llmBackgroundModel?: BackgroundModelId;
+  stripeSecretKey?: string | undefined;
+  stripeWebhookSecret?: string | undefined;
+  stripePricePersonal?: string | undefined;
+  /** Debounce before the post-session brief update runs. Default 10 min. */
+  briefUpdateDelayMs?: number;
+  /** Background job poll interval. Default 15 s. */
+  jobPollIntervalMs?: number;
+  /** HMAC secret for unsubscribe / reflection links in email. */
+  emailLinkSecret?: string | undefined;
 }
+
+export const CHAT_MODEL_IDS = ['claude-haiku-4-5', 'claude-haiku-5-5'] as const;
+export type ChatModelId = (typeof CHAT_MODEL_IDS)[number];
+export const BACKGROUND_MODEL_IDS = ['claude-opus-5-5', 'claude-sonnet-5-5'] as const;
+export type BackgroundModelId = (typeof BACKGROUND_MODEL_IDS)[number];
 
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -100,8 +141,50 @@ export function loadConfig(): AppConfig {
     throw new ConfigError(`LOG_LEVEL must be one of ${validLevels.join('|')}, got: ${logLevelRaw}`);
   }
 
+  const demoRaw = readOptional('DEMO_MODE');
+  const demoMode = demoRaw === 'true' || demoRaw === '1';
+  if (demoMode && nodeEnvRaw === 'production') {
+    // Hard stop: demo mode bypasses sign-in. It must never run in production.
+    throw new ConfigError('DEMO_MODE cannot be enabled when NODE_ENV=production');
+  }
+
+  const chatModelRaw = readOptional('LLM_CHAT_MODEL') ?? 'claude-haiku-4-5';
+  if (!(CHAT_MODEL_IDS as readonly string[]).includes(chatModelRaw)) {
+    throw new ConfigError(
+      `LLM_CHAT_MODEL must be one of ${CHAT_MODEL_IDS.join('|')}, got: ${chatModelRaw}`,
+    );
+  }
+  const bgModelRaw = readOptional('LLM_BACKGROUND_MODEL') ?? 'claude-opus-5-5';
+  if (!(BACKGROUND_MODEL_IDS as readonly string[]).includes(bgModelRaw)) {
+    throw new ConfigError(
+      `LLM_BACKGROUND_MODEL must be one of ${BACKGROUND_MODEL_IDS.join('|')}, got: ${bgModelRaw}`,
+    );
+  }
+  const effortRaw = readOptional('LLM_CHAT_EFFORT') ?? 'low';
+  if (effortRaw !== 'low' && effortRaw !== 'medium' && effortRaw !== 'high') {
+    throw new ConfigError(`LLM_CHAT_EFFORT must be low|medium|high, got: ${effortRaw}`);
+  }
+  const intOpt = (k: OptionalKey, dflt: number): number => {
+    const raw = readOptional(k);
+    if (raw === undefined) return dflt;
+    const n = Number.parseInt(raw, 10);
+    if (Number.isNaN(n) || n < 0) throw new ConfigError(`${k} must be a non-negative integer`);
+    return n;
+  };
+
   return {
     nodeEnv: nodeEnvRaw,
+    demoMode,
+    features: readFeatureFlags(process.env, demoMode),
+    llmChatModel: chatModelRaw as ChatModelId,
+    llmChatEffort: effortRaw,
+    llmBackgroundModel: bgModelRaw as BackgroundModelId,
+    stripeSecretKey: readOptional('STRIPE_SECRET_KEY'),
+    stripeWebhookSecret: readOptional('STRIPE_WEBHOOK_SECRET'),
+    stripePricePersonal: readOptional('STRIPE_PRICE_PERSONAL'),
+    briefUpdateDelayMs: intOpt('BRIEF_UPDATE_DELAY_MS', demoMode ? 3_000 : 10 * 60_000),
+    jobPollIntervalMs: intOpt('JOB_POLL_INTERVAL_MS', demoMode ? 1_000 : 15_000),
+    emailLinkSecret: readOptional('EMAIL_LINK_SECRET'),
     port,
     logLevel: logLevelRaw as AppConfig['logLevel'],
     publicBaseUrl: readOptional('PUBLIC_BASE_URL'),

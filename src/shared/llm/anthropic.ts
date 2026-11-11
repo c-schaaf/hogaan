@@ -18,13 +18,89 @@ function getClient(config: AppConfig): Anthropic {
   return cached;
 }
 
+/**
+ * One block of the system prompt. `cache: true` puts a prompt-caching
+ * breakpoint after the block (P1.4: the static library text and knowledge
+ * digest are cached; per-leader blocks come after the breakpoint so they
+ * never invalidate it).
+ */
+export interface SystemBlock {
+  text: string;
+  cache?: boolean;
+}
+
 export interface AnthropicChatRequest {
-  model: 'claude-haiku-4-5' | 'claude-sonnet-4-6' | 'claude-opus-4-7';
+  model:
+    | 'claude-haiku-4-5'
+    | 'claude-haiku-5-5'
+    | 'claude-sonnet-4-6'
+    | 'claude-opus-4-7'
+    | 'claude-sonnet-5-5'
+    | 'claude-opus-5-5';
   systemPrompt: string;
+  /** When present, sent instead of `systemPrompt` (enables cache breakpoints). */
+  systemBlocks?: SystemBlock[];
   messages: { role: 'user' | 'assistant'; content: string }[];
   maxTokens: number;
+  /** Only honoured on claude-haiku-4-5 and older; newer models 400 on non-default sampling. */
   temperature?: number;
+  /** output_config.effort — ignored on claude-haiku-4-5 (it 400s there). */
+  effort?: 'low' | 'medium' | 'high';
+  /** Structured JSON output (output_config.format). */
+  jsonSchema?: Record<string, unknown>;
   timeoutMs: number;
+}
+
+/** Models that predate the 2026 request surface (sampling params allowed, no effort). */
+function isLegacyModel(model: AnthropicChatRequest['model']): boolean {
+  return (
+    model === 'claude-haiku-4-5' || model === 'claude-sonnet-4-6' || model === 'claude-opus-4-7'
+  );
+}
+
+/**
+ * Per-model request parameters. Follows the official migration guide:
+ *   - Haiku 5.5 / Opus 5.5 / Sonnet 5.5 reject non-default temperature -> omitted.
+ *   - Their thinking is on by default and counts toward max_tokens, so the
+ *     cap is raised to leave room; reply length is governed by the prompt.
+ *   - Effort is the depth control (Haiku 5.5 / Opus 5.5 default to medium,
+ *     so we always set it explicitly).
+ */
+function buildParams(req: Omit<AnthropicChatRequest, 'timeoutMs'>) {
+  const system: string | Anthropic.TextBlockParam[] =
+    req.systemBlocks !== undefined
+      ? req.systemBlocks
+          .filter((b) => b.text.length > 0)
+          .map((b) => ({
+            type: 'text' as const,
+            text: b.text,
+            ...(b.cache === true ? { cache_control: { type: 'ephemeral' as const } } : {}),
+          }))
+      : req.systemPrompt;
+  if (isLegacyModel(req.model)) {
+    return {
+      model: req.model,
+      max_tokens: req.maxTokens,
+      ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
+      system,
+      messages: req.messages,
+      ...(req.jsonSchema !== undefined
+        ? { output_config: { format: { type: 'json_schema' as const, schema: req.jsonSchema } } }
+        : {}),
+    };
+  }
+  return {
+    model: req.model,
+    max_tokens: Math.max(req.maxTokens, 2048),
+    system,
+    messages: req.messages,
+    output_config: {
+      effort: req.effort ?? 'medium',
+      ...(req.jsonSchema !== undefined
+        ? { format: { type: 'json_schema' as const, schema: req.jsonSchema } }
+        : {}),
+    },
+  };
 }
 
 export interface AnthropicChatResponse {
@@ -42,18 +118,19 @@ export async function anthropicChat(
 
   const response = await withTimeout('anthropic', req.timeoutMs, async () => {
     try {
-      return await client.messages.create({
-        model: req.model,
-        max_tokens: req.maxTokens,
-        ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-        system: req.systemPrompt,
-        messages: req.messages,
-      });
+      return await client.messages.create(buildParams(req));
     } catch (err) {
       throw mapAnthropicError(err);
     }
   });
 
+  // Newer models can decline via a 200 with stop_reason 'refusal'. Treat it
+  // like a provider content filter so chat() serves the safe template.
+  if (response.stop_reason === 'refusal') {
+    throw new LlmContentFilterError('anthropic', new Error('model refusal'));
+  }
+  // Read blocks by type, never by position: responses on thinking-capable
+  // models can begin with `thinking` blocks.
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === 'text')
     .map((b) => b.text)
@@ -172,14 +249,7 @@ async function openStreamWithRetry(
       // The SDK types the return as a union of Message | Stream; since we
       // pass stream:true the runtime value is always the Stream branch.
       const result = await withTimeout('anthropic', STREAM_OPEN_TIMEOUT_MS, () =>
-        client.messages.create({
-          model: req.model,
-          max_tokens: req.maxTokens,
-          ...(req.temperature !== undefined ? { temperature: req.temperature } : {}),
-          system: req.systemPrompt,
-          messages: req.messages,
-          stream: true,
-        }),
+        client.messages.create({ ...buildParams(req), stream: true }),
       );
       return result as AnthropicStream;
     } catch (err) {
@@ -244,6 +314,9 @@ export async function* anthropicChatStream(
     throw mapAnthropicError(err);
   }
 
+  if (stopReason === 'refusal' && text.length === 0) {
+    throw new LlmContentFilterError('anthropic', new Error('model refusal'));
+  }
   return { text, inputTokens, outputTokens, stopReason };
 }
 

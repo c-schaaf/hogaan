@@ -1,7 +1,7 @@
 # 02 — Coaching Turn
 
 **Status:** living contract — update in the same PR that changes this process.
-**Last reviewed:** 2026-05-19 (updated per SCRUM-50 leadership-coach prompt rewrite).
+**Last reviewed:** 2026-11-11 (context-and-connections build: privacy filter, cached system blocks, configurable chat model, demo mode).
 
 ## Purpose
 
@@ -33,10 +33,19 @@ orchestrator (triage / tagger / quality-check) were removed in SCRUM-43.
         │   - build user-profile block (experience, role)
         │   - build current-user-message block
         │   - concatenate in canonical order
+        │   - ALSO split into provider blocks: [library template (+ knowledge
+        │     digest)] marked trusted + prompt-cached, then [per-leader blocks]
         │   - compute determinism hash
         │   - fire-and-forget log write
         ▼
-[Stream LLM call via shared/llm/chat.ts → Anthropic Haiku 4.5]
+[D2 privacy filter inside shared/llm/chat.ts]
+        │   - strips email addresses, phone numbers, surnames from the
+        │     messages and every non-library system block
+        │   - library blocks (founder content) pass through unchanged
+        ▼
+[Stream LLM call via shared/llm/chat.ts → LLM_CHAT_MODEL]
+        │   - default claude-haiku-4-5; claude-haiku-5-5 opt-in (P1.5)
+        │   - demo mode with no key: scripted stand-in coach (never in production)
         │   - hijack Fastify reply, write SSE headers (X-Accel-Buffering: no)
         │   - emit `event: start { sessionId }`
         │   - emit `event: delta { text }` per chunk
@@ -71,6 +80,7 @@ orchestrator (triage / tagger / quality-check) were removed in SCRUM-43.
 | Step | Failure | Behaviour |
 |---|---|---|
 | Auth | Missing / invalid JWT | 401 before any LLM call |
+| LLM stream | Model declines (`stop_reason: refusal`, Haiku 5.5) before any text | Treated as content filter → non-streaming fallback → safe template |
 | Resolve session | DB error | 5xx; Sentry P2 |
 | Assemble prompt | Library load failure (E6) | Throws `PromptAssemblyError`; route emits SSE `event: error` |
 | Assemble prompt | Template missing for response mode (E8) | Same |
@@ -83,7 +93,8 @@ orchestrator (triage / tagger / quality-check) were removed in SCRUM-43.
 - `src/web-api/routes.ts` — `POST /api/chat/turn/stream` handler
 - `src/session-lifecycle/resolver.ts`
 - `src/prompt-assembly/assembler.ts`
-- `src/shared/llm/chat.ts`
+- `src/shared/llm/chat.ts` (model choice, privacy filter, scripted demo coach)
+- `src/shared/pii/filter.ts` (D2 filter)
 - `src/shared/db/schema/turns.ts`, `sessions.ts`
 
 ## Known issues

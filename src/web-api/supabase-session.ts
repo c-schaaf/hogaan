@@ -109,13 +109,82 @@ export type AuditEvent =
   | 'E1_SessionDelete'
   | 'E1_ProfileGet'
   | 'E1_ProfilePatch'
-  | 'E1_ProfileDelete';
+  | 'E1_ProfileDelete'
+  | 'E1_Features'
+  | 'E1_BriefGet'
+  | 'E1_BriefEdit'
+  | 'E1_BriefDelete'
+  | 'E1_MomentsList'
+  | 'E1_MomentWrite'
+  | 'E1_OutcomeWrite'
+  | 'E1_RatingWrite'
+  | 'E1_PreferencesWrite'
+  | 'E1_McpTokens'
+  | 'E1_Billing'
+  | 'E1_Orgs'
+  | 'E1_SponsorReport'
+  | 'E1_MeetingNotes'
+  | 'E1_DemoTools'
+  | 'E1_McpToolCall';
+
+/**
+ * DEMO MODE ONLY — fixed identity for the one seeded sample leader. The
+ * browser in demo mode sends `Authorization: Bearer <DEMO_ACCESS_TOKEN>`.
+ * Any other token is rejected, and this path refuses to run at all when
+ * NODE_ENV=production (loadConfig also refuses DEMO_MODE there).
+ */
+export const DEMO_SUPABASE_USER_ID = '00000000-0000-4000-8000-0000000d3e00';
+export const DEMO_ACCESS_TOKEN = 'hogaan-demo-session';
+
+export class DemoModeInProductionError extends Error {
+  constructor() {
+    super('demo session path invoked with NODE_ENV=production — refusing');
+    this.name = 'DemoModeInProductionError';
+  }
+}
+
+async function readDemoSession(
+  req: FastifyRequest,
+  opts: ReadSessionOpts,
+  targetEndEvent: AuditEvent,
+): Promise<WebSession | null> {
+  if (opts.config.nodeEnv === 'production') throw new DemoModeInProductionError();
+  const auth = req.headers.authorization;
+  const token =
+    typeof auth === 'string' && auth.toLowerCase().startsWith('bearer ')
+      ? auth.slice(7).trim()
+      : '';
+  if (token !== DEMO_ACCESS_TOKEN) return null;
+  const rows = await opts.db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.supabaseUserId, DEMO_SUPABASE_USER_ID))
+    .limit(1);
+  const u = rows[0];
+  if (u === undefined) return null;
+  // Same fail-closed audit contract as the real path (Hard Rule 3 / BPMN 03).
+  await writeSupabaseAuditEntry(opts.db, {
+    userId: u.id,
+    requestId: req.id,
+    targetEndEvent,
+    ipAddress: req.ip ?? null,
+  });
+  return {
+    userId: u.id,
+    email: u.email ?? '',
+    supabaseUserId: DEMO_SUPABASE_USER_ID,
+    fullName: '',
+  };
+}
 
 export async function readSupabaseSession(
   req: FastifyRequest,
   opts: ReadSessionOpts,
   targetEndEvent: AuditEvent = 'E1_SupabaseSessionValidated',
 ): Promise<WebSession | null> {
+  if (opts.config.demoMode === true) {
+    return readDemoSession(req, opts, targetEndEvent);
+  }
   const auth = req.headers.authorization;
   const hasAuthHeader = typeof auth === 'string' && auth.length > 0;
   const token =

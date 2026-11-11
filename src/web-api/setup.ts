@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
-import { getDb } from '../shared/db/client.js';
+import { type Database, getDb } from '../shared/db/client.js';
 import { installRedisForBreakerSync } from '../shared/llm/breaker-redis-sync.js';
-import { getRedis } from '../shared/redis/client.js';
-import { buildRateLimiters } from '../shared/redis/rate-limit.js';
+import { getRedis, type RedisBundle } from '../shared/redis/client.js';
+import { buildRateLimiters, type RateLimiters } from '../shared/redis/rate-limit.js';
 import type { AppConfig } from '../shared/secrets/config.js';
 import { buildTraceEmitter } from '../shared/trace/index.js';
 import { registerWebApiRoutes } from './routes.js';
@@ -31,11 +31,33 @@ const REQUIRED_VARS: Array<[keyof AppConfig, string]> = [
   ['supabaseAnonKey', 'SUPABASE_ANON_KEY'],
 ];
 
+/**
+ * Dependencies can be injected (demo mode: embedded DB + in-memory Redis).
+ * Production passes nothing and gets the real Supabase / Upstash clients.
+ */
+export interface WebApiDeps {
+  db: Database;
+  redis: RedisBundle;
+  rateLimiters: RateLimiters;
+}
+
 // eslint-disable-next-line @typescript-eslint/require-await -- async signature kept symmetric with other setup helpers
 export async function wireWebApiRoutes(
   app: FastifyInstance,
   config: AppConfig,
-): Promise<{ registered: true }> {
+  injected?: WebApiDeps,
+): Promise<{ registered: true; deps: WebApiDeps }> {
+  if (injected !== undefined) {
+    if (config.demoMode !== true || config.nodeEnv === 'production') {
+      throw new Error('injected web-api dependencies are only allowed in demo mode');
+    }
+    registerWebApiRoutes(app, {
+      config,
+      ...injected,
+      traceEmitter: buildTraceEmitter(config),
+    });
+    return { registered: true, deps: injected };
+  }
   const missing = REQUIRED_VARS.filter(([k]) => config[k] === undefined).map(([, name]) => name);
   if (missing.length > 0) {
     // Fail loudly so a misconfigured deploy doesn't boot into a non-
@@ -83,5 +105,5 @@ export async function wireWebApiRoutes(
     rateLimiters,
     traceEmitter,
   });
-  return { registered: true };
+  return { registered: true, deps: { db, redis, rateLimiters } };
 }
