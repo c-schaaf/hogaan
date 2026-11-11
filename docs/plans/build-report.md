@@ -66,7 +66,7 @@ What to click, in order:
    (Phase 4). No money or card is involved.
 7. **Profile → Sponsored programs.** Read what a sponsor can and cannot
    see. Then **I fund or run a program → sponsor reports**. "Fall 2026
-   Fellows" (12 leaders) shows a report with totals only. "Spring pilot" (6
+   Fellows" (11 leaders) shows a report with totals only. "Spring pilot" (6
    leaders) shows no report, because it is under the 10-person privacy
    floor (Phase 5). In the demo, Amina is the funder's administrator;
    sponsors are not allowed to join their own cohorts, so the leader's side
@@ -331,7 +331,7 @@ exits without real Supabase/Redis/database settings.
 | P3.1 OAuth sign-in for assistants | The MCP standard recommends OAuth for remote servers. Built personal keys instead (simpler, works with assistants that accept a key header). OAuth is the next step before a wide launch. |
 | Server-generated PDF of the sponsor report | Used the browser's print-to-PDF; adding a PDF library felt unjustified. |
 | P6.1 calendar connection, P6.3 inbox access | The plan builds these "only if Phases 2–3 show demand"; there is no usage data yet. Both also need Google's app verification. Google's current rules: apps using "restricted" scopes need extra review, a yearly security assessment by an approved assessor when the data is stored on servers, and "several weeks". Gmail reading is one of these per Google's scope list (Google's page I read did not list scopes; check the OAuth FAQ before scoping). |
-| Stripe `fallbacks` (automatic retry on a different model when the model declines) for Opus 5.5 | The installed Anthropic SDK (0.92) doesn't support that option; upgrading the SDK across a major version was out of scope. Declines are handled instead (chat: safe message; background: retried, then failed safely). |
+| Anthropic `fallbacks` option (automatic retry on a different model when the model declines) for Opus 5.5 | The installed Anthropic SDK (0.92) doesn't support that option; upgrading the SDK across a major version was out of scope. Declines are handled instead (chat: safe message; background: retried, then failed safely). |
 
 ---
 
@@ -444,7 +444,9 @@ Most important first.
       claimed, so two server instances sending at the same instant could
       exceed it. Low risk with one instance; fix with a database lock if
       you run several.
-    Every fix has a test (named in section 2).
+    Most fixes have a test (named in section 2). Two were checked by
+    reading the code only: the Stripe single-transaction change and the
+    job-runner timing changes.
 
 ---
 
