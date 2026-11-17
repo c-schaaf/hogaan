@@ -1,0 +1,36 @@
+# Hosted DEMO of the build branch, for showing people the new features.
+#
+# This is NOT the production app and is not connected to it. It runs demo
+# mode: an in-memory database that is wiped on every restart, one shared
+# sample leader, no sign-up. See docs/runbooks/hosted-demo.md.
+#
+# In Render: New > Blueprint > pick this repository and this branch. Render
+# asks for the two values marked `sync: false`.
+services:
+  - type: web
+    name: hogaan-demo
+    runtime: node
+    # The embedded database needs about 400 MB by itself and the whole demo
+    # about 600 MB, so the 512 MB plans (Free, Starter) are killed for running
+    # out of memory. Standard has 2 GB. Delete the service when you are done.
+    plan: standard
+    branch: build/context-and-connections
+    autoDeploy: false
+    buildCommand: pnpm install --frozen-lockfile && pnpm build:api && pnpm demo:build
+    startCommand: node dist/demo/main.js
+    healthCheckPath: /healthz
+    envVars:
+      # Demo mode refuses to start as production or staging. "development"
+      # also makes the build install the tools the demo needs.
+      - key: NODE_ENV
+        value: development
+      - key: DEMO_HOSTED
+        value: 'true'
+      # Real AI calls per day before the demo falls back to scripted replies.
+      - key: DEMO_DAILY_MODEL_CALLS
+        value: '200'
+      # You type these two in when Render asks. They are never stored in git.
+      - key: DEMO_ACCESS_CODE
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

@@ -25,6 +25,7 @@ type OptionalKey =
   | 'SUPABASE_ANON_KEY'
   | 'SUPABASE_JWT_SECRET'
   | 'DEMO_MODE'
+  | 'DEMO_DAILY_MODEL_CALLS'
   | 'LLM_CHAT_MODEL'
   | 'LLM_CHAT_EFFORT'
   | 'LLM_BACKGROUND_MODEL'
@@ -72,6 +73,8 @@ export interface AppConfig {
    * NODE_ENV=production. Optional so existing test fakes stay valid.
    */
   demoMode?: boolean;
+  /** DEMO MODE only: real model calls allowed per UTC day (see llm/demo-budget.ts). */
+  demoDailyModelCalls?: number;
   /** Feature flags — see src/shared/flags/index.ts. Missing = off. */
   features?: Partial<Record<FeatureFlag, boolean>>;
   /** Live-chat model id. Default 'claude-haiku-4-5' (today's model). */
@@ -176,6 +179,7 @@ export function loadConfig(): AppConfig {
   return {
     nodeEnv: nodeEnvRaw,
     demoMode,
+    demoDailyModelCalls: intOpt('DEMO_DAILY_MODEL_CALLS', 200),
     features: readFeatureFlags(process.env, demoMode),
     llmChatModel: chatModelRaw as ChatModelId,
     llmChatEffort: effortRaw,

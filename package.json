@@ -14,6 +14,8 @@
     "dev:api": "tsx watch src/index.ts",
     "dev:web": "vite --config web/vite.config.ts",
     "demo": "tsx scripts/demo.ts",
+    "demo:build": "tsx scripts/demo.ts --build-only",
+    "demo:start": "node dist/demo/main.js",
     "build": "tsc -p tsconfig.build.json && vite build --config web/vite.config.ts && tsx scripts/copy-assets.ts",
     "build:api": "tsc -p tsconfig.build.json && tsx scripts/copy-assets.ts",
     "build:web": "vite build --config web/vite.config.ts",

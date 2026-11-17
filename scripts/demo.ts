@@ -39,6 +39,10 @@ async function main(): Promise<void> {
     if (callerNodeEnv === undefined) delete process.env['NODE_ENV'];
     else process.env['NODE_ENV'] = callerNodeEnv;
   }
+  if (process.argv.includes('--build-only')) {
+    console.log('[demo] web app built; not starting the server (--build-only).');
+    return;
+  }
   const server = await startDemoServer({ webDistDir: outDir });
   const model =
     server.config.anthropicApiKey !== undefined
@@ -48,6 +52,9 @@ async function main(): Promise<void> {
   console.log('  Hogaan demo is running.');
   console.log(`  Open:  http://localhost:${server.config.port}`);
   console.log('  You are signed in as the sample leader "Amina". Nothing is saved after you stop.');
+  if ((process.env['DEMO_ACCESS_CODE'] ?? '') !== '') {
+    console.log('  Access: private. Visitors need the access code (add ?access=CODE to the link).');
+  }
   console.log(`  Coach: ${model}`);
   console.log('  Stop:  Ctrl+C');
   console.log('');

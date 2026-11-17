@@ -15,7 +15,8 @@ import {
 } from './errors.js';
 import { groqChat } from './groq.js';
 import { withRetry } from './retry.js';
-import { scriptedCoachReply, scriptedStream } from './scripted.js';
+import { DEMO_BUDGET_MARKER, tryConsumeDemoModelCall } from './demo-budget.js';
+import { SCRIPTED_MARKER, scriptedCoachReply, scriptedStream } from './scripted.js';
 
 /**
  * A system block. `trusted: true` marks library content (Hamse-owned system
@@ -103,6 +104,26 @@ export function useScriptedModel(config: AppConfig): boolean {
 }
 
 /**
+ * Which path a model call takes in demo mode. With a real key, each call
+ * draws on the day's demo budget; once that is spent the scripted stand-in
+ * answers instead, so a hosted demo cannot run up an open-ended bill.
+ * Outside demo mode this is always 'real' and nothing is counted.
+ */
+type DemoPath = 'real' | 'scripted' | 'over-budget';
+function demoPath(config: AppConfig): DemoPath {
+  if (config.demoMode !== true) return 'real';
+  if (useScriptedModel(config)) return 'scripted';
+  return tryConsumeDemoModelCall(config) ? 'real' : 'over-budget';
+}
+
+function standInText(path: DemoPath, base: string): string {
+  if (path !== 'over-budget') return base;
+  return base.includes(SCRIPTED_MARKER)
+    ? base.replace(SCRIPTED_MARKER, DEMO_BUDGET_MARKER)
+    : `${DEMO_BUDGET_MARKER}\n\n${base}`;
+}
+
+/**
  * D2 privacy filter at the provider boundary. Every message and every
  * untrusted system block passes through stripPii before any provider call.
  */
@@ -167,8 +188,12 @@ export async function chat(
 ): Promise<ChatResponse> {
   const start = Date.now();
   const req = sanitizeRequest(rawReq);
-  if (useScriptedModel(config)) {
-    const text = req.scripted?.() ?? scriptedCoachReply(systemText(req), req.messages);
+  const path = demoPath(config);
+  if (path !== 'real') {
+    const text = standInText(
+      path,
+      req.scripted?.() ?? scriptedCoachReply(systemText(req), req.messages),
+    );
     return {
       text,
       modelUsed: 'scripted-demo',
@@ -280,8 +305,12 @@ export async function* chatStream(
 ): AsyncGenerator<string, ChatStreamFinal, void> {
   const start = Date.now();
   const req = sanitizeRequest(rawReq);
-  if (useScriptedModel(config)) {
-    const text = req.scripted?.() ?? scriptedCoachReply(systemText(req), req.messages);
+  const path = demoPath(config);
+  if (path !== 'real') {
+    const text = standInText(
+      path,
+      req.scripted?.() ?? scriptedCoachReply(systemText(req), req.messages),
+    );
     yield* scriptedStream(text);
     return {
       text,
@@ -334,7 +363,7 @@ export async function backgroundJson<T>(
   config: AppConfig,
   req: BackgroundJsonRequest<T>,
 ): Promise<{ value: T; model: BackgroundModelId | 'scripted-demo' }> {
-  if (useScriptedModel(config)) {
+  if (demoPath(config) !== 'real') {
     return { value: req.scripted(), model: 'scripted-demo' };
   }
   const model = config.llmBackgroundModel ?? 'claude-opus-5-5';

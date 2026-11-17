@@ -6,6 +6,7 @@ import { createMemoryRedis, createPassThroughRateLimiters } from '../shared/redi
 import { type AppConfig, loadConfig } from '../shared/secrets/config.js';
 import { wireWebApiRoutes } from '../web-api/setup.js';
 import { wireWebStatic } from '../web-static/setup.js';
+import { installAccessGate, MIN_ACCESS_CODE_LENGTH } from './access-gate.js';
 import { seedDemo } from './seed.js';
 import { buildJobHandlers } from '../jobs/handlers.js';
 import { startJobRunner } from '../jobs/runner.js';
@@ -57,6 +58,30 @@ export function assertDemoAllowed(env: Record<string, string | undefined>): void
   }
 }
 
+/**
+ * The access code for this run, if any. A HOSTED demo (DEMO_HOSTED=true, or
+ * running on Render) signs every visitor in as the sample leader on a public
+ * address, so it must have one; a demo on your own computer may go without.
+ */
+export function demoAccessCode(env: Record<string, string | undefined>): string | undefined {
+  const hosted = env['DEMO_HOSTED'] === 'true' || env['RENDER'] !== undefined;
+  const code = (env['DEMO_ACCESS_CODE'] ?? '').trim();
+  if (code.length === 0) {
+    if (hosted) {
+      throw new DemoRefusedError(
+        'Refusing to start a hosted demo without DEMO_ACCESS_CODE: anyone with the address could use it.',
+      );
+    }
+    return undefined;
+  }
+  if (code.length < MIN_ACCESS_CODE_LENGTH) {
+    throw new DemoRefusedError(
+      `DEMO_ACCESS_CODE must be at least ${MIN_ACCESS_CODE_LENGTH} characters.`,
+    );
+  }
+  return code;
+}
+
 /** Prepare process.env for demo mode (mutates and returns it). */
 export function prepareDemoEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   assertDemoAllowed(env);
@@ -65,7 +90,7 @@ export function prepareDemoEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   env['NODE_ENV'] ??= 'development';
   env['PORT'] ??= '3000';
   env['LOG_LEVEL'] ??= 'warn';
-  env['PUBLIC_BASE_URL'] ??= `http://localhost:${env['PORT']}`;
+  env['PUBLIC_BASE_URL'] ??= env['RENDER_EXTERNAL_URL'] ?? `http://localhost:${env['PORT']}`;
   env['ENCRYPTION_KEY_BASE64'] ??= randomBytes(32).toString('base64');
   env['EMAIL_LINK_SECRET'] ??= randomBytes(32).toString('base64');
   return env;
@@ -81,6 +106,7 @@ export interface DemoServer {
 export async function startDemoServer(
   opts: { listen?: boolean; webDistDir?: string } = {},
 ): Promise<DemoServer> {
+  const accessCode = demoAccessCode(process.env);
   prepareDemoEnv(process.env);
   const config = loadConfig();
   if (config.demoMode !== true || config.nodeEnv === 'production') {
@@ -90,6 +116,8 @@ export async function startDemoServer(
   await seedDemo(embedded.db, config);
 
   const app = await buildApp(config);
+  // Must be installed before any route so it guards all of them.
+  if (accessCode !== undefined) installAccessGate(app, accessCode);
   await wireWebApiRoutes(app, config, {
     db: embedded.db,
     redis: createMemoryRedis(),
