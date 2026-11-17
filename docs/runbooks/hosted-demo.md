@@ -59,6 +59,16 @@ The hosted demo is compiled first and started with `node dist/demo/main.js`.
 `pnpm demo` (through tsx, building the web app on start) uses about 1 GB and is
 meant for your own computer.
 
+## Setting it up on Railway
+
+Railway bills for what the service uses, so there is no plan to pick. Create an
+empty service, set the variables below, set the build command to
+`pnpm build:api && pnpm demo:build` and the start command to
+`node dist/demo/main.js`, set the health check path to `/healthz`, then connect
+the GitHub repository and branch and generate a domain. Turning on "sleep when
+idle" (serverless) means it only costs money while someone is using it; the
+shared demo data resets each time it wakes.
+
 ## Setting it up on Render
 
 1. Sign in to Render and choose New > Blueprint.
@@ -71,7 +81,8 @@ meant for your own computer.
 
 | Variable | Meaning |
 |---|---|
-| `DEMO_HOSTED` | `true` marks a public demo and makes the access code required. Also assumed when running on Render. |
+| `NODE_ENV` | Must be `development`. Demo mode refuses `production` and `staging`. |
+| `DEMO_HOSTED` | `true` marks a public demo and makes the access code required. Also assumed when running on Render or Railway. |
 | `DEMO_ACCESS_CODE` | The shared code. |
 | `DEMO_DAILY_MODEL_CALLS` | Real AI calls allowed per UTC day. |
 | `ANTHROPIC_API_KEY` | Optional. Without it the coach is scripted. |

@@ -15,6 +15,7 @@ describe('hosted demo: start rules', () => {
   it('refuses to start hosted without an access code', () => {
     expect(() => demoAccessCode({ DEMO_HOSTED: 'true' })).toThrow(/DEMO_ACCESS_CODE/);
     expect(() => demoAccessCode({ RENDER: 'true' })).toThrow(/DEMO_ACCESS_CODE/);
+    expect(() => demoAccessCode({ RAILWAY_PROJECT_ID: 'abc' })).toThrow(/DEMO_ACCESS_CODE/);
   });
   it('refuses a short access code', () => {
     expect(() => demoAccessCode({ DEMO_ACCESS_CODE: 'short' })).toThrow(/at least 8/);

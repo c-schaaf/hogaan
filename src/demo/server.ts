@@ -60,11 +60,14 @@ export function assertDemoAllowed(env: Record<string, string | undefined>): void
 
 /**
  * The access code for this run, if any. A HOSTED demo (DEMO_HOSTED=true, or
- * running on Render) signs every visitor in as the sample leader on a public
+ * running on Render or Railway) signs every visitor in as the sample leader on a public
  * address, so it must have one; a demo on your own computer may go without.
  */
 export function demoAccessCode(env: Record<string, string | undefined>): string | undefined {
-  const hosted = env['DEMO_HOSTED'] === 'true' || env['RENDER'] !== undefined;
+  const hosted =
+    env['DEMO_HOSTED'] === 'true' ||
+    env['RENDER'] !== undefined ||
+    env['RAILWAY_PROJECT_ID'] !== undefined;
   const code = (env['DEMO_ACCESS_CODE'] ?? '').trim();
   if (code.length === 0) {
     if (hosted) {
@@ -90,7 +93,11 @@ export function prepareDemoEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   env['NODE_ENV'] ??= 'development';
   env['PORT'] ??= '3000';
   env['LOG_LEVEL'] ??= 'warn';
-  env['PUBLIC_BASE_URL'] ??= env['RENDER_EXTERNAL_URL'] ?? `http://localhost:${env['PORT']}`;
+  env['PUBLIC_BASE_URL'] ??=
+    env['RENDER_EXTERNAL_URL'] ??
+    (env['RAILWAY_PUBLIC_DOMAIN'] !== undefined
+      ? `https://${env['RAILWAY_PUBLIC_DOMAIN']}`
+      : `http://localhost:${env['PORT']}`);
   env['ENCRYPTION_KEY_BASE64'] ??= randomBytes(32).toString('base64');
   env['EMAIL_LINK_SECRET'] ??= randomBytes(32).toString('base64');
   return env;
