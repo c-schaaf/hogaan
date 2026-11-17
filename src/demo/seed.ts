@@ -20,6 +20,7 @@ import { createCohort, createInvite, createOrg, joinByCode, verifyOrg } from '..
 import { setPrefs } from '../shared/email/proactive.js';
 import { scheduleWeeklyNudge } from '../jobs/phase2-handlers.js';
 import { isEnabled } from '../shared/flags/index.js';
+import { registerFixedToken } from '../mcp/tokens.js';
 
 /**
  * Seed data for DEMO MODE. One fictional sample leader ("Amina"), a few past
@@ -216,6 +217,11 @@ export async function seedDemo(db: Database, config: AppConfig): Promise<{ userI
   // funder's admin (sponsors may not join their own cohorts); the leader side
   // is visible on her Profile ("Sponsored programs").
   if (isEnabled(config, 'orgs')) await seedOrgs(config, db, userId);
+  // P3 — a fixed assistant key for a hosted demo (DEMO_MCP_KEY), so a
+  // connected assistant survives the demo restarting. See hosted-demo.md.
+  if (isEnabled(config, 'mcp') && config.demoMcpKey !== undefined) {
+    await registerFixedToken(db, userId, config.demoMcpKey, 'Demo key (fixed)');
+  }
   return { userId };
 }
 

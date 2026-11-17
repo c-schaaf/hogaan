@@ -28,6 +28,31 @@ export async function createToken(
   return { id: rows[0]!.id, token };
 }
 
+export const MIN_FIXED_TOKEN_LENGTH = 24;
+
+/** True when `token` is acceptable as an operator-chosen key. */
+export function isValidFixedToken(token: string): boolean {
+  return (
+    token.startsWith(TOKEN_PREFIX) && token.length >= MIN_FIXED_TOKEN_LENGTH && token.length <= 200
+  );
+}
+
+/**
+ * DEMO MODE only: register a key the operator chose (DEMO_MCP_KEY), so an
+ * assistant connected to a hosted demo keeps working after the demo
+ * restarts and its in-memory database is rebuilt. Never used outside demo
+ * mode: real keys are always random and created by the leader.
+ */
+export async function registerFixedToken(
+  db: Database,
+  userId: string,
+  token: string,
+  label: string,
+): Promise<void> {
+  if (!isValidFixedToken(token)) throw new Error('invalid fixed MCP token');
+  await db.insert(mcpTokens).values({ userId, tokenHash: hashToken(token), label });
+}
+
 export async function listTokens(db: Database, userId: string) {
   return db
     .select({

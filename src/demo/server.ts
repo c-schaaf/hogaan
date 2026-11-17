@@ -8,6 +8,7 @@ import { wireWebApiRoutes } from '../web-api/setup.js';
 import { wireWebStatic } from '../web-static/setup.js';
 import { installAccessGate, MIN_ACCESS_CODE_LENGTH } from './access-gate.js';
 import { seedDemo } from './seed.js';
+import { isValidFixedToken, MIN_FIXED_TOKEN_LENGTH, TOKEN_PREFIX } from '../mcp/tokens.js';
 import { buildJobHandlers } from '../jobs/handlers.js';
 import { startJobRunner } from '../jobs/runner.js';
 
@@ -118,6 +119,11 @@ export async function startDemoServer(
   const config = loadConfig();
   if (config.demoMode !== true || config.nodeEnv === 'production') {
     throw new DemoRefusedError('demo config invalid');
+  }
+  if (config.demoMcpKey !== undefined && !isValidFixedToken(config.demoMcpKey)) {
+    throw new DemoRefusedError(
+      `DEMO_MCP_KEY must start with "${TOKEN_PREFIX}" and be at least ${MIN_FIXED_TOKEN_LENGTH} characters.`,
+    );
   }
   const embedded = await createEmbeddedDb();
   await seedDemo(embedded.db, config);

@@ -26,6 +26,7 @@ type OptionalKey =
   | 'SUPABASE_JWT_SECRET'
   | 'DEMO_MODE'
   | 'DEMO_DAILY_MODEL_CALLS'
+  | 'DEMO_MCP_KEY'
   | 'LLM_CHAT_MODEL'
   | 'LLM_CHAT_EFFORT'
   | 'LLM_BACKGROUND_MODEL'
@@ -75,6 +76,8 @@ export interface AppConfig {
   demoMode?: boolean;
   /** DEMO MODE only: real model calls allowed per UTC day (see llm/demo-budget.ts). */
   demoDailyModelCalls?: number;
+  /** DEMO MODE only: a fixed assistant (MCP) key for the sample leader. */
+  demoMcpKey?: string;
   /** Feature flags — see src/shared/flags/index.ts. Missing = off. */
   features?: Partial<Record<FeatureFlag, boolean>>;
   /** Live-chat model id. Default 'claude-haiku-4-5' (today's model). */
@@ -180,6 +183,9 @@ export function loadConfig(): AppConfig {
     nodeEnv: nodeEnvRaw,
     demoMode,
     demoDailyModelCalls: intOpt('DEMO_DAILY_MODEL_CALLS', 200),
+    ...(demoMode && readOptional('DEMO_MCP_KEY') !== undefined
+      ? { demoMcpKey: readOptional('DEMO_MCP_KEY') as string }
+      : {}),
     features: readFeatureFlags(process.env, demoMode),
     llmChatModel: chatModelRaw as ChatModelId,
     llmChatEffort: effortRaw,

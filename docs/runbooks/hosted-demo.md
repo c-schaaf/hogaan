@@ -42,8 +42,26 @@ Opening it once sets a cookie for 30 days. Someone who opens the bare address
 sees a page asking for the code. To cut off access, change the code in the
 host's settings and restart.
 
-The MCP endpoint (`/mcp`) is not behind the access code. It has its own keys,
-created on the Profile page.
+The MCP endpoint (`/mcp`) is not behind the access code. It has its own keys.
+
+## Connecting an AI assistant to the demo
+
+A key created on the demo's Profile page is stored in memory, so it stops
+working whenever the demo restarts or wakes from sleep. For a hosted demo, set
+`DEMO_MCP_KEY` instead (`hgn_` followed by 20 or more random characters). That
+key is registered for the sample leader every time the demo starts.
+
+Two ways to give it to an assistant:
+
+- Address `https://YOUR-DEMO-ADDRESS/mcp`, with the request header
+  `Authorization: Bearer YOUR-KEY`. This is how the real app works.
+- Address `https://YOUR-DEMO-ADDRESS/mcp/key/YOUR-KEY`, with no sign-in. This
+  form exists in demo mode only, for assistants whose connector form accepts
+  an address and nothing else.
+
+Either way the assistant acts as the sample leader, "Amina". Its calls to the
+coach count against the daily AI-call cap. To cut off access, change
+`DEMO_MCP_KEY` and redeploy.
 
 ## Memory and cost
 

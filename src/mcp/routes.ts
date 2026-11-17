@@ -1,5 +1,5 @@
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { hasCapability } from '../entitlements/index.js';
 import { reportP0 } from '../incident-handling/index.js';
 import { auditLog } from '../shared/db/schema/audit-log.js';
@@ -64,10 +64,8 @@ export function registerMcpRoutes(app: FastifyInstance, opts: WebApiRoutesOpts):
     id: null,
   });
 
-  app.post('/mcp', async (req, reply) => {
+  const handleMcp = async (req: FastifyRequest, reply: FastifyReply, token: string) => {
     if (off()) return reply.code(404).send({ error: 'feature_off' });
-    const auth = req.headers.authorization;
-    const token = typeof auth === 'string' && /^bearer /i.test(auth) ? auth.slice(7).trim() : '';
     const userId = token === '' ? null : await resolveToken(opts.db, token);
     if (userId === null) {
       void reply.header('WWW-Authenticate', 'Bearer realm="hogaan"');
@@ -135,7 +133,25 @@ export function registerMcpRoutes(app: FastifyInstance, opts: WebApiRoutesOpts):
         reply.raw.end(JSON.stringify(rpcError(-32603, 'Internal server error')));
       }
     }
+    return reply;
+  };
+
+  app.post('/mcp', (req, reply) => {
+    const auth = req.headers.authorization;
+    const token = typeof auth === 'string' && /^bearer /i.test(auth) ? auth.slice(7).trim() : '';
+    return handleMcp(req, reply, token);
   });
+
+  // DEMO MODE only: the key may travel in the address instead of a header,
+  // for assistants whose "add a connector" form takes an address and nothing
+  // else. Never registered outside demo mode: an address ends up in logs and
+  // browser history, which is acceptable for a sample leader's demo key and
+  // not for a real person's.
+  if (opts.config.demoMode === true) {
+    app.post<{ Params: { key: string } }>('/mcp/key/:key', (req, reply) =>
+      handleMcp(req, reply, req.params.key),
+    );
+  }
 
   const notAllowed = (
     _req: unknown,
