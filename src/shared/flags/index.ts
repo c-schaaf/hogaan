@@ -17,6 +17,7 @@ export const FEATURE_FLAGS = {
   ratings: 'FEATURE_RATINGS', // P2.4 helpful / not helpful
   weeklyNudge: 'FEATURE_WEEKLY_NUDGE', // P2.6 opt-in weekly nudge
   mcp: 'FEATURE_MCP', // P3 Hogaan MCP server
+  mcpOAuth: 'FEATURE_MCP_OAUTH', // P3.1b "Sign in with Hogaan" for assistants (needs mcp)
   billing: 'FEATURE_BILLING', // P4 subscriptions + free-tier limits
   orgs: 'FEATURE_ORGS', // P5 organizations, cohorts, funder report
   meetingNotes: 'FEATURE_MEETING_NOTES', // P6.2 paste meeting notes into a reflection

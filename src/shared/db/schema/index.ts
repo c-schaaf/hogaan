@@ -10,5 +10,6 @@ export * from './leader-briefs.js';
 export * from './background-jobs.js';
 export * from './moments.js';
 export * from './mcp-tokens.js';
+export * from './mcp-oauth.js';
 export * from './billing.js';
 export * from './orgs.js';

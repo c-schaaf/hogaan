@@ -17,6 +17,7 @@ import { devLog } from './lib/log';
 import { isDemoMode } from './lib/demo';
 import { supabase } from './lib/supabase';
 import { Chat } from './phases/Chat';
+import { ConnectAssistant } from './phases/ConnectAssistant';
 import { Context } from './phases/Context';
 import { Moments } from './phases/Moments';
 import { Reflect } from './phases/Reflect';
@@ -47,7 +48,8 @@ type Phase =
   | 'context'
   | 'moments'
   | 'reflect'
-  | 'sponsor';
+  | 'sponsor'
+  | 'connect';
 
 const AUTHED_PHASES = new Set<Phase>([
   'home',
@@ -58,6 +60,7 @@ const AUTHED_PHASES = new Set<Phase>([
   'moments',
   'reflect',
   'sponsor',
+  'connect',
 ]);
 
 const URL_PATH_TO_PHASE: Partial<Record<string, Phase>> = {
@@ -66,6 +69,7 @@ const URL_PATH_TO_PHASE: Partial<Record<string, Phase>> = {
   '/about-you': 'context',
   '/moments': 'moments',
   '/sponsor': 'sponsor',
+  '/connect-assistant': 'connect',
 };
 
 // Phases that own their own URL path. Home/chat live at '/'.
@@ -75,6 +79,7 @@ const PHASE_TO_URL_PATH: Partial<Record<Phase, string>> = {
   context: '/about-you',
   moments: '/moments',
   sponsor: '/sponsor',
+  connect: '/connect-assistant',
   home: '/',
   chat: '/',
 };
@@ -120,7 +125,8 @@ export function Shell() {
   useEffect(() => {
     phaseRef.current = phase;
     if (AUTHED_PHASES.has(phase)) {
-      sessionStorage.setItem('shell-phase', phase);
+      // The consent screen is a one-off detour; never restore it later.
+      if (phase !== 'connect') sessionStorage.setItem('shell-phase', phase);
       const desiredPath =
         phase === 'reflect' && reflectId !== null
           ? `/reflect/${reflectId}`
@@ -444,6 +450,9 @@ export function Shell() {
       break;
     case 'sponsor':
       body = <Sponsor onNav={onNav} onBack={() => setPhase('profile')} />;
+      break;
+    case 'connect':
+      body = <ConnectAssistant onNav={onNav} onDone={() => setPhase('profile')} />;
       break;
     case 'context':
       body = <Context onNav={onNav} onBack={() => setPhase('profile')} />;

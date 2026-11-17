@@ -27,6 +27,7 @@ type OptionalKey =
   | 'DEMO_MODE'
   | 'DEMO_DAILY_MODEL_CALLS'
   | 'DEMO_MCP_KEY'
+  | 'MCP_OAUTH_SECRET'
   | 'LLM_CHAT_MODEL'
   | 'LLM_CHAT_EFFORT'
   | 'LLM_BACKGROUND_MODEL'
@@ -78,6 +79,11 @@ export interface AppConfig {
   demoDailyModelCalls?: number;
   /** DEMO MODE only: a fixed assistant (MCP) key for the sample leader. */
   demoMcpKey?: string;
+  /**
+   * Secret that signs "Sign in with Hogaan" (MCP OAuth) codes and tokens.
+   * At least 32 characters. Without it the OAuth endpoints answer 503.
+   */
+  mcpOAuthSecret?: string | undefined;
   /** Feature flags — see src/shared/flags/index.ts. Missing = off. */
   features?: Partial<Record<FeatureFlag, boolean>>;
   /** Live-chat model id. Default 'claude-haiku-4-5' (today's model). */
@@ -196,6 +202,7 @@ export function loadConfig(): AppConfig {
     briefUpdateDelayMs: intOpt('BRIEF_UPDATE_DELAY_MS', demoMode ? 3_000 : 10 * 60_000),
     jobPollIntervalMs: intOpt('JOB_POLL_INTERVAL_MS', demoMode ? 1_000 : 15_000),
     emailLinkSecret: readOptional('EMAIL_LINK_SECRET'),
+    mcpOAuthSecret: readOptional('MCP_OAUTH_SECRET'),
     port,
     logLevel: logLevelRaw as AppConfig['logLevel'],
     publicBaseUrl: readOptional('PUBLIC_BASE_URL'),

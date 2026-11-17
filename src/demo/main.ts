@@ -23,6 +23,11 @@ async function main(): Promise<void> {
       ? `real model, capped at ${server.config.demoDailyModelCalls ?? 200} calls a day`
       : 'scripted stand-in (no ANTHROPIC_API_KEY set)';
   console.log(`[demo] listening on port ${server.config.port}; coach: ${coach}`);
+  if (process.env['HOGAAN_MCP_OAUTH_SECRET_GENERATED'] === 'true') {
+    console.warn(
+      '[demo] MCP_OAUTH_SECRET is not set: assistants connected with "Sign in with Hogaan" will need to reconnect after every restart. Set it to 32+ random characters.',
+    );
+  }
   const stop = () => {
     void server.close().then(() => process.exit(0));
   };

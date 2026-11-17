@@ -10,6 +10,7 @@ export interface Features {
   ratings: boolean;
   weeklyNudge: boolean;
   mcp: boolean;
+  mcpOAuth: boolean;
   billing: boolean;
   orgs: boolean;
   meetingNotes: boolean;
@@ -24,6 +25,7 @@ export const NO_FEATURES: Features = {
   ratings: false,
   weeklyNudge: false,
   mcp: false,
+  mcpOAuth: false,
   billing: false,
   orgs: false,
   meetingNotes: false,

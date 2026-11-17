@@ -1,4 +1,5 @@
 import { and, eq, inArray, lte, sql } from 'drizzle-orm';
+import { now as clockNow } from '../shared/clock.js';
 import { reportP2 } from '../incident-handling/index.js';
 import type { Database } from '../shared/db/client.js';
 import { backgroundJobs, type BackgroundJobRow } from '../shared/db/schema/background-jobs.js';
@@ -58,7 +59,7 @@ export async function enqueueJob(db: Database, opts: EnqueueOptions): Promise<vo
     kind: opts.kind,
     dedupeKey: opts.dedupeKey,
     payload: opts.payload ?? {},
-    runAfter: opts.runAfter ?? new Date(),
+    runAfter: opts.runAfter ?? clockNow(),
   };
   if (opts.mode === 'replace') {
     await db

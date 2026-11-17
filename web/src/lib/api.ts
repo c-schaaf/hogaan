@@ -251,6 +251,22 @@ export interface DemoEmail {
   at: string;
 }
 
+export interface McpConnection {
+  id: string;
+  clientName: string;
+  redirectHost: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+export interface OAuthRequestView {
+  clientName: string;
+  returnsTo: string;
+  localApp: boolean;
+  publishedBy: string | null;
+  allowed: boolean;
+}
+
 export interface McpToken {
   id: string;
   label: string;
@@ -393,6 +409,18 @@ export const api = {
       }),
     revoke: (id: string) =>
       call<{ ok: true }>(`/api/mcp/tokens/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    connections: () => call<{ connections: McpConnection[] }>('/api/mcp/connections'),
+    disconnect: (id: string) =>
+      call<{ ok: true }>(`/api/mcp/connections/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  },
+  oauth: {
+    request: (req: string) =>
+      call<OAuthRequestView>(`/api/oauth/request?req=${encodeURIComponent(req)}`),
+    consent: (req: string, approve: boolean) =>
+      call<{ redirectTo: string }>('/api/oauth/consent', {
+        method: 'POST',
+        body: { req, approve },
+      }),
   },
   billing: {
     get: () => call<Billing>('/api/billing'),

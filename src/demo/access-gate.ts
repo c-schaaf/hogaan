@@ -16,8 +16,26 @@ import type { FastifyInstance } from 'fastify';
 const COOKIE = 'hg_demo_access';
 const MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const MAX_WRONG_PER_MINUTE = 20;
-/** Paths that must stay open: health checks, and the MCP server (own keys). */
-const OPEN_PATHS = new Set(['/healthz', '/readyz']);
+/**
+ * Paths that must stay open: health checks, the MCP server (own keys), and
+ * the parts of "Sign in with Hogaan" that an assistant's SERVERS call
+ * directly, with no browser and so no access cookie: the two metadata
+ * documents, client registration, token and revocation. These hand out
+ * nothing on their own; a token still needs a code, and a code is only
+ * issued on the consent screen. /oauth/authorize and the consent screen
+ * are opened in the leader's browser and stay behind the gate: the access
+ * code is the demo's sign-in.
+ */
+const OPEN_PATHS = new Set([
+  '/healthz',
+  '/readyz',
+  '/.well-known/oauth-protected-resource',
+  '/.well-known/oauth-protected-resource/mcp',
+  '/.well-known/oauth-authorization-server',
+  '/oauth/register',
+  '/oauth/token',
+  '/oauth/revoke',
+]);
 
 export const MIN_ACCESS_CODE_LENGTH = 8;
 
@@ -40,7 +58,21 @@ function readCookie(header: string | undefined, name: string): string | undefine
   return undefined;
 }
 
-function page(message: string): string {
+/** Hidden inputs that carry the current query string through the form. */
+function carry(query: URLSearchParams): string {
+  const esc = (v: string) => v.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  let out = '';
+  for (const [k, v] of query) {
+    if (k !== 'access') out += `<input type="hidden" name="${esc(k)}" value="${esc(v)}">`;
+  }
+  return out;
+}
+
+function page(
+  message: string,
+  action = '/',
+  query: URLSearchParams = new URLSearchParams(),
+): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
@@ -51,7 +83,7 @@ h1{font-size:20px;margin:0 0 8px}p{margin:0 0 16px;color:#4a4a68;font-size:14px}
 input{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid #c2dcf5;font:inherit;margin-bottom:12px}
 button{width:100%;padding:10px;border-radius:999px;border:0;background:#0068cc;color:#fff;font:inherit;font-weight:600;cursor:pointer}</style>
 </head><body><main><h1>Hogaan demo</h1><p>${message}</p>
-<form method="get" action="/"><input name="access" type="password" autocomplete="off" aria-label="Access code" placeholder="Access code" required>
+<form method="get" action="${action.replace(/[^A-Za-z0-9/_.-]/g, '')}">${carry(query)}<input name="access" type="password" autocomplete="off" aria-label="Access code" placeholder="Access code" required>
 <button type="submit">Open the demo</button></form></main></body></html>`;
 }
 
@@ -70,7 +102,7 @@ export function installAccessGate(app: FastifyInstance, code: string): void {
         .code(status)
         .header('Cache-Control', 'no-store')
         .type('text/html; charset=utf-8')
-        .send(page(message));
+        .send(page(message, path, url.searchParams));
 
     const offered = url.searchParams.get('access');
     if (offered !== null) {

@@ -32,7 +32,8 @@ safety framing.
 **Built behind feature flags on the fork (all OFF by default; see
 `.env.example` and `docs/plans/build-report.md`):** leader brief + "What
 Hogaan knows about you", knowledge-digest mechanism, moments + follow-up
-email + reflections, response ratings, weekly nudge, Hogaan MCP server,
+email + reflections, response ratings, weekly nudge, Hogaan MCP server
+(personal keys and "Sign in with Hogaan" OAuth),
 billing + free tier, organizations/cohorts/funder report, meeting-notes
 reflection. `pnpm demo` runs everything with no accounts.
 
@@ -81,7 +82,7 @@ src/
 ├── leader-context/    # P1 leader brief: store (encrypted), render, background updater
 ├── moments/           # P2 moments + outcomes (reflections)
 ├── jobs/              # P2.5 Postgres-backed background job runner + handlers
-├── mcp/               # P3 Hogaan MCP server (tokens, tools, prompts)
+├── mcp/               # P3 Hogaan MCP server (tokens, tools, prompts; oauth/ = sign-in)
 ├── entitlements/      # P4 the one place plans/capabilities are decided
 ├── billing/           # P4 Stripe checkout, portal, webhooks
 ├── orgs/              # P5 organizations, cohorts, invites, funder report

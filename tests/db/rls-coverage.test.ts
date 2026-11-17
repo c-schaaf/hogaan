@@ -45,6 +45,8 @@ const CONTEXT_BUILD_RLS_TABLES = [
   'cohorts',
   'org_admins',
   'organizations',
+  // 0023
+  'mcp_oauth_grants',
 ];
 
 const DOCUMENTED_RLS_EXCLUSIONS = new Set<string>(['audit_log', 'prompt_logs']);

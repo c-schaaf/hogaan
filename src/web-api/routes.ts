@@ -1,4 +1,5 @@
 import { and, desc, eq, gt, ilike, inArray, isNotNull, lt, sql as drizzleSql } from 'drizzle-orm';
+import { now as clockNow } from '../shared/clock.js';
 import type { FastifyInstance } from 'fastify';
 import { fetchCoachingContext } from '../coaching/context-fetch.js';
 import { reportP2 } from '../incident-handling/index.js';
@@ -554,7 +555,7 @@ export function registerWebApiRoutes(app: FastifyInstance, opts: WebApiRoutesOpt
           kind: 'brief.update',
           dedupeKey: `brief:${sessionId}`,
           payload: { userId, sessionId },
-          runAfter: new Date(Date.now() + (opts.config.briefUpdateDelayMs ?? 600_000)),
+          runAfter: new Date(clockNow().getTime() + (opts.config.briefUpdateDelayMs ?? 600_000)),
           mode: 'replace',
         });
       }

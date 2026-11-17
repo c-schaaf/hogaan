@@ -8,6 +8,8 @@ import { checkRateLimit } from '../shared/redis/rate-limit.js';
 import type { WebApiRoutesOpts } from '../web-api/routes.js';
 import { requireSupabaseSession } from '../web-api/supabase-session.js';
 import { buildMcpServer } from './server.js';
+import { registerMcpOAuthRoutes, resolveOAuthAccess, wwwAuthenticate } from './oauth/routes.js';
+import { SEAL_PREFIX } from './oauth/seal.js';
 import { createToken, listTokens, resolveToken, revokeToken } from './tokens.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -66,12 +68,21 @@ export function registerMcpRoutes(app: FastifyInstance, opts: WebApiRoutesOpts):
 
   const handleMcp = async (req: FastifyRequest, reply: FastifyReply, token: string) => {
     if (off()) return reply.code(404).send({ error: 'feature_off' });
-    const userId = token === '' ? null : await resolveToken(opts.db, token);
+    // Two kinds of credential: a personal key the leader copied from
+    // Profile (hgn_...), or an access token from "Sign in with Hogaan"
+    // (hgo_..., OAuth). Both resolve to the same leader and then pass the
+    // same plan, rate-limit and audit checks below.
+    const userId =
+      token === ''
+        ? null
+        : token.startsWith(SEAL_PREFIX.access)
+          ? await resolveOAuthAccess(opts, token)
+          : await resolveToken(opts.db, token);
     if (userId === null) {
-      void reply.header('WWW-Authenticate', 'Bearer realm="hogaan"');
+      void reply.header('WWW-Authenticate', wwwAuthenticate(opts.config, token !== ''));
       return reply
         .code(401)
-        .send(rpcError(-32001, 'Unauthorized: create a token in Hogaan > Profile'));
+        .send(rpcError(-32001, 'Unauthorized: connect your assistant from Hogaan > Profile'));
     }
     if (!(await hasCapability(opts.config, opts.db, userId, 'mcp'))) {
       return reply
@@ -149,9 +160,13 @@ export function registerMcpRoutes(app: FastifyInstance, opts: WebApiRoutesOpts):
   // not for a real person's.
   if (opts.config.demoMode === true) {
     app.post<{ Params: { key: string } }>('/mcp/key/:key', (req, reply) =>
-      handleMcp(req, reply, req.params.key),
+      // Personal demo keys only: an OAuth access token must travel in the
+      // Authorization header (MCP spec), never in an address.
+      handleMcp(req, reply, req.params.key.startsWith(SEAL_PREFIX.access) ? '' : req.params.key),
     );
   }
+
+  registerMcpOAuthRoutes(app, opts);
 
   const notAllowed = (
     _req: unknown,

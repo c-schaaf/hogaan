@@ -43,8 +43,33 @@ sees a page asking for the code. To cut off access, change the code in the
 host's settings and restart.
 
 The MCP endpoint (`/mcp`) is not behind the access code. It has its own keys.
+Nor are the parts of "Sign in with Hogaan" that an assistant's servers call
+directly (the two `/.well-known/oauth-…` documents, `/oauth/register`,
+`/oauth/token`, `/oauth/revoke`). The sign-in page itself is behind the code.
 
-## Connecting an AI assistant to the demo
+## Connecting Claude to the demo by signing in (recommended)
+
+Set `MCP_OAUTH_SECRET` (32 or more random characters) on the host and
+redeploy. Without it, the demo makes a new secret each time it starts, and
+the connection breaks every time the service sleeps.
+
+Then, in Claude (claude.ai, the desktop app or Cowork):
+
+1. Open Customize > Connectors (claude.ai/customize/connectors).
+2. Choose + Add, then Add custom connector.
+3. Name it "Hogaan demo" and paste `https://YOUR-DEMO-ADDRESS/mcp`. Leave
+   the advanced settings as they are. Choose Add.
+4. Choose Connect. A Hogaan page opens. If it asks for the access code,
+   enter it (once per browser). Read what the assistant may do and choose
+   Allow. You are sent back to Claude, connected.
+
+It stays connected across restarts and sleep, as long as `MCP_OAUTH_SECRET`
+does not change. To disconnect, remove the connector in Claude, or use
+Disconnect on the demo's Profile page (in a demo, that lasts until the next
+restart, because the demo's memory is wiped). To cut off everyone at once,
+change `MCP_OAUTH_SECRET`.
+
+## Connecting an AI assistant with a key (older method)
 
 A key created on the demo's Profile page is stored in memory, so it stops
 working whenever the demo restarts or wakes from sleep. For a hosted demo, set
@@ -105,3 +130,5 @@ shared demo data resets each time it wakes.
 | `DEMO_DAILY_MODEL_CALLS` | Real AI calls allowed per UTC day. |
 | `ANTHROPIC_API_KEY` | Optional. Without it the coach is scripted. |
 | `LLM_CHAT_MODEL` | Optional. The live-chat model; defaults to the one production uses today. |
+| `MCP_OAUTH_SECRET` | Recommended. 32+ random characters. Keeps assistants connected by "Sign in with Hogaan" working across restarts. |
+| `DEMO_MCP_KEY` | Optional. A fixed key for the older key-based connection. |

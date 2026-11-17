@@ -120,6 +120,7 @@ export type AuditEvent =
   | 'E1_RatingWrite'
   | 'E1_PreferencesWrite'
   | 'E1_McpTokens'
+  | 'E1_McpOAuthConsent'
   | 'E1_Billing'
   | 'E1_Orgs'
   | 'E1_SponsorReport'

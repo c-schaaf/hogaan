@@ -101,6 +101,13 @@ export function prepareDemoEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
       : `http://localhost:${env['PORT']}`);
   env['ENCRYPTION_KEY_BASE64'] ??= randomBytes(32).toString('base64');
   env['EMAIL_LINK_SECRET'] ??= randomBytes(32).toString('base64');
+  // "Sign in with Hogaan": a hosted demo should set MCP_OAUTH_SECRET so a
+  // connected assistant keeps working after the demo restarts. Without it a
+  // fresh secret is made each start, and assistants must reconnect.
+  if (env['MCP_OAUTH_SECRET'] === undefined || env['MCP_OAUTH_SECRET'] === '') {
+    env['MCP_OAUTH_SECRET'] = randomBytes(32).toString('base64url');
+    env['HOGAAN_MCP_OAUTH_SECRET_GENERATED'] = 'true';
+  }
   return env;
 }
 
