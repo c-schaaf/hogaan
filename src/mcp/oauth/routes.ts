@@ -219,14 +219,29 @@ function tokenError(reply: FastifyReply, error: string, description: string, sta
     .send({ error, error_description: description });
 }
 
+/**
+ * The caller's address for rate limiting. `req.ip` trusts the left-most
+ * X-Forwarded-For entry, which the caller can write. The right-most entry is
+ * the one the host's own proxy appended, so it cannot be faked.
+ */
+function callerAddress(req: FastifyRequest): string {
+  const xff = req.headers['x-forwarded-for'];
+  const raw = Array.isArray(xff) ? xff.join(',') : xff;
+  const last = raw?.split(',').pop()?.trim();
+  return last !== undefined && last !== '' ? last : (req.socket.remoteAddress ?? 'unknown');
+}
+
 /** Small per-address limiter for the unauthenticated endpoints. */
 function limiter(perMinute: number) {
   const hits = new Map<string, { start: number; n: number }>();
-  return (ip: string): boolean => {
+  return (req: FastifyRequest): boolean => {
+    const ip = callerAddress(req);
     const t = Date.now();
     const h = hits.get(ip);
     if (h === undefined || t - h.start > 60_000) {
-      if (hits.size > 5000) hits.clear();
+      // Evict the oldest entries rather than clearing everyone's counts.
+      while (hits.size >= 5000) hits.delete(hits.keys().next().value as string);
+      hits.delete(ip);
       hits.set(ip, { start: t, n: 1 });
       return true;
     }
@@ -258,6 +273,7 @@ export function registerMcpOAuthRoutes(app: FastifyInstance, opts: WebApiRoutesO
   };
   const registerLimit = limiter(20);
   const tokenLimit = limiter(120);
+  const authorizeLimit = limiter(60);
 
   const machinePaths = [
     '/.well-known/oauth-protected-resource',
@@ -311,7 +327,7 @@ export function registerMcpOAuthRoutes(app: FastifyInstance, opts: WebApiRoutesO
   app.post('/oauth/register', (req, reply) => {
     const r = ready(reply);
     if (r === null) return reply;
-    if (!registerLimit(req.ip)) {
+    if (!registerLimit(req)) {
       return tokenError(
         reply,
         'temporarily_unavailable',
@@ -336,6 +352,9 @@ export function registerMcpOAuthRoutes(app: FastifyInstance, opts: WebApiRoutesO
     const r = ready(reply);
     if (r === null) return reply;
     const q = req.query;
+    if (!authorizeLimit(req)) {
+      return reply.code(429).header('Retry-After', '60').send({ error: 'too_many_requests' });
+    }
     const client = await resolveClient(r.secret, q['client_id']);
     if (client === null) {
       return errorPage(reply, 'Hogaan does not recognise the assistant that sent you here.');
@@ -406,6 +425,8 @@ export function registerMcpOAuthRoutes(app: FastifyInstance, opts: WebApiRoutesO
       returnsTo: redirectHost(p.ru),
       localApp: isLoopbackRedirect(p.ru),
       publishedBy: p.kind === 'cimd' ? redirectHost(p.ci) : null,
+      // A registered (DCR) name is whatever the assistant chose to call itself.
+      nameVerified: p.kind === 'cimd',
       allowed: await hasCapability(opts.config, opts.db, s.userId, 'mcp'),
     });
   });
@@ -474,7 +495,7 @@ export function registerMcpOAuthRoutes(app: FastifyInstance, opts: WebApiRoutesO
     scoped.post<{ Body: Record<string, unknown> }>('/oauth/token', async (req, reply) => {
       const r = ready(reply);
       if (r === null) return reply;
-      if (!tokenLimit(req.ip))
+      if (!tokenLimit(req))
         return tokenError(reply, 'temporarily_unavailable', 'Too many requests.', 429);
       const b = req.body ?? {};
       const clientId = str(b['client_id']);
@@ -599,10 +620,25 @@ export function registerMcpOAuthRoutes(app: FastifyInstance, opts: WebApiRoutesO
             g.rotatedAt !== null &&
             Date.now() - g.rotatedAt.getTime() < BENIGN_RETRY_MS;
           // A refresh token used after it was replaced means two parties hold
-          // it: end the connection (OAuth 2.1 §4.3.1). A retry within a
-          // minute of the rotation is treated as a network retry instead.
-          if (!benign) await revokeGrant(opts.db, g.id);
-          return tokenError(reply, 'invalid_grant', 'The refresh token was already used.');
+          // it: end the connection (OAuth 2.1 §4.3.1).
+          if (!benign) {
+            await revokeGrant(opts.db, g.id);
+            return tokenError(reply, 'invalid_grant', 'The refresh token was already used.');
+          }
+          // Within a minute of the rotation it is most likely the same client
+          // retrying after losing the response: rotate again so the latest
+          // caller holds the only valid refresh token. If it was a thief, the
+          // other holder's next refresh is a reuse and ends the connection.
+          // The minute counts from the first rotation and is not extended.
+          const retryJti = newJti();
+          if (
+            !(await rotateRefresh(opts.db, g.id, g.refreshJtiHash, sha256(retryJti), presented, {
+              keepRotatedAt: true,
+            }))
+          ) {
+            return tokenError(reply, 'invalid_grant', 'The refresh token was already used.');
+          }
+          return issue(g, retryJti);
         }
         const nextJti = newJti();
         if (!(await rotateRefresh(opts.db, g.id, expected, sha256(nextJti), presented))) {
@@ -622,7 +658,7 @@ export function registerMcpOAuthRoutes(app: FastifyInstance, opts: WebApiRoutesO
     scoped.post<{ Body: Record<string, unknown> }>('/oauth/revoke', async (req, reply) => {
       const r = ready(reply);
       if (r === null) return reply;
-      if (!tokenLimit(req.ip))
+      if (!tokenLimit(req))
         return tokenError(reply, 'temporarily_unavailable', 'Too many requests.', 429);
       const b = req.body ?? {};
       const t =

@@ -264,6 +264,7 @@ export interface OAuthRequestView {
   returnsTo: string;
   localApp: boolean;
   publishedBy: string | null;
+  nameVerified: boolean;
   allowed: boolean;
 }
 

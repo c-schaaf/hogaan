@@ -55,6 +55,7 @@ export async function rotateRefresh(
   expectedHash: string,
   nextHash: string,
   presentedHash: string = expectedHash,
+  opts: { keepRotatedAt?: boolean } = {},
 ): Promise<boolean> {
   const rows = await db
     .update(mcpOAuthGrants)
@@ -64,7 +65,7 @@ export async function rotateRefresh(
       // demo grant rebuilt after a restart), so a quick retry with it is
       // recognised as a retry.
       prevRefreshJtiHash: presentedHash,
-      rotatedAt: new Date(),
+      ...(opts.keepRotatedAt === true ? {} : { rotatedAt: new Date() }),
       lastUsedAt: new Date(),
     })
     .where(

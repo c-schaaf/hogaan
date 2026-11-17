@@ -40,6 +40,7 @@ describe('Connect an assistant (consent screen)', () => {
       returnsTo: 'claude.ai',
       localApp: false,
       publishedBy: null,
+      nameVerified: true,
       allowed: true,
     });
     oauth.consent.mockResolvedValue({
@@ -63,6 +64,7 @@ describe('Connect an assistant (consent screen)', () => {
       returnsTo: 'claude.ai',
       localApp: false,
       publishedBy: null,
+      nameVerified: true,
       allowed: true,
     });
     oauth.consent.mockResolvedValue({
@@ -73,12 +75,26 @@ describe('Connect an assistant (consent screen)', () => {
     await waitFor(() => expect(oauth.consent).toHaveBeenCalledWith('hgr_signed', false));
   });
 
+  it('warns when the assistant named itself (registered, not published)', async () => {
+    oauth.request.mockResolvedValue({
+      clientName: 'Claude',
+      returnsTo: 'evil.example',
+      localApp: false,
+      publishedBy: null,
+      nameVerified: false,
+      allowed: true,
+    });
+    render(<ConnectAssistant onNav={vi.fn()} onDone={vi.fn()} />);
+    expect(await screen.findByText(/cannot confirm this name/)).toBeInTheDocument();
+  });
+
   it('without the plan there is no Allow button', async () => {
     oauth.request.mockResolvedValue({
       clientName: 'Claude',
       returnsTo: 'claude.ai',
       localApp: false,
       publishedBy: null,
+      nameVerified: true,
       allowed: false,
     });
     render(<ConnectAssistant onNav={vi.fn()} onDone={vi.fn()} />);

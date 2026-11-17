@@ -107,6 +107,13 @@ export function ConnectAssistant({
               : ''}
             .
           </p>
+          {!view.nameVerified && (
+            <p className="pr-card-note">
+              Hogaan cannot confirm this name: the assistant chose it itself. Check the address
+              above: <strong>{view.returnsTo}</strong> is where you will be sent. Only allow it if
+              that is the assistant you meant to connect.
+            </p>
+          )}
           {view.localApp && (
             <p className="pr-card-note">
               This assistant runs on a computer, not on a website. Only allow it if you started this

@@ -32,6 +32,8 @@ export class ClientMetadataError extends Error {}
 const MAX_REDIRECT_URIS = 10;
 const MAX_URI_LENGTH = 500;
 const MAX_NAME_LENGTH = 100;
+/** Keeps a registered client_id well inside seal.ts's size limit. */
+export const MAX_CLIENT_ID_LENGTH = 2048;
 
 /** Plain text for display: no control characters, trimmed, capped. */
 export function cleanName(raw: unknown, fallback: string): string {
@@ -153,6 +155,12 @@ export function registerClient(secret: string, body: unknown): RegistrationRespo
   const name = cleanName(b['client_name'], `Assistant at ${redirectHost(redirectUris[0]!)}`);
   const iat = nowSeconds();
   const clientId = seal(secret, 'client', { n: name, r: redirectUris, iat });
+  // It must still fit inside the sign-in request it will travel in.
+  if (clientId.length > MAX_CLIENT_ID_LENGTH) {
+    throw new ClientMetadataError(
+      'Too much registration data: use fewer or shorter redirect_uris.',
+    );
+  }
   return {
     client_id: clientId,
     client_id_issued_at: iat,
@@ -190,6 +198,8 @@ export function isCimdClientId(clientId: string): boolean {
 export type CimdFetcher = (url: URL) => Promise<{ json: unknown; maxAgeSeconds: number | null }>;
 
 const CIMD_TIMEOUT_MS = 5_000;
+const CIMD_MAX_CONCURRENT = 8;
+const FAILURE_CACHE_MS = 60_000;
 const CIMD_MAX_BYTES = 64 * 1024;
 const CACHE_DEFAULT_S = 300;
 const CACHE_MIN_S = 60;
@@ -210,6 +220,9 @@ export function isPublicAddress(address: string): boolean {
   if ((first & 0xffc0) === 0xfe80) return false; // fe80::/10 link local
   if ((first & 0xff00) === 0xff00) return false; // ff00::/8 multicast
   if (a.startsWith('64:ff9b:') || a.startsWith('2001:db8:') || a.startsWith('::')) return false;
+  if ((first & 0xffff) === 0x2002) return false; // 6to4: can embed a private IPv4
+  if (/^2001:0{0,4}:/.test(a)) return false; // Teredo 2001::/32
+  if (/^100:0{0,4}:0{0,4}:0{0,4}:/.test(a) || a.startsWith('100::')) return false; // discard 100::/64
   return true;
 }
 
@@ -287,22 +300,61 @@ const defaultFetcher: CimdFetcher = (url) =>
         });
       },
     );
+    // `timeout` above is per idle socket; this is the total deadline, so a
+    // server that trickles bytes cannot hold the request open.
+    const deadline = setTimeout(
+      () => req.destroy(new ClientMetadataError('client metadata timed out')),
+      CIMD_TIMEOUT_MS,
+    );
+    req.on('close', () => clearTimeout(deadline));
     req.on('timeout', () => req.destroy(new ClientMetadataError('client metadata timed out')));
     req.on('error', reject);
   });
 
 let fetcher: CimdFetcher = defaultFetcher;
 const cache = new Map<string, { info: ClientInfo; until: number }>();
+const failures = new Map<string, number>();
+const inFlight = new Map<string, Promise<ClientInfo>>();
 
 /** Tests only: serve metadata documents without the network. */
 export function setCimdFetcherForTests(f: CimdFetcher | null): void {
   fetcher = f ?? defaultFetcher;
   cache.clear();
+  failures.clear();
+  inFlight.clear();
 }
 
+function remember<V>(map: Map<string, V>, key: string, value: V): void {
+  if (map.size >= CACHE_MAX_ENTRIES) map.delete(map.keys().next().value as string);
+  map.set(key, value);
+}
+
+/**
+ * Cached, de-duplicated and bounded: one fetch per address at a time, at
+ * most CIMD_MAX_CONCURRENT in total, and a failed address is not fetched
+ * again for a minute.
+ */
 async function fetchCimd(clientId: string): Promise<ClientInfo> {
   const hit = cache.get(clientId);
   if (hit !== undefined && hit.until > Date.now()) return hit.info;
+  const failedAt = failures.get(clientId);
+  if (failedAt !== undefined && Date.now() - failedAt < FAILURE_CACHE_MS) {
+    throw new ClientMetadataError('client metadata failed recently');
+  }
+  const running = inFlight.get(clientId);
+  if (running !== undefined) return running;
+  if (inFlight.size >= CIMD_MAX_CONCURRENT) throw new ClientMetadataError('too many lookups');
+  const p = loadCimd(clientId)
+    .catch((err: unknown) => {
+      remember(failures, clientId, Date.now());
+      throw err;
+    })
+    .finally(() => inFlight.delete(clientId));
+  inFlight.set(clientId, p);
+  return p;
+}
+
+async function loadCimd(clientId: string): Promise<ClientInfo> {
   const { json, maxAgeSeconds } = await fetcher(new URL(clientId));
   if (typeof json !== 'object' || json === null || Array.isArray(json)) {
     throw new ClientMetadataError('client metadata must be a JSON object');
@@ -332,10 +384,7 @@ async function fetchCimd(clientId: string): Promise<ClientInfo> {
     kind: 'cimd',
   };
   const ttl = Math.min(CACHE_MAX_S, Math.max(CACHE_MIN_S, maxAgeSeconds ?? CACHE_DEFAULT_S));
-  if (maxAgeSeconds !== 0) {
-    if (cache.size >= CACHE_MAX_ENTRIES) cache.delete(cache.keys().next().value as string);
-    cache.set(clientId, { info, until: Date.now() + ttl * 1000 });
-  }
+  if (maxAgeSeconds !== 0) remember(cache, clientId, { info, until: Date.now() + ttl * 1000 });
   return info;
 }
 

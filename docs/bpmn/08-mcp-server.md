@@ -62,8 +62,14 @@ Connect. Hogaan is both the authorization server and the protected resource.
         │  signature, expiry, audience, then the grant row (revoked → 401 at once)
 
 Refresh: POST /oauth/token grant_type=refresh_token → rotated every time.
-  Reuse of a replaced refresh token → grant revoked (theft), except within
-  60 s of the rotation (a network retry: refused, grant kept).
+  Reuse of a replaced refresh token → grant revoked (theft). Exception: the
+  token replaced most recently, within 60 s of that first rotation, is a
+  client retrying after a lost response → rotated again, latest caller wins
+  (the window is not extended by the retry).
+Limits: authorize 60/min, register 20/min, token+revoke 120/min per caller
+  address (the right-most X-Forwarded-For entry, which the caller cannot set).
+  Client-metadata fetches: one per address at a time, at most 8 at once,
+  5 s total deadline, failures remembered for 60 s.
 Revoke: Profile "Disconnect" (DELETE /api/mcp/connections/:id) or POST /oauth/revoke.
 ```
 

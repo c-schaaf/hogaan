@@ -31,7 +31,9 @@ export const SEAL_PREFIX: Record<SealKind, string> = {
 };
 
 export const MIN_SECRET_LENGTH = 32;
-const MAX_SEALED_LENGTH = 4096;
+// A sign-in request carries a client id (<= 2048), a return address
+// (<= 500) and state (<= 1024), base64-encoded: well under this.
+const MAX_SEALED_LENGTH = 8192;
 
 function keyFor(secret: string, kind: SealKind): Buffer {
   return createHmac('sha256', secret).update(`hogaan-mcp-oauth-v1:${kind}`).digest();

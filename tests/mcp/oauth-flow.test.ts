@@ -246,41 +246,78 @@ describe('P3.1b Sign in with Hogaan', () => {
     expect(r1.status).toBe(200);
     const t1 = (await r1.json()) as OAuthTokens;
     expect(t1.refresh_token).not.toBe(first);
-    // An immediate second use is treated as a network retry: refused, connection kept.
+    // An immediate second use is treated as the client retrying after a lost
+    // response: it gets fresh tokens, and the latest holder wins.
     const retry = await form({
       grant_type: 'refresh_token',
       refresh_token: first,
       client_id: clientId,
     });
-    expect(retry.status).toBe(400);
-    expect(await retry.json()).toMatchObject({ error: 'invalid_grant' });
-    const t1Works = await fetch(`${base}/mcp`, {
+    expect(retry.status).toBe(200);
+    const t2 = (await retry.json()) as OAuthTokens;
+    const t2Works = await fetch(`${base}/mcp`, {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${t1.access_token}`,
+        authorization: `Bearer ${t2.access_token}`,
         'content-type': 'application/json',
         accept: 'application/json, text/event-stream',
       },
       body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
     });
-    expect(t1Works.status).toBe(200);
-    // Later reuse means the token leaked: the whole connection is ended.
+    expect(t2Works.status).toBe(200);
+    // The minute counts from the first rotation and is not extended by the retry.
     await edb.db
       .update(mcpOAuthGrants)
       .set({ rotatedAt: new Date(Date.now() - 5 * 60_000) })
       .where(eq(mcpOAuthGrants.clientName, 'Test Assistant'));
+    // Later reuse means the token leaked: the whole connection is ended.
     const late = await form({
       grant_type: 'refresh_token',
       refresh_token: first,
       client_id: clientId,
     });
     expect(await late.json()).toMatchObject({ error: 'invalid_grant' });
-    const after = await form({
-      grant_type: 'refresh_token',
-      refresh_token: t1.refresh_token!,
-      client_id: clientId,
-    });
-    expect(await after.json()).toMatchObject({ error: 'invalid_grant' });
+    for (const stale of [t1.refresh_token!, t2.refresh_token!]) {
+      const after = await form({
+        grant_type: 'refresh_token',
+        refresh_token: stale,
+        client_id: clientId,
+      });
+      expect(await after.json()).toMatchObject({ error: 'invalid_grant' });
+    }
+  });
+
+  it('a replaced refresh token that is not the latest-but-one ends the connection at once', async () => {
+    const a = new TestAssistant();
+    const client = await connectWithSignIn(a);
+    await client.close();
+    const clientId = String(a.info!.client_id);
+    const r0 = a.tok!.refresh_token!;
+    const t1 = (await (
+      await form({ grant_type: 'refresh_token', refresh_token: r0, client_id: clientId })
+    ).json()) as OAuthTokens;
+    const t2 = (await (
+      await form({
+        grant_type: 'refresh_token',
+        refresh_token: t1.refresh_token!,
+        client_id: clientId,
+      })
+    ).json()) as OAuthTokens;
+    // r0 is two rotations old: never a retry, even inside the minute.
+    expect(
+      await (
+        await form({ grant_type: 'refresh_token', refresh_token: r0, client_id: clientId })
+      ).json(),
+    ).toMatchObject({ error: 'invalid_grant' });
+    expect(
+      await (
+        await form({
+          grant_type: 'refresh_token',
+          refresh_token: t2.refresh_token!,
+          client_id: clientId,
+        })
+      ).json(),
+    ).toMatchObject({ error: 'invalid_grant' });
   });
 
   it('Disconnect on Profile ends the connection at once (access and refresh)', async () => {

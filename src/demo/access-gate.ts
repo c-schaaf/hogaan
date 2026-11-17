@@ -58,6 +58,17 @@ function readCookie(header: string | undefined, name: string): string | undefine
   return undefined;
 }
 
+/**
+ * A path that can only mean "this site": one leading slash, then plain
+ * characters. Anything else (a protocol-relative "//other.site", odd
+ * characters) becomes "/". Used for the form's action and the redirect after
+ * a correct code, so neither can send the code or the visitor elsewhere.
+ */
+const SAFE_PATH = /^\/(?!\/)[A-Za-z0-9/_.-]*$/;
+export function safeSamePath(path: string): string {
+  return SAFE_PATH.test(path) ? path : '/';
+}
+
 /** Hidden inputs that carry the current query string through the form. */
 function carry(query: URLSearchParams): string {
   const esc = (v: string) => v.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -83,7 +94,7 @@ h1{font-size:20px;margin:0 0 8px}p{margin:0 0 16px;color:#4a4a68;font-size:14px}
 input{width:100%;box-sizing:border-box;padding:10px 12px;border-radius:10px;border:1px solid #c2dcf5;font:inherit;margin-bottom:12px}
 button{width:100%;padding:10px;border-radius:999px;border:0;background:#0068cc;color:#fff;font:inherit;font-weight:600;cursor:pointer}</style>
 </head><body><main><h1>Hogaan demo</h1><p>${message}</p>
-<form method="get" action="${action.replace(/[^A-Za-z0-9/_.-]/g, '')}">${carry(query)}<input name="access" type="password" autocomplete="off" aria-label="Access code" placeholder="Access code" required>
+<form method="get" action="${safeSamePath(action)}">${carry(query)}<input name="access" type="password" autocomplete="off" aria-label="Access code" placeholder="Access code" required>
 <button type="submit">Open the demo</button></form></main></body></html>`;
 }
 
@@ -95,7 +106,10 @@ export function installAccessGate(app: FastifyInstance, code: string): void {
   app.addHook('onRequest', async (req, reply) => {
     const url = new URL(req.url, 'http://demo.local');
     const path = url.pathname;
-    if (OPEN_PATHS.has(path) || path === '/mcp' || path.startsWith('/mcp/')) return;
+    // Open paths are matched only on a plain request path: "//x/mcp/" would
+    // otherwise parse to "/mcp/" and slip past the gate.
+    const plain = req.url.startsWith('/') && !req.url.startsWith('//');
+    if (plain && (OPEN_PATHS.has(path) || path === '/mcp' || path.startsWith('/mcp/'))) return;
 
     const deny = (status: number, message: string) =>
       reply
@@ -127,7 +141,7 @@ export function installAccessGate(app: FastifyInstance, code: string): void {
           `${COOKIE}=${expected}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${MAX_AGE_SECONDS}${secure ? '; Secure' : ''}`,
         )
         .header('Cache-Control', 'no-store')
-        .header('Location', url.pathname + url.search)
+        .header('Location', safeSamePath(url.pathname) + url.search)
         .send();
     }
 

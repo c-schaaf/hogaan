@@ -66,7 +66,9 @@ describe('hosted demo: Sign in with Hogaan', () => {
     ).toBe(401);
     expect((await fetch(`${BASE}/api/oauth/request?req=x`)).status).toBe(401);
     expect((await fetch(`${BASE}/connect-assistant`)).status).toBe(401);
-    // Near-miss paths stay closed.
+    // Near-miss paths stay closed, including a doubled slash that would
+    // otherwise parse to an open path.
+    expect((await fetch(`${BASE}//x/mcp/`)).status).toBe(401);
     expect((await fetch(`${BASE}/oauth/tokenx`, { method: 'POST' })).status).toBe(401);
     expect(
       (await fetch(`${BASE}/.well-known/oauth-protected-resource/../../api/profile`)).status,
@@ -166,7 +168,7 @@ describe('hosted demo: Sign in with Hogaan', () => {
     });
     expect(refresh.status).toBe(200);
     const next = (await refresh.json()) as typeof tokens;
-    // The rotated token is now the only valid one.
+    // A second use within a minute is treated as a retry and rotates again.
     const reuse = await fetch(`${BASE}/oauth/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
@@ -176,7 +178,7 @@ describe('hosted demo: Sign in with Hogaan', () => {
         client_id: clientId,
       }).toString(),
     });
-    expect(reuse.status).toBe(400);
+    expect(reuse.status).toBe(200);
     const use2 = await fetch(`${BASE}/mcp`, {
       method: 'POST',
       headers: { ...MCP_HEADERS, authorization: `Bearer ${next.access_token}` },

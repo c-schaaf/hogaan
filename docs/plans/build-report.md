@@ -328,7 +328,7 @@ exits without real Supabase/Redis/database settings.
 | P0.4 baseline score for the current model; founder sample review | Needs a model key. The harness runs; `pnpm eval:coaching` produces the score in a few minutes. |
 | P1.4 knowledge digest content | Hamse-owned (Hard Rule 2). Needs: a curated digest of *The Transformational Leader* and the twelve practices (prose for the prompt, plus short per-practice excerpts for the assistant tool), published as an `approved` `knowledge_digest` library version naming the approver. |
 | P1.5 the actual switch to Haiku 5.5 | Blocked on the eval score and latency check above. The switch is one setting (`LLM_CHAT_MODEL`). |
-| P3.1 OAuth sign-in for assistants | The MCP standard recommends OAuth for remote servers. Built personal keys instead (simpler, works with assistants that accept a key header). OAuth is the next step before a wide launch. |
+| P3.1 OAuth sign-in for assistants | The MCP standard recommends OAuth for remote servers. Built personal keys instead (simpler, works with assistants that accept a key header). **Now built: see section 9 (2026-11-17).** |
 | Server-generated PDF of the sponsor report | Used the browser's print-to-PDF; adding a PDF library felt unjustified. |
 | P6.1 calendar connection, P6.3 inbox access | The plan builds these "only if Phases 2–3 show demand"; there is no usage data yet. Both also need Google's app verification. Google's current rules: apps using "restricted" scopes need extra review, a yearly security assessment by an approved assessor when the data is stored on servers, and "several weeks". Gmail reading is one of these per Google's scope list (Google's page I read did not list scopes; check the OAuth FAQ before scoping). |
 | Anthropic `fallbacks` option (automatic retry on a different model when the model declines) for Opus 5.5 | The installed Anthropic SDK (0.92) doesn't support that option; upgrading the SDK across a major version was out of scope. Declines are handled instead (chat: safe message; background: retried, then failed safely). |
@@ -596,3 +596,243 @@ problems, and fixed them:
 
 After these changes: typecheck and web typecheck pass, lint passes, backend 484
 passed, web 130 passed, and the demo was clicked through again with no errors.
+
+---
+
+## 9. "Sign in with Hogaan" for AI assistants (P3.1b, OAuth)
+
+Asked for by the owner ("build the login screen method for the MCP") on
+2026-11-17, relayed by the reviewing session and confirmed by the owner in
+this session. This was item P3.1 "OAuth" under section 4.
+
+### What it does, in plain words
+
+Before: to connect an AI assistant, a leader created a key on Profile and
+pasted an address and a key into the assistant. Claude's custom connectors
+cannot send a pasted key, so this did not work with Claude.
+
+Now: the leader pastes only the address (`https://<host>/mcp`) into the
+assistant and clicks Connect. A Hogaan page opens, names the assistant and
+where it will send them back to, lists what it will and will not be able to
+do, and asks "Allow". After Allow, the leader is back in the assistant,
+connected. The connection appears on Profile with a Disconnect button.
+Personal keys still work, unchanged.
+
+### Which standard pieces it implements
+
+The MCP authorization specification (2026-07-28 revision) and Anthropic's
+connector authentication docs, both read on 2026-11-17:
+
+- The 401 from `/mcp` names where to start (`WWW-Authenticate` with
+  `resource_metadata`), and the two "where is the sign-in" documents exist:
+  protected-resource metadata (RFC 9728) and authorization-server metadata
+  (RFC 8414).
+- Both ways Claude identifies itself: a **Client ID Metadata Document**
+  (Claude's default: Hogaan fetches Claude's published description) and
+  **Dynamic Client Registration** (RFC 7591, Claude's fallback).
+- **PKCE S256** required on every sign-in; the token is bound to Hogaan's
+  `/mcp` address (RFC 8707) and refused anywhere else; the sign-in response
+  names its issuer (RFC 9207, protects against mix-ups).
+- Refresh tokens are replaced on every use, and an old one used again ends
+  the connection (OAuth 2.1). Revocation endpoint (RFC 7009).
+- Not built: pre-registered clients with a secret ("Use your own OAuth
+  client" in Claude) and per-tool permissions (one permission covers all six
+  tools). Neither is needed for Claude's automatic setup.
+
+### How a connection survives the hosted demo restarting
+
+The hosted demo keeps its database in memory and wipes it whenever Railway
+puts it to sleep. So every value an assistant holds carries its own proof,
+signed with `MCP_OAUTH_SECRET`:
+
+- A registered assistant's id **is** its registration (name and return
+  addresses), signed. Nothing to store.
+- Access and refresh tokens are signed and name their connection.
+
+In the real app every connection is **also** a database row, and every use
+checks it: that is what makes Disconnect work at once rather than when a
+token expires, and a token whose row is gone is refused. In demo mode only,
+a valid token whose row was wiped recreates the row for the sample leader
+(the only person a demo token can name). Consequence, demo only: Disconnect
+in a hosted demo lasts until the next restart. To cut every assistant off a
+hosted demo, change `MCP_OAUTH_SECRET`.
+
+### Ran it and saw it pass
+
+Run by me on the final code (after the security-review fixes below):
+
+| Check | Result |
+|---|---|
+| Typecheck (server) | pass |
+| Typecheck (browser code) | pass |
+| Lint + formatting | pass (one old warning in `src/demo/main.ts`, unchanged) |
+| Backend tests | 533 passed, 4 to-do, 0 failed (was 500 at the start of this task) |
+| Route tests | 89 passed |
+| Web tests | 134 passed (was 130) |
+| Production build | pass |
+
+New tests:
+
+- `tests/mcp/oauth-flow.test.ts` — the "assistant" is the official MCP
+  TypeScript client using its own OAuth support. It finds the sign-in from
+  the 401, registers (once by Dynamic Client Registration, once by a Client
+  ID Metadata Document), sends the leader to sign in, the test plays the
+  leader's browser and presses Allow, and the client then lists and calls a
+  Hogaan tool. Also: the consent is audited; refresh rotation; reusing an old
+  refresh token ends the connection; Disconnect ends it at once; Cancel
+  creates nothing; no redirect to unregistered addresses; PKCE and resource
+  enforced; a code works once (and reuse ends the connection); forged,
+  tampered, wrong-audience and wrong-kind tokens refused; unsafe
+  registrations refused; in the real app a token with no connection row is
+  refused; a leader without the plan gets no code; everything 404s with the
+  flag off.
+- `tests/demo/demo-oauth.test.ts` — the real hosted-demo server with the
+  access code on: the endpoints the assistant's servers call are reachable
+  without the code, the sign-in page and every `/api` route are not, and
+  near-miss addresses stay closed; the leader enters the code once and lands
+  back on the sign-in request; **the demo is restarted (database wiped) and
+  the same tokens still work, refresh still works**; a demo with a different
+  secret refuses old tokens.
+- `tests/mcp/oauth-clients.test.ts` — return-address rules, the private-
+  address guard for fetching client descriptions, metadata-document checks,
+  and that signed values of one kind are never accepted as another.
+- `web/src/__tests__/connect/connect-assistant.test.tsx` — the consent
+  screen names the assistant and the return address, does nothing until a
+  choice, sends the leader back on Allow, Cancel says no, no Allow without
+  the plan.
+- `tests/demo/access-gate-paths.test.ts` — the access gate's form and
+  redirect can only point at this site (review fix 1).
+- Checked by breaking it on purpose: with the PKCE check disabled, the code
+  test fails.
+- Found by these tests while building, and fixed: after a demo restart, a
+  quick retry with the previous refresh token ended the connection. And an
+  older test (`tests/moments/close-the-loop.test.ts`, Phase 2) had started
+  failing on the untouched branch because the real date passed the date the
+  test pins; job scheduling now uses the app's adjustable clock, as the rest
+  of that code already did (no change in the real app).
+
+In a real browser (headless Chromium, local `pnpm demo`): registered an
+assistant, opened the sign-in link, the consent screen rendered (screenshot
+checked at phone width), pressed Allow, landed on
+`https://claude.ai/api/mcp/auth_callback` with a code, state and issuer,
+exchanged the code, called `get_leader_context` over `/mcp` and got the
+sample leader's context, then saw the connection on Profile.
+
+### Wrote it, not verified
+
+- **Against real Claude.** Not possible from here: Claude's servers must
+  reach a public https address, and I may not deploy. Every step Claude
+  performs is the same step the official MCP client performed in the test,
+  and the URLs and fields follow Claude's published docs, but the first real
+  connection is the owner's (section "Exact steps" below).
+- **The real fetch of Claude's published client description** (the network
+  code with the private-address guard). Tests use a stand-in fetcher; the
+  guard's address checks are unit-tested, the live fetch is not.
+- **The real app's sign-in detour**: a leader who is signed out when the
+  consent page opens is sent to log in, then back. The routing was written
+  for this and the web tests pass, but Supabase sign-in cannot run here.
+- **Two server instances**: the one-time use of a code is enforced by a
+  unique database index, so it holds across instances; not run with two.
+
+### New environment variables
+
+| Name | What it is for | Where |
+|---|---|---|
+| `MCP_OAUTH_SECRET` | 32 or more random characters. Signs everything the sign-in hands out. **Set it on the hosted demo**, or assistants must reconnect after every sleep. Changing it disconnects every assistant. | Hosted demo; real app when the flag is on |
+| `FEATURE_MCP_OAUTH` | Turns sign-in on (needs `FEATURE_MCP`). Default off; on automatically in demo mode. | Real app |
+
+`PUBLIC_BASE_URL` (already set on Railway from its domain) is used as the
+sign-in's identity, so it must be the https address people use.
+
+### Exact steps to add it to Claude (after the hosted demo is redeployed)
+
+1. In Railway, add `MCP_OAUTH_SECRET` (32+ random characters) and redeploy.
+2. In Claude: Customize > Connectors (claude.ai/customize/connectors) > +
+   Add > Add custom connector.
+3. Name "Hogaan demo", address `https://hogaan-demo.up.railway.app/mcp`.
+   Leave the advanced settings alone. Add.
+4. Connect. A Hogaan page opens; enter the access code if asked (once per
+   browser); read it; Allow. You are back in Claude, connected.
+5. Try: "Use Hogaan to help me prepare for my 1:1 with my director."
+
+Free Claude accounts can add one custom connector.
+
+### Needs your eyes
+
+1. **Consent-screen wording speaks in Hogaan's name** (Hard Rule 2):
+   `web/src/phases/ConnectAssistant.tsx`, marked for Hamse's review. It
+   promises what an assistant can and cannot do; those promises are true of
+   the code today and must stay true.
+2. **One permission covers all six tools.** An assistant that is allowed in
+   can read the brief and write moments and notes. Finer choices ("read
+   only") would be a follow-up.
+3. **Demo Disconnect lasts until restart** (above). Fine for a sample leader;
+   the real app does not have this.
+4. **Who can register.** Anyone can register an assistant (that is how the
+   standard works); registration grants nothing without a leader's Allow.
+   The consent screen always shows the real return address, so a look-alike
+   name ("Claude") cannot hide where the leader is being sent.
+5. **Keep `PUBLIC_BASE_URL` exactly the address people paste** (same
+   scheme and host, no `www` difference), or Claude's sign-in is refused.
+
+### Independent security review, and what I did
+
+A separate reviewer (another AI agent given only the code and a list of
+things to attack, not my conclusions) read all of it and tried attacks with
+throwaway tests. It found **no way to get a token without the leader
+pressing Allow, and no way to keep using a connection after Disconnect in
+the real app.** It found eight smaller issues:
+
+1. **Medium, hosted demo only: a crafted link could make the access-code
+   form send the code to another website.** Fixed: the form and the redirect
+   after a correct code can only point at this site. Test added.
+2. **Medium/low: the sign-in start page could be used to make Hogaan's
+   server fetch any https address, without limits, and a slow server could
+   hold connections open.** Fixed: 60 per minute per caller, one fetch per
+   address at a time, at most 8 at once, a 5-second total deadline, and
+   failures remembered for a minute. Test added for sharing and remembering.
+3. **Low: three IPv6 address ranges that can hide a private address were not
+   blocked.** Fixed, test added.
+4. **Low: an assistant registering itself can call itself "Claude".**
+   Fixed: the consent screen now says when Hogaan cannot confirm the name,
+   and points at the return address. (Claude's default method publishes its
+   identity, so a real Claude connection shows no warning.) Test added.
+5. **Low: rate limits used an address the caller can fake, and a flood could
+   reset everyone's counters.** Fixed for the new endpoints: they use the
+   address the host's proxy added, and old entries are dropped one at a
+   time. **Not changed:** the rest of the app uses Fastify's `trustProxy:
+   true`, which trusts the caller's own claim; that predates this work and
+   affects any per-address limit. Set it to the number of proxies in front
+   of the app before relying on per-address limits.
+6. **Low: the one-minute "retry" allowance did not help a real retry, and a
+   thief who used a stolen token first could stay connected.** Fixed: within
+   the minute the retry gets fresh tokens and becomes the only valid holder;
+   if it was a thief, the other holder's next refresh ends the connection.
+   The minute is not extended. Tests updated.
+7. **Low: an assistant could register so many long return addresses that
+   its id became too long to use.** Fixed: such a registration is refused
+   with a clear reason. Test added.
+8. **Info: a doubled slash (`//x/mcp/`) got past the demo access gate to the
+   app's empty page (not its data).** Fixed, test added.
+
+The reviewer also confirmed as sound: the signed values cannot be passed off
+as one another, PKCE and the one-time code, no open redirect, consent cannot
+be forged from another site, every token use checks the connection row, the
+demo-only recovery after restart cannot run outside demo mode, and the plan
+check, rate limit, audit and privacy filter still apply to every `/mcp` call.
+
+
+### G4.5 risk audit — sign-in for assistants (trust boundary, schema, personal data)
+
+| Risks | Implications | Audit objectives | Audit procedures | Audit questions | Audit evidence | Control recommendations |
+|---|---|---|---|---|---|---|
+| Token issued without the leader's consent | An assistant reads and writes a leader's coaching data | Only an Allow by the signed-in leader produces a code | Consent POST requires the app's normal sign-in header (not a cookie, so a cross-site form cannot send it); codes are signed and bound to client, return address and PKCE | Can a third party complete consent for someone else? | `oauth-flow.test.ts` (Cancel creates nothing; code bound to client and verifier); consent API uses `requireSupabaseSession` | Keep consent as an authenticated API call; never accept consent by a GET or by cookie alone |
+| Open redirect / code sent to an attacker | Code theft | Never send anything to an address the client did not register | Return address chosen and matched before any redirect; unknown client or address → error page | Can `redirect_uri` be swapped? | "never redirects to an address the client did not register" test; registration refuses non-https, non-localhost addresses | Exact matching except the port on localhost only (per Claude's docs) |
+| Intercepted code reused | Second party gets tokens | A code works once; PKCE required | Unique `code_jti` index; PKCE S256 check; reuse revokes the connection | Does a second exchange fail, across instances? | "a code needs the right verifier and client, and works only once"; unique index in migration 0023 | Keep the index; do not move code tracking to memory |
+| Stolen refresh token | Long-lived access | Rotate every use; reuse ends the connection | Rotation is a conditional update; reuse outside 60 s revokes | Can two parties keep refreshing? | "refreshes with rotation; reusing an old refresh token ends the connection" | Watch for spurious disconnects from clients that retry slowly |
+| Revoked connection still works | Leader cannot cut an assistant off | Every token use checks the row | Access and refresh both load the grant; revoked → refused | Does Disconnect take effect at once? | "Disconnect on Profile ends the connection at once" | In the real app never trust the signature alone (demo-only rehydrate is gated on `demoMode`) |
+| Token used at another service (confused deputy) | Hogaan tokens replayed elsewhere, or others' tokens here | Audience bound to `<host>/mcp` | `aud` checked on every call; `resource` checked at authorize and token | Is a token for another resource refused? | "refuses forged, tampered, wrong-audience and wrong-kind tokens"; `invalid_target` test | Keep `PUBLIC_BASE_URL` exact |
+| Server-side request forgery via client descriptions | Hogaan's server made to fetch internal addresses | Only public https on 443; no redirects; pinned address; size and time limits | Every resolved address must be public; connection pinned to the checked address | Can a description URL reach cloud metadata or localhost? | `oauth-clients.test.ts` address and URL-shape tests | Live fetch path not exercised in tests (stand-in fetcher); verify once on staging |
+| Access gate opened too wide | Demo usable without the code | Only machine endpoints open | Exact path set; authorize, consent, `/api` stay gated | Do near-miss paths stay closed? | `demo-oauth.test.ts` gate tests | Add any new machine endpoint to the set deliberately |
+| Leak of the signing secret | Anyone can mint tokens for any grant id they know; real app still requires the row | Secret only in the host's settings | Never logged; min 32 chars; demo generates one if missing | What happens if it leaks? | `.env.example`, runbook | Rotate by changing it (disconnects everyone) |
+| Personal data to the assistant | Brief, moments, notes leave Hogaan | Only after Allow; same tools, plan check, rate limit, fail-closed audit and PII filter as keys | `/mcp` path unchanged after token resolution | Do the existing controls still apply? | `mcp-server.test.ts`, `audit-fail-closed.test.ts` unchanged and passing; consent audit row test | Hamse to confirm the consent screen's promises |

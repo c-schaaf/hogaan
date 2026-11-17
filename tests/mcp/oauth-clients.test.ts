@@ -124,6 +124,22 @@ describe('client metadata documents', () => {
   });
 });
 
+describe('fetch limits for client metadata (review fix)', () => {
+  it('shares one fetch between simultaneous requests and remembers failures for a minute', async () => {
+    let calls = 0;
+    setCimdFetcherForTests(async () => {
+      calls += 1;
+      await new Promise((r) => setTimeout(r, 20));
+      throw new Error('down');
+    });
+    const results = await Promise.all([1, 2, 3].map(() => resolveClient(SECRET, DOC_URL)));
+    expect(results).toEqual([null, null, null]);
+    expect(calls).toBe(1);
+    expect(await resolveClient(SECRET, DOC_URL)).toBeNull();
+    expect(calls).toBe(1);
+  });
+});
+
 describe('registration and signed values', () => {
   it('a registered client id carries its own details and cannot be altered', async () => {
     const r = registerClient(SECRET, {
@@ -141,6 +157,12 @@ describe('registration and signed values', () => {
     ).toString('base64url');
     expect(await resolveClient(SECRET, `${prefix}${altered}.${sig}`)).toBeNull();
     expect(body!.length).toBeGreaterThan(0);
+  });
+  it('refuses a registration too large to fit in a sign-in request', () => {
+    const long = (i: number) => `https://claude.ai/${String(i).padStart(450, 'x')}`;
+    expect(() =>
+      registerClient(SECRET, { redirect_uris: Array.from({ length: 10 }, (_, i) => long(i)) }),
+    ).toThrow(/Too much registration data/);
   });
   it('kinds never cross, and expired values are refused', () => {
     const code = seal(SECRET, 'code', { a: 1, exp: Math.floor(Date.now() / 1000) + 60 });
